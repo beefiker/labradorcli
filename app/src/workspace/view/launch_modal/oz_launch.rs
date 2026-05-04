@@ -22,13 +22,13 @@ pub enum OzLaunchSlide {
 
 impl Slide for OzLaunchSlide {
     fn modal_title(&self) -> String {
-        "Introducing Oz".to_string()
+        "Introducing Dwarf".to_string()
     }
 
     fn modal_subtext_paragraphs(&self) -> Vec<FormattedTextLine> {
         vec![FormattedTextLine::Line(vec![
             FormattedTextFragment::plain_text(
-                "Infinitely scalable coding agent — run in local sessions or in the cloud.",
+                "Local coding agent workflows backed by your own authentication.",
             ),
         ])]
     }
@@ -57,7 +57,7 @@ impl Slide for OzLaunchSlide {
 
     fn display_text(&self) -> Option<&'static str> {
         Some(match self {
-            OzLaunchSlide::CloudAgents => "Cloud agents",
+            OzLaunchSlide::CloudAgents => "Local agents",
             OzLaunchSlide::AgentAutomations => "Agent automations",
             OzLaunchSlide::AgentManagement => "Agent management",
             OzLaunchSlide::LaunchCredits => "A little gift",
@@ -66,23 +66,21 @@ impl Slide for OzLaunchSlide {
 
     fn short_label(&self) -> &'static str {
         match self {
-            OzLaunchSlide::CloudAgents => "Cloud agents",
+            OzLaunchSlide::CloudAgents => "Local agents",
             OzLaunchSlide::AgentAutomations => "Agent automations",
             OzLaunchSlide::AgentManagement => "Agent management",
-            OzLaunchSlide::LaunchCredits => "Launch credits",
+            OzLaunchSlide::LaunchCredits => "Local access",
         }
     }
 
     fn title(&self) -> &'static str {
         match self {
-            OzLaunchSlide::CloudAgents => "Break out of your laptop with cloud agents",
+            OzLaunchSlide::CloudAgents => "Work locally with Dwarf agents",
             OzLaunchSlide::AgentAutomations => {
                 "Orchestrate agents, turning Skills into automations"
             }
-            OzLaunchSlide::AgentManagement => "Track local and cloud agents seamlessly",
-            OzLaunchSlide::LaunchCredits => {
-                "1,000 free cloud agent credits when you upgrade to Warp Build"
-            }
+            OzLaunchSlide::AgentManagement => "Track local agents seamlessly",
+            OzLaunchSlide::LaunchCredits => "Free local agent access",
         }
     }
 
@@ -93,16 +91,16 @@ impl Slide for OzLaunchSlide {
     fn content(&self) -> &'static str {
         match self {
             OzLaunchSlide::CloudAgents => {
-                "Use cloud agents to run many agents in parallel, keep agents working when you close your laptop, or start agents programmatically. Plus, you can check on their work through the web."
+                "Use Dwarf agents to run commands, inspect projects, and keep coding tasks inside your local terminal."
             }
             OzLaunchSlide::AgentAutomations => {
-                "Oz agents can be defined using the standard Skills format. You can use the built in scheduler to setup agents to run autonomously at set intervals, or use the Oz SDK or API to programmatically start and manage Oz agents."
+                "Dwarf agents can use the standard Skills format and your local Codex authentication."
             }
             OzLaunchSlide::AgentManagement => {
-                "View all of your agents across local and cloud sessions in the Warp app or at [oz.warp.dev](https://oz.warp.dev). Join live agent sessions, continue tasks locally, and steer agents with one click."
+                "View and continue local agent sessions in the Dwarf app without a Dwarf account."
             }
             OzLaunchSlide::LaunchCredits => {
-                "Upgrade to Build this month and receive 1,000 extra credits to try using Oz. Credits are only eligible for Oz runs in Warp-hosted cloud environments."
+                "Dwarf local agent mode is free to use with your own local Codex credentials."
             }
         }
     }

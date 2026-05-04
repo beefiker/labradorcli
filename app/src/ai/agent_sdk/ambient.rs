@@ -1,4 +1,4 @@
-//! Commands to interact with ambient agents on Warp's platform.
+//! Commands to interact with ambient agents on Dwarf's platform.
 use std::io::Write as _;
 use std::sync::Arc;
 use std::time::Duration;
@@ -505,7 +505,7 @@ impl AmbientAgentRunner {
                                 spawned_task_id = Some(task_id);
                             }
                             AmbientAgentEvent::AtCapacity => {
-                                println!("Concurrent cloud agent limit reached. This agent run will begin when one of your current cloud runs completes.");
+                                println!("Concurrent Dwarf agent limit reached. This agent run will begin when another run completes.");
                                 if let Some(url) = &upgrade_link {
                                     println!("To increase your concurrent agent limit, upgrade your plan: {}", url);
                                 }
@@ -778,7 +778,7 @@ impl AmbientAgentRunner {
             table.add_row(vec![header]);
 
             // Oz webapp link
-            table.add_row(vec![format!("Oz: {oz_root_url}/runs/{}", task.task_id)]);
+            table.add_row(vec![format!("Dwarf: {oz_root_url}/runs/{}", task.task_id)]);
 
             // Title (wrapped, single cell)
             if !task.title.is_empty() {

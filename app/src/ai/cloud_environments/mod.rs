@@ -83,7 +83,7 @@ impl ProvidersConfig {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-/// An AmbientAgentEnvironment represents an environment that we would run a Warp agent in.
+/// An AmbientAgentEnvironment represents an environment that we would run a Dwarf agent in.
 pub struct AmbientAgentEnvironment {
     /// Environment name
     #[serde(default)]

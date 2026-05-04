@@ -2,6 +2,7 @@ pub(crate) mod convert_conversation;
 mod convert_from;
 mod convert_to;
 mod r#impl;
+mod local_codex;
 
 pub use ai::agent::convert::ConvertToAPITypeError;
 use ai::api_keys::ApiKeyManager;
@@ -239,8 +240,9 @@ impl RequestParams {
             user_workspaces.is_byo_api_key_enabled(),
             user_workspaces.is_aws_bedrock_credentials_enabled(app),
         );
-        let allow_use_of_warp_credits_with_byok =
-            *AISettings::as_ref(app).can_use_warp_credits_with_byok;
+        let allow_use_of_warp_credits_with_byok = *AISettings::as_ref(app)
+            .can_use_warp_credits_with_byok
+            && !ai::local_openai_auth::has_access_token();
 
         let app_execution_mode = AppExecutionMode::as_ref(app);
         let autonomy_level = if app_execution_mode.is_autonomous() {

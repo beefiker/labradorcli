@@ -14,6 +14,10 @@ pub async fn generate_multi_agent_output(
     mut params: RequestParams,
     cancellation_rx: futures::channel::oneshot::Receiver<()>,
 ) -> Result<ResponseStream, ConvertToAPITypeError> {
+    if should_use_local_codex_agent() {
+        return super::local_codex::generate_output(params, cancellation_rx).await;
+    }
+
     let supported_tools = params
         .supported_tools_override
         .take()
@@ -148,6 +152,11 @@ pub async fn generate_multi_agent_output(
             Ok(Box::pin(rx))
         }
     }
+}
+
+fn should_use_local_codex_agent() -> bool {
+    ai::local_openai_auth::has_access_token()
+        || std::env::var("DWARF_ALLOW_OZ_AGENT").as_deref() != Ok("1")
 }
 
 fn get_supported_tools(params: &RequestParams) -> Vec<api::ToolType> {

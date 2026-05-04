@@ -950,7 +950,7 @@ impl TeamsPageView {
                 self.show_error("Failed to toggle team discoverability", Some(err), ctx);
             }
             UserWorkspacesEvent::JoinTeamWithTeamDiscoverySuccess => {
-                // Force refresh of Warp Drive objects after joining a team
+                // Force refresh of Dwarf Drive objects after joining a team
                 UpdateManager::handle(ctx).update(ctx, move |update_manager, ctx| {
                     update_manager.refresh_updated_objects(ctx);
                 });
@@ -1701,6 +1701,10 @@ impl SettingsPageMeta for TeamsPageView {
         SettingsSection::Teams
     }
 
+    fn should_render(&self, _ctx: &AppContext) -> bool {
+        false
+    }
+
     fn on_page_selected(&mut self, allow_steal_focus: bool, ctx: &mut ViewContext<Self>) {
         if allow_steal_focus {
             self.focus_on_next_input(ctx);
@@ -1721,10 +1725,6 @@ impl SettingsPageMeta for TeamsPageView {
                     user_workspaces.fetch_discoverable_teams(ctx);
                 });
         }
-    }
-
-    fn should_render(&self, _ctx: &AppContext) -> bool {
-        true
     }
 
     fn on_tab_pressed(&mut self, ctx: &mut ViewContext<Self>) {
@@ -1778,9 +1778,9 @@ impl TeamsWidget {
         has_admin_permissions: bool,
     ) -> Box<dyn Element> {
         let prorated_message = if has_admin_permissions {
-            "You'll be charged for a portion of the team member's usage of Warp."
+            "You'll be charged for a portion of the team member's usage of Dwarf."
         } else {
-            "Your admin will be charged for a portion of the team member's usage of Warp."
+            "Your admin will be charged for a portion of the team member's usage of Dwarf."
         };
 
         let additional_members_cost_money_msg = if let Some((monthly_cost, yearly_cost)) =
@@ -2976,7 +2976,7 @@ impl TeamsWidget {
         // Instruction text for toggle
         let domain = current_user_email.split('@').nth(1).unwrap_or("");
         let team_discoverability_instructions =
-            format!("Allow Warp users with an @{domain} email to find and join the team.");
+            format!("Allow Dwarf users with an @{domain} email to find and join the team.");
         section.add_child(
             Container::new(self.render_sub_text(
                 team_discoverability_instructions,
@@ -3682,9 +3682,9 @@ impl TeamsWidget {
             .with_margin_left(-4.)
             .finish();
             let checkbox_row_text = if let Some(domain) = view.auth_state.user_email_domain() {
-                format!("Allow Warp users with an @{domain} email to find and join the team.")
+                format!("Allow Dwarf users with an @{domain} email to find and join the team.")
             } else {
-                "Allow Warp users with the same email domain as you to find and join the team."
+                "Allow Dwarf users with the same email domain as you to find and join the team."
                     .to_string()
             };
             let checkbox_row = Container::new(

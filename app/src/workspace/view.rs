@@ -50,7 +50,6 @@ use crate::ai::conversation_utils;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel};
 use crate::ai::llms::LLMPreferences;
 use crate::ai::persisted_workspace::PersistedWorkspace;
-use crate::ai::AIRequestUsageModel;
 use crate::ai::{
     agent::{api::ServerConversationToken, conversation::AIConversationId, EntrypointType},
     blocklist::{
@@ -545,7 +544,7 @@ const TAB_BAR_PILL_WIDTH: f32 = 100.;
 const PILL_FONT_SIZE: f32 = 12.;
 // We use the word "Warp" in the Update Ready button to make it obvious that the terminal is Warp.
 // This can lead to free advertising when users screen-share Warp when an update is available.
-const UPDATE_READY_TEXT: &str = "Update Warp";
+const UPDATE_READY_TEXT: &str = "Update Dwarf";
 
 const TAB_BAR_OVERFLOW_MENU_WIDTH: f32 = 300.;
 
@@ -574,7 +573,7 @@ const AI_ASSISTANT_BUTTON_ID: &str = "workspace_view:ai_assistant_button";
 
 const VERSION_DEPRECATION_BANNER_TEXT: &str = "Your app is out of date and some features may not work as expected. Please update immediately.";
 
-const VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT: &str = "Some Warp features may not work as expected without updating immediately, but Warp is unable to perform the update.";
+const VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT: &str = "Some Dwarf features may not work as expected without updating immediately, but Dwarf is unable to perform the update.";
 
 const ASK_AI_ASSISTANT_KEYBINDING_NAME: &str = "workspace:toggle_ai_assistant";
 const TOGGLE_RESOURCE_CENTER_KEYBINDING_NAME: &str = "workspace:toggle_resource_center";
@@ -755,7 +754,7 @@ impl ShowTabBar {
 #[cfg(target_family = "wasm")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SimplifiedWasmTabBarContent {
-    /// Viewing a Warp Drive object (notebook, workflow, env vars, AI facts, MCP servers)
+    /// Viewing a Dwarf Drive object (notebook, workflow, env vars, AI facts, MCP servers)
     WarpDriveObject,
     /// Participating in a shared session (viewer or writer). Contains the optional ambient agent task ID.
     SharedSession { task_id: Option<AmbientAgentTaskId> },
@@ -798,7 +797,7 @@ pub enum BannerSeverity {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum BannerButtonVariant {
     /// No fill, no border, just text (and optional icon). Used for the primary
-    /// action in the Figma design (e.g. "Fix with Oz").
+    /// action in the Figma design (e.g. "Fix with Dwarf").
     Naked,
     /// Border-only, no fill (e.g. "Open file").
     Outlined,
@@ -2833,20 +2832,22 @@ impl Workspace {
             me.handle_window_settings_changed_event(event, ctx);
         });
 
-        // Show the Warp AI warm welcome iff the user hasn't dismissed it nor interacted with Warp AI before.
+        // Show the Dwarf AI warm welcome iff the user hasn't dismissed it nor interacted with Dwarf AI before.
         // Also, avoid showing it in integration tests to prevent interaction with other tests.
-        let mut should_show_ai_assistant_warm_welcome: bool = !FeatureFlag::AgentMode.is_enabled()
-            && AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
-            && !matches!(ChannelState::channel(), Channel::Integration)
-            && ctx
-                .private_user_preferences()
-                .read_value(settings::DISMISSED_AI_ASSISTANT_WELCOME_KEY)
-                .unwrap_or_default()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .map(|dismissed: bool| !dismissed)
-                .unwrap_or(true);
+        let mut should_show_ai_assistant_warm_welcome: bool =
+            !matches!(ChannelState::channel(), Channel::Oss)
+                && !FeatureFlag::AgentMode.is_enabled()
+                && AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
+                && !matches!(ChannelState::channel(), Channel::Integration)
+                && ctx
+                    .private_user_preferences()
+                    .read_value(settings::DISMISSED_AI_ASSISTANT_WELCOME_KEY)
+                    .unwrap_or_default()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .map(|dismissed: bool| !dismissed)
+                    .unwrap_or(true);
 
-        // Don't automatically show the Warp AI welcome during onboarding if the block onboarding flow is being used.
+        // Don't automatically show the Dwarf AI welcome during onboarding if the block onboarding flow is being used.
         // This way, we can delay the reveal until the end of the onboarding flow so as not to overwhelm the user.
         if matches!(
             BlockOnboarding::get_group(ctx),
@@ -3860,23 +3861,23 @@ impl Workspace {
             self.add_tab_from_existing_pane(home_pane, 0, ctx);
 
             // If we can't start a terminal session to run the onboarding flow, show the Warp Home
-            // placeholder along with Warp Drive.
+            // placeholder along with Dwarf Drive.
             true
         };
         let initial_tab = self.active_tab_pane_group().clone();
 
         if open_warp_drive {
-            // We open Warp Drive automatically in two cases:
+            // We open Dwarf Drive automatically in two cases:
             // * The user is new to Warp, and went through the overall onboarding flow
             // * The user is on the web, so we can't open a terminal session.
             let initial_load_complete = UpdateManager::as_ref(ctx).initial_load_complete();
             ctx.spawn(initial_load_complete, move |me, _, ctx| {
-                // New Warp users can have non-welcome objects if they were directly invited OR if
+                // New Dwarf users can have non-welcome objects if they were directly invited OR if
                 // linked objects were copied over from an anonymous user.
                 if CloudModel::as_ref(ctx).has_non_welcome_objects() {
                     me.open_or_toggle_warp_drive(false, false, ctx);
 
-                    // After opening Warp Drive, if we rendered the Warp Home placeholder panel, replace it with one of
+                    // After opening Dwarf Drive, if we rendered the Warp Home placeholder panel, replace it with one of
                     // the user's own objects.
                     if show_warp_home {
                         let cloud_model = CloudModel::as_ref(ctx);
@@ -4094,6 +4095,11 @@ impl Workspace {
     }
 
     fn open_share_session_modal(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
+        if !FeatureFlag::CreatingSharedSessions.is_enabled() {
+            let _ = (index, ctx);
+            return;
+        }
+
         // Focus on the clicked tab
         if index >= self.tab_count() {
             return;
@@ -4271,7 +4277,7 @@ impl Workspace {
             }
         }
 
-        // Check if focused pane is a Warp Drive object
+        // Check if focused pane is a Dwarf Drive object
         let focused_pane_id = pane_group.focused_pane_id(ctx);
         if focused_pane_id.is_warp_drive_object_pane() {
             return Some(SimplifiedWasmTabBarContent::WarpDriveObject);
@@ -4381,9 +4387,9 @@ impl Workspace {
         });
 
         // The panel is already open and no models are open, so just refocus the panel.
-        // If there is a modal open, it would sit above the Warp AI panel and we would end up
-        // focusing the Warp AI panel _behind_ the floating modal. Instead, we opt for the normal
-        // toggle behavior which will close the current modal view and then toggle Warp AI.
+        // If there is a modal open, it would sit above the Dwarf AI panel and we would end up
+        // focusing the Dwarf AI panel _behind_ the floating modal. Instead, we opt for the normal
+        // toggle behavior which will close the current modal view and then toggle Dwarf AI.
         if self.current_workspace_state.is_ai_assistant_panel_open
             && !self.ai_assistant_panel.is_self_or_child_focused(ctx)
             && !self.current_workspace_state.is_any_modal_open(ctx)
@@ -4396,7 +4402,7 @@ impl Workspace {
         self.current_workspace_state.is_ai_assistant_panel_open =
             !self.current_workspace_state.is_ai_assistant_panel_open;
 
-        // Close any other modals that could be floating on top of the Warp AI panel.
+        // Close any other modals that could be floating on top of the Dwarf AI panel.
         self.current_workspace_state.close_all_modals();
 
         if self.current_workspace_state.is_ai_assistant_panel_open {
@@ -4433,8 +4439,8 @@ impl Workspace {
             .has_warp_drive_initialized_sections(app)
     }
 
-    /// Check if Warp Drive view is focused within.
-    /// Routes to the appropriate Warp Drive panel.
+    /// Check if Dwarf Drive view is focused within.
+    /// Routes to the appropriate Dwarf Drive panel.
     fn is_warp_drive_view_focused(&self, ctx: &mut ViewContext<Self>) -> bool {
         let app = ctx;
         self.left_panel_view.is_self_or_child_focused(app)
@@ -4636,7 +4642,7 @@ impl Workspace {
     }
 
     /// This function shifts focus to the panel on the left.
-    /// The current focusable panels are: Warp Drive, theme chooser, AI, and resource center (keyboard shortcuts page only)
+    /// The current focusable panels are: Dwarf Drive, theme chooser, AI, and resource center (keyboard shortcuts page only)
     fn focus_left_panel(&mut self, ctx: &mut ViewContext<Self>) {
         // Starts from terminal
         if self.active_tab_pane_group().is_self_or_child_focused(ctx) {
@@ -4656,7 +4662,7 @@ impl Workspace {
         {
             self.focus_active_tab(ctx);
         }
-        // Starts from a left panel: Warp Drive
+        // Starts from a left panel: Dwarf Drive
         else if self.is_warp_drive_view_focused(ctx) {
             if self.current_workspace_state.is_right_panel_open() {
                 self.set_selected_object(None, ctx);
@@ -4701,7 +4707,7 @@ impl Workspace {
                 ctx.focus(&self.theme_chooser_view);
             }
         }
-        // Starts from a left panel: Warp Drive, theme chooser
+        // Starts from a left panel: Dwarf Drive, theme chooser
         else if self.is_warp_drive_view_focused(ctx)
             || self.theme_chooser_view.is_self_or_child_focused(ctx)
         {
@@ -6114,12 +6120,12 @@ impl Workspace {
             }
         }
 
-        // 3. Cloud Oz (if flags enabled)
+        // 3. Dwarf agent (if flags enabled)
         if is_any_ai_enabled
             && FeatureFlag::AgentView.is_enabled()
             && FeatureFlag::CloudMode.is_enabled()
         {
-            let mut cloud_item = MenuItemFields::new("Cloud Oz")
+            let mut cloud_item = MenuItemFields::new("Dwarf Agent")
                 .with_on_select_action(WorkspaceAction::AddAmbientAgentTab)
                 .with_icon(icons::Icon::LayoutAlt01);
             if effective_default == DefaultSessionMode::CloudAgent {
@@ -6557,7 +6563,7 @@ impl Workspace {
     }
 
     /// The tab bar overflow menu is the context menu that appears when
-    /// a user clicks "Update Warp" in the top right of the tab bar.
+    /// a user clicks "Update Dwarf" in the top right of the tab bar.
     pub fn toggle_tab_bar_overflow_menu(&mut self, ctx: &mut ViewContext<Self>) {
         if self.show_tab_bar_overflow_menu {
             self.close_tab_bar_overflow_menu(ctx);
@@ -6585,7 +6591,7 @@ impl Workspace {
                             .into_item(),
                     ),
                     AutoupdateStage::UnableToUpdateToNewVersion { .. } => menu_items.push(
-                        MenuItemFields::new("Update Warp manually")
+                        MenuItemFields::new("Update Dwarf manually")
                             .with_on_select_action(WorkspaceAction::DownloadNewVersion)
                             .into_item(),
                     ),
@@ -6700,6 +6706,10 @@ impl Workspace {
     }
 
     fn should_trigger_get_started_onboarding(&self, ctx: &mut ViewContext<Self>) -> bool {
+        if matches!(ChannelState::channel(), Channel::Oss) {
+            return false;
+        }
+
         if !FeatureFlag::GetStartedTab.is_enabled() {
             return false;
         }
@@ -6732,6 +6742,10 @@ impl Workspace {
     /// If the user is new and therefore has not seen the in app onboarding,
     /// triggers the welcome block to be shown after bootstrapping is completed.
     fn check_and_trigger_onboarding(&mut self, ctx: &mut ViewContext<Self>) -> bool {
+        if matches!(ChannelState::channel(), Channel::Oss) {
+            return false;
+        }
+
         if !self.auth_state.is_onboarded().unwrap_or_default() {
             if self.should_show_agent_onboarding(ctx) {
                 // If the user is anonymous, we shouldn't trigger agent onboarding.
@@ -6832,7 +6846,7 @@ impl Workspace {
         ctx.notify();
     }
 
-    /// Opens the Warp Drive object identified by `uid` in a new pane
+    /// Opens the Dwarf Drive object identified by `uid` in a new pane
     /// if it has a pane representation.
     fn open_warp_drive_object_in_new_pane(&mut self, uid: &ObjectUid, ctx: &mut ViewContext<Self>) {
         let Some(object) = CloudModel::as_ref(ctx).get_by_uid(uid) else {
@@ -6960,7 +6974,7 @@ impl Workspace {
         }
     }
 
-    /// Open a Warp Drive workflow in response to an intent URL.
+    /// Open a Dwarf Drive workflow in response to an intent URL.
     pub fn open_workflow_from_intent(
         &mut self,
         workflow_id: SyncId,
@@ -7611,7 +7625,7 @@ impl Workspace {
             match result {
                 Ok(_) => {
                     let command_name = ChannelState::channel().cli_command_name();
-                    let message = format!("Successfully installed the Oz CLI! You can now run '{command_name}' from the command line.");
+                    let message = format!("Successfully installed the Dwarf CLI! You can now run '{command_name}' from the command line.");
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::success(message.to_string())
                             .with_link(
@@ -7623,7 +7637,7 @@ impl Workspace {
                     });
                 }
                 Err(error) => {
-                    let error_message = format!("Failed to install Oz command: {error}");
+                    let error_message = format!("Failed to install Dwarf command: {error}");
                     log::error!("{error_message}");
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::error(error_message);
@@ -7641,14 +7655,14 @@ impl Workspace {
             async { cli_install::uninstall_cli() },
             |view, result, ctx| match result {
                 Ok(_) => {
-                    let message = "Successfully uninstalled the Oz command.";
+                    let message = "Successfully uninstalled the Dwarf command.";
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::success(message.to_string());
                         toast_stack.add_ephemeral_toast(toast, ctx);
                     });
                 }
                 Err(error) => {
-                    let error_message = format!("Failed to uninstall Oz command: {error}");
+                    let error_message = format!("Failed to uninstall Dwarf command: {error}");
                     log::error!("{error_message}");
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::error(error_message);
@@ -7732,21 +7746,21 @@ impl Workspace {
         self.current_workspace_state.is_warp_drive_open =
             if toggle { !was_warp_drive_open } else { true };
 
-        // Set selected object to None upon toggle close of Warp Drive
+        // Set selected object to None upon toggle close of Dwarf Drive
         if !self.current_workspace_state.is_warp_drive_open {
             self.set_selected_object(None, ctx);
             self.focus_active_tab(ctx);
         }
 
-        // Reset focused index when opening/toggling Warp Drive open
+        // Reset focused index when opening/toggling Dwarf Drive open
         if self.current_workspace_state.is_warp_drive_open {
             self.reset_focused_index_in_warp_drive(true, ctx);
         }
 
         ctx.notify();
 
-        // Telemetry and welcome tip logic is only for when the user explicitly opens Warp Drive
-        // AND warp drive wasn't open before. There are other scenarios where we open Warp Drive like:
+        // Telemetry and welcome tip logic is only for when the user explicitly opens Dwarf Drive
+        // AND warp drive wasn't open before. There are other scenarios where we open Dwarf Drive like:
         // new user onboarding, user joins a team, etc so we want to avoid counting those.
         if explicit_user_action
             && !was_warp_drive_open
@@ -8288,7 +8302,7 @@ impl Workspace {
                     ) =>
                 {
                     items.push(
-                        MenuItemFields::new("Update and relaunch Warp")
+                        MenuItemFields::new("Update and relaunch Dwarf")
                             .with_on_select_action(WorkspaceAction::ApplyUpdate)
                             .with_override_text_color(appearance.theme().ansi_fg_red())
                             .into_item(),
@@ -8311,7 +8325,7 @@ impl Workspace {
                     ) =>
                 {
                     items.push(
-                        MenuItemFields::new("Update Warp manually")
+                        MenuItemFields::new("Update Dwarf manually")
                             .with_on_select_action(WorkspaceAction::DownloadNewVersion)
                             .with_override_text_color(appearance.theme().ansi_fg_red())
                             .into_item(),
@@ -8342,7 +8356,7 @@ impl Workspace {
 
         #[cfg(not(target_family = "wasm"))]
         items.push(
-            MenuItemFields::new("View Warp logs")
+            MenuItemFields::new("View Dwarf logs")
                 .with_on_select_action(WorkspaceAction::ViewLogs)
                 .into_item(),
         );
@@ -8354,49 +8368,6 @@ impl Workspace {
             MenuItem::Separator,
         ]);
 
-        if self.auth_state.is_anonymous_or_logged_out() {
-            items.push(
-                MenuItemFields::new("Sign up")
-                    .with_on_select_action(WorkspaceAction::SignupAnonymousUser)
-                    .into_item(),
-            );
-        }
-
-        // Check if the user is on any paid plan to determine whether to show "Billing and Usage" or "Upgrade"
-        let is_on_paid_plan = UserWorkspaces::as_ref(app)
-            .current_workspace()
-            .map(|workspace| workspace.billing_metadata.is_user_on_paid_plan())
-            .unwrap_or(false);
-
-        if is_on_paid_plan {
-            items.push(
-                MenuItemFields::new("Billing and usage")
-                    .with_on_select_action(WorkspaceAction::ShowSettingsPage(
-                        SettingsSection::BillingAndUsage,
-                    ))
-                    .into_item(),
-            );
-        } else {
-            items.push(
-                MenuItemFields::new("Upgrade")
-                    .with_on_select_action(WorkspaceAction::ShowUpgrade)
-                    .into_item(),
-            );
-        }
-
-        items.push(
-            MenuItemFields::new("Invite a friend")
-                .with_on_select_action(WorkspaceAction::ShowReferralSettingsPage)
-                .into_item(),
-        );
-
-        if !self.auth_state.is_anonymous_or_logged_out() {
-            items.push(
-                MenuItemFields::new("Log out")
-                    .with_on_select_action(WorkspaceAction::LogOut)
-                    .into_item(),
-            );
-        }
         items
     }
 
@@ -9450,18 +9421,10 @@ impl Workspace {
             WorkflowModalEvent::ViewInWarpDrive(id) => {
                 self.view_in_and_focus_warp_drive(*id, ctx);
             }
-            WorkflowModalEvent::AiAssistUpgradeError(team_uid, user_id) => {
-                let upgrade_link = team_uid
-                    .map(UserWorkspaces::upgrade_link_for_team)
-                    .unwrap_or_else(|| UserWorkspaces::upgrade_link(*user_id));
-
+            WorkflowModalEvent::AiAssistUpgradeError => {
                 self.toast_stack.update(ctx, |view, ctx| {
                     let new_toast =
-                        DismissibleToast::error("Looks like you're out of AI credits.".into())
-                            .with_link(
-                                ToastLink::new("Upgrade for more credits.".into())
-                                    .with_href(upgrade_link),
-                            );
+                        DismissibleToast::error("Local agent request could not be started.".into());
                     view.add_ephemeral_toast(new_toast, ctx);
                 });
             }
@@ -11560,7 +11523,7 @@ impl Workspace {
 
         ctx.spawn(future, move |workspace, source_conversation, ctx| {
             let Some(CloudConversationData::Oz(source_conversation)) = source_conversation else {
-                log::error!("Failed to load Oz conversation {conversation_id} for forking.");
+                log::error!("Failed to load Dwarf conversation {conversation_id} for forking.");
                 WorkspaceToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     let toast = DismissibleToast::error(
                         "Failed to load conversation for forking.".to_owned(),
@@ -12112,7 +12075,7 @@ impl Workspace {
                         let url = NOTIFICATIONS_TROUBLESHOOT_URL.to_string();
                         view.toast_stack.update(ctx, |toast_stack, ctx| {
                             let toast = DismissibleToast::error(
-                                "Warp doesn't have permission to send desktop notifications.".to_string(),
+                                "Dwarf doesn't have permission to send desktop notifications.".to_string(),
                             )
                             .with_link(ToastLink::new("Troubleshoot notifications".to_string()).with_href(url));
                             toast_stack.add_persistent_toast(toast, ctx);
@@ -12369,14 +12332,7 @@ impl Workspace {
     }
 
     fn open_require_login_modal(&mut self, variant: AuthViewVariant, ctx: &mut ViewContext<Self>) {
-        self.require_login_modal.update(ctx, |modal, ctx| {
-            modal.set_variant(ctx, variant);
-        });
-
-        self.close_all_overlays(ctx);
-        self.current_workspace_state.is_require_login_modal_open = true;
-        ctx.focus(&self.require_login_modal);
-        ctx.notify();
+        let _ = (variant, ctx);
     }
 
     fn open_auth_override_warning_modal(
@@ -12565,7 +12521,7 @@ impl Workspace {
     }
 
     /// This function is used when we set a selected object, which is an object open in an active pane.
-    /// We do not want to focus Warp Drive, instead we want to focus the editor of the open object.
+    /// We do not want to focus Dwarf Drive, instead we want to focus the editor of the open object.
     fn view_in_warp_drive(&mut self, item_id: WarpDriveItemId, ctx: &mut ViewContext<Self>) {
         self.open_left_panel(ctx);
         self.left_panel_view.update(ctx, |left_panel, ctx| {
@@ -12584,7 +12540,7 @@ impl Workspace {
         });
     }
 
-    /// This function is used when we want to view an item in Warp Drive AND focus Warp Drive.
+    /// This function is used when we want to view an item in Dwarf Drive AND focus Dwarf Drive.
     pub fn view_in_and_focus_warp_drive(
         &mut self,
         item_id: WarpDriveItemId,
@@ -12611,7 +12567,7 @@ impl Workspace {
         });
     }
 
-    /// View an object in Warp Drive and open its sharing settings.
+    /// View an object in Dwarf Drive and open its sharing settings.
     fn open_object_sharing_settings(
         &mut self,
         object_id: CloudObjectTypeAndId,
@@ -12678,7 +12634,7 @@ impl Workspace {
 
                     request_type = Some(ChangelogRequestType::WindowLaunch);
                     // Do not show changelog on quake mode window or if it has already been shown
-                    // or if we are opening Warp Drive on start up
+                    // or if we are opening Dwarf Drive on start up
                     quake_mode_window_id() != Some(ctx.window_id())
                         && !Settings::has_changelog_been_shown(version, ctx)
                         && !*opening_warp_drive_on_start_up
@@ -12713,13 +12669,13 @@ impl Workspace {
                                 link = link.with_keystroke(keystroke);
                             }
 
-                            let toast = DismissibleToast::default(String::from("Warp updated!"))
+                            let toast = DismissibleToast::default(String::from("Dwarf updated!"))
                                 .with_link(link);
 
                             stack.add_ephemeral_toast(toast, ctx);
                         });
                     } else {
-                        // If resource center isn't already open and Warp AI isn't open, then open resource center
+                        // If resource center isn't already open and Dwarf AI isn't open, then open resource center
                         if !self.current_workspace_state.is_resource_center_open
                             && !self.current_workspace_state.is_ai_assistant_panel_open
                         {
@@ -13219,7 +13175,7 @@ impl Workspace {
                         ctx,
                     ),
                     _ => {
-                        log::warn!("Attempted to open an unsupported Warp Drive link")
+                        log::warn!("Attempted to open an unsupported Dwarf Drive link")
                     }
                 }
             }
@@ -14774,18 +14730,6 @@ impl Workspace {
         if self.is_readonly_shared_session_active(ctx) {
             return;
         }
-        if self.auth_state.is_anonymous_or_logged_out()
-            && workflow.as_workflow().is_agent_mode_workflow()
-        {
-            AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                auth_manager.attempt_login_gated_feature(
-                    "Run Agent Mode Workflow",
-                    AuthViewVariant::RequireLoginCloseable,
-                    ctx,
-                )
-            });
-            return;
-        }
         if let Some(terminal_view_handle) =
             self.focus_terminal_input(workflow.object_id(), fallback_behavior, ctx)
         {
@@ -15125,7 +15069,7 @@ impl Workspace {
                                             },
                                         ) {
                                             new_toast = DismissibleToast::success(
-                                                "Plan synced to your Warp Drive".to_string(),
+                                                "Plan synced to your Dwarf Drive".to_string(),
                                             )
                                             .with_object_id(object_id_clone)
                                             .with_link(
@@ -15838,7 +15782,7 @@ impl Workspace {
                 let command = code.trim().to_string();
                 let args_state =
                     ArgumentsState::for_command_workflow(&Default::default(), command.clone());
-                let workflow = Workflow::new("Command from Warp AI", command)
+                let workflow = Workflow::new("Command from Dwarf AI", command)
                     .with_arguments(args_state.arguments);
                 self.run_workflow_in_active_input(
                     &WorkflowType::AIGenerated {
@@ -15890,7 +15834,7 @@ impl Workspace {
                     model.mark_oz_launch_modal_dismissed(ctx);
                 });
 
-                // Clear the "Introducing Oz" custom tab name so normal tab naming rules apply.
+                // Clear the Dwarf launch modal custom tab name so normal tab naming rules apply.
                 if let Some(pane_group_id) = self.oz_launch_modal.tab_pane_group_id.take() {
                     if let Some(tab) = self
                         .tabs
@@ -16164,18 +16108,7 @@ impl Workspace {
         variant: CloudAgentCapacityModalVariant,
         ctx: &mut ViewContext<Self>,
     ) {
-        if !FeatureFlag::CloudMode.is_enabled() {
-            return;
-        }
-        self.cloud_agent_capacity_modal.update(ctx, |modal, ctx| {
-            modal.set_variant(variant);
-            ctx.notify();
-        });
-        self.current_workspace_state
-            .is_cloud_agent_capacity_modal_open = true;
-        ctx.focus(&self.cloud_agent_capacity_modal);
-        ctx.notify();
-        send_telemetry_from_ctx!(TelemetryEvent::CloudAgentCapacityModalOpened, ctx);
+        let _ = (variant, ctx);
     }
 
     fn handle_free_tier_limit_modal_event(
@@ -16209,35 +16142,8 @@ impl Workspace {
     }
 
     pub fn check_and_open_free_tier_limit_modal(&mut self, ctx: &mut ViewContext<Self>) -> bool {
-        let is_free_tier = !UserWorkspaces::as_ref(ctx)
-            .current_workspace()
-            .is_some_and(|workspace| workspace.billing_metadata.is_user_on_paid_plan());
-
-        if !is_free_tier {
-            return false;
-        }
-
-        if AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining(ctx) {
-            return false;
-        }
-
-        if self
-            .current_workspace_state
-            .is_free_tier_limit_hit_modal_open
-            || *GeneralSettings::as_ref(ctx).free_tier_limit_hit_modal_dismissed
-        {
-            return false;
-        }
-
-        self.current_workspace_state
-            .is_free_tier_limit_hit_modal_open = true;
-
-        send_telemetry_from_ctx!(TelemetryEvent::FreeTierLimitHitInterstitialDisplayed, ctx);
-
-        ctx.focus(&self.free_tier_limit_hit_modal);
-        ctx.notify();
-
-        true
+        let _ = ctx;
+        false
     }
 
     fn ask_ai_assistant(&mut self, ask_type: &AskAIType, ctx: &mut ViewContext<Self>) {
@@ -16559,7 +16465,7 @@ impl Workspace {
         let body = appearance
             .ui_builder()
             .wrappable_text(
-                "Ask Warp AI to explain errors, suggest commands or write scripts.".to_owned(),
+                "Ask Dwarf AI to explain errors, suggest commands or write scripts.".to_owned(),
                 true,
             )
             .with_style(UiComponentStyles {
@@ -16689,7 +16595,7 @@ impl Workspace {
                     {
                         ToolPanelView::ProjectExplorer => "Project explorer",
                         ToolPanelView::GlobalSearch { .. } => "Global search",
-                        ToolPanelView::WarpDrive => "Warp Drive",
+                        ToolPanelView::WarpDrive => "Dwarf Drive",
                         ToolPanelView::ConversationListView => "Agent conversations",
                     }
                 } else {
@@ -16743,7 +16649,7 @@ impl Workspace {
             {
                 ToolPanelView::ProjectExplorer => "Project explorer",
                 ToolPanelView::GlobalSearch { .. } => "Global search",
-                ToolPanelView::WarpDrive => "Warp Drive",
+                ToolPanelView::WarpDrive => "Dwarf Drive",
                 ToolPanelView::ConversationListView => "Agent conversations",
             }
         } else {
@@ -17025,7 +16931,7 @@ impl Workspace {
             .is_user_web_anonymous_user()
             .unwrap_or_default();
 
-        // Simplified mode for viewing Warp Drive objects, shared sessions, or conversation transcripts on WASM
+        // Simplified mode for viewing Dwarf Drive objects, shared sessions, or conversation transcripts on WASM
         #[cfg(target_family = "wasm")]
         if let Some(content_type) = self.get_simplified_wasm_tab_bar_content(ctx) {
             // Use MainAxisAlignment::SpaceBetween and expand to fill width
@@ -17052,7 +16958,7 @@ impl Workspace {
             .finish();
             tab_bar.add_child(warp_logo);
 
-            // Right: Info button + "View all cloud runs" button (for ambient agent sessions) + "Open in Warp" button
+            // Right: Info button + "View all cloud runs" button (for ambient agent sessions) + "Open in Dwarf" button
             let mut right_row = Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_main_axis_size(MainAxisSize::Min);
@@ -17092,7 +16998,7 @@ impl Workspace {
                 }
             }
 
-            // Hide "Open in Warp" button on mobile devices
+            // Hide "Open in Dwarf" button on mobile devices
             if !warpui::platform::wasm::is_mobile_device() {
                 right_row.add_child(ChildView::new(&self.open_in_warp_button).finish());
             }
@@ -17453,7 +17359,8 @@ impl Workspace {
             );
         }
 
-        if self.auth_state.is_anonymous_or_logged_out()
+        if false
+            && self.auth_state.is_anonymous_or_logged_out()
             && !FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
         {
             if is_web_anonymous_user {
@@ -17852,7 +17759,7 @@ impl Workspace {
                 icons::Icon::Lightbulb,
                 &self.mouse_states.resource_center_icon,
                 WorkspaceAction::ToggleResourceCenter,
-                "Warp Essentials".to_string(),
+                "Dwarf Essentials".to_string(),
                 self.cached_keybindings[TOGGLE_RESOURCE_CENTER_KEYBINDING_NAME].clone(),
                 false,
                 false,
@@ -18338,7 +18245,7 @@ impl Workspace {
             AISettings::as_ref(app)
                 .is_any_ai_enabled(app)
                 .then(|| WorkspaceBannerButtonDetails {
-                    text: "Fix with Oz".to_owned(),
+                    text: "Fix with Dwarf".to_owned(),
                     action: WorkspaceAction::FixSettingsWithOz {
                         error_description: error.to_string(),
                     },
@@ -18402,7 +18309,7 @@ impl Workspace {
                         if is_incoming_version_past_current(new_version.soft_cutoff.as_deref()) {
                             VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
                         } else {
-                            "A new version is available but Warp is unable to perform the update."
+                            "A new version is available but Dwarf is unable to perform the update."
                                 .to_owned()
                         };
 
@@ -18413,7 +18320,7 @@ impl Workspace {
                         description,
                         secondary_button: None,
                         button: Some(WorkspaceBannerButtonDetails {
-                            text: "Update Warp manually".to_string(),
+                            text: "Update Dwarf manually".to_string(),
                             action: WorkspaceAction::DownloadNewVersion,
                             variant: BannerButtonVariant::Outlined,
                             icon: None,
@@ -18428,7 +18335,7 @@ impl Workspace {
                         if is_incoming_version_past_current(new_version.soft_cutoff.as_deref()) {
                             VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
                         } else {
-                            "Warp was unable to launch the new installed version.".to_owned()
+                            "Dwarf was unable to launch the new installed version.".to_owned()
                         };
 
                     Some(WorkspaceBannerFields {
@@ -18438,7 +18345,7 @@ impl Workspace {
                         description,
                         secondary_button: None,
                         button: Some(WorkspaceBannerButtonDetails {
-                            text: "Update Warp manually".to_string(),
+                            text: "Update Dwarf manually".to_string(),
                             action: WorkspaceAction::DownloadNewVersion,
                             variant: BannerButtonVariant::Outlined,
                             icon: None,
@@ -19568,7 +19475,7 @@ impl Workspace {
     }
 
     fn open_tab_and_focus_oz_launch_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        // Create a new tab with one terminal session titled "Introducing Oz"
+        // Create a new tab with one terminal session titled "Introducing Dwarf"
         self.add_tab_with_pane_layout(
             PanesLayout::SingleTerminal(Box::new(NewTerminalOptions {
                 shell: None,
@@ -19577,7 +19484,7 @@ impl Workspace {
                 ..Default::default()
             })),
             Arc::new(HashMap::new()),
-            Some("Introducing Oz".to_string()),
+            Some("Introducing Dwarf".to_string()),
             ctx,
         );
         self.oz_launch_modal.tab_pane_group_id = self
@@ -19658,7 +19565,7 @@ impl Workspace {
         });
     }
 
-    /// Opens a given URL in the desktop Warp app if installed, or redirects to download page.
+    /// Opens a given URL in the desktop Dwarf app if installed, or redirects to download page.
     #[cfg(target_family = "wasm")]
     fn open_link_on_desktop(&mut self, url: &Url, ctx: &mut ViewContext<Self>) {
         use crate::settings::app_installation_detection::{
@@ -19681,7 +19588,7 @@ impl Workspace {
             // Many users' browser settings will block Local Network Access so this will end up redirecting to download page,
             // even if they have the app installed.
             let toast_message = format!(
-                "Have Warp installed but redirecting to download page?\nEnable Local Network Access for {} in your browser.",
+                "Have Dwarf installed but redirecting to download page?\nEnable Local Network Access for {} in your browser.",
                 ChannelState::server_root_url()
             );
             self.toast_stack.update(ctx, |toast_stack, ctx| {
@@ -20062,22 +19969,10 @@ impl TypedActionView for Workspace {
                 source,
             } => self.toggle_palette(*palette_mode, *source, ctx),
             ShowUpgrade => {
-                send_telemetry_from_ctx!(TelemetryEvent::UserMenuUpgradeClicked, ctx);
-
-                let auth_state = AuthStateProvider::as_ref(ctx).get();
-                let user_workspaces = UserWorkspaces::as_ref(ctx);
-
-                let upgrade_url = if let Some(team) = user_workspaces.current_team() {
-                    UserWorkspaces::upgrade_link_for_team(team.uid)
-                } else {
-                    let user_id = auth_state.user_id().unwrap_or_default();
-                    UserWorkspaces::upgrade_link(user_id)
-                };
-
-                ctx.open_url(&upgrade_url);
+                self.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
             }
             ShowReferralSettingsPage => {
-                self.show_settings_with_section(Some(SettingsSection::Referrals), ctx);
+                self.show_settings(ctx);
             }
             JoinSlack => self.join_slack(ctx),
             ViewUserDocs => self.view_user_docs(ctx),
@@ -20304,7 +20199,7 @@ impl TypedActionView for Workspace {
                             ctx
                         );
                     } else if warp_drive_active {
-                        // Tools panel opened with Warp Drive as the active view
+                        // Tools panel opened with Dwarf Drive as the active view
                         send_telemetry_from_ctx!(
                             TelemetryEvent::WarpDriveOpened {
                                 source: WarpDriveSource::LeftPanelToolbelt,
@@ -20860,7 +20755,7 @@ impl TypedActionView for Workspace {
             }
             RunAISuggestedCommand(code) => {
                 let command = code.trim().to_string();
-                let workflow = Workflow::new("Command from Oz", command);
+                let workflow = Workflow::new("Command from Dwarf", command);
                 self.run_workflow_in_active_input(
                     &WorkflowType::AIGenerated {
                         workflow,
@@ -20888,13 +20783,7 @@ impl TypedActionView for Workspace {
                 ctx.notify();
             }
             AttemptLoginGatedAIUpgrade => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager.attempt_login_gated_feature(
-                        "Upgrade AI Usage",
-                        AuthViewVariant::RequireLoginCloseable,
-                        ctx,
-                    )
-                });
+                self.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
             }
             #[cfg(all(enable_crash_recovery, target_os = "linux"))]
             DismissWaylandCrashRecoveryBannerAndOpenLink => {
@@ -21326,12 +21215,12 @@ impl TypedActionView for Workspace {
                         .did_check_to_trigger_oz_launch_modal
                         .set_value(false, ctx)
                     {
-                        log::warn!("Failed to reset Oz launch modal dismissed setting: {e}");
+                        log::warn!("Failed to reset Dwarf launch modal dismissed setting: {e}");
                     }
                 });
                 let new_value = *AISettings::as_ref(ctx).did_check_to_trigger_oz_launch_modal;
                 log::info!(
-                    "Oz launch modal state: old={}, new={}, feature_flag_enabled={}",
+                    "Dwarf launch modal state: old={}, new={}, feature_flag_enabled={}",
                     old_value,
                     new_value,
                     FeatureFlag::OzLaunchModal.is_enabled()
@@ -21918,7 +21807,7 @@ impl View for Workspace {
 
         let tab_bar_mode = self.tab_bar_mode(app);
 
-        // For WASM simplified tab bar views (Warp Drive objects, shared sessions, conversation transcripts),
+        // For WASM simplified tab bar views (Dwarf Drive objects, shared sessions, conversation transcripts),
         // we render the tab bar outside of panels so that the details panel only affects content below the tab bar.
         cfg_if::cfg_if! {
             if #[cfg(target_family = "wasm")] {

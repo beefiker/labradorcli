@@ -122,11 +122,11 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 
     fn install_success_message(&self) -> &'static str {
-        "Warp plugin installed. Please run /reload-plugins to activate."
+        "Dwarf plugin installed. Please run /reload-plugins to activate."
     }
 
     fn update_success_message(&self) -> &'static str {
-        "Warp plugin updated. Please run /reload-plugins to activate."
+        "Dwarf plugin updated. Please run /reload-plugins to activate."
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
@@ -167,13 +167,13 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
         subtitle: "Ensure that jq is installed on your machine. Then, run these commands.",
         steps: &[
             PluginInstructionStep {
-                description: "Add the Warp plugin marketplace repository",
+                description: "Add the Dwarf plugin marketplace repository",
                 command: "claude plugin marketplace add warpdotdev/claude-code-warp",
                 executable: true,
                 link: None,
             },
             PluginInstructionStep {
-                description: "Install the Warp plugin",
+                description: "Install the Dwarf plugin",
                 command: "claude plugin install warp@claude-code-warp",
                 executable: true,
                 link: None,
@@ -229,7 +229,7 @@ fn check_installed(claude_dir: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Reads the installed version string for the Warp plugin, if present.
+/// Reads the installed version string for the Dwarf plugin, if present.
 fn installed_version(claude_dir: &Path) -> Option<String> {
     let plugins_path = claude_dir.join("plugins").join("installed_plugins.json");
     let contents = fs::read_to_string(plugins_path).ok()?;

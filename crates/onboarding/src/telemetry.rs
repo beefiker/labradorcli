@@ -39,7 +39,7 @@ pub enum OnboardingEvent {
     SlideNavigatedBack,
     /// The user clicked the upgrade/subscribe button on the FreeUserNoAi experiment slide.
     FreeUserNoAiUpgradeClicked,
-    /// The user clicked the "Upgrade" button on the "Customize your agent" slide.
+    /// The user clicked the "Continue" button on the "Customize your agent" slide.
     AgentSlideUpgradeClicked,
     /// The user clicked the "Log in" link on the welcome/intro slide.
     WelcomeLoginClicked,
@@ -127,7 +127,7 @@ impl TelemetryEvent for OnboardingEvent {
                 "User clicked the upgrade button on the free-user no-AI experiment slide"
             }
             OnboardingEvent::AgentSlideUpgradeClicked => {
-                "User clicked the Upgrade button on the Customize your agent slide"
+                "User clicked the Continue button on the Customize your agent slide"
             }
             OnboardingEvent::WelcomeLoginClicked => {
                 "User clicked the Log in link on the welcome/intro slide"
@@ -201,7 +201,7 @@ impl TelemetryEventDesc for OnboardingEventDiscriminant {
                 "User clicked the upgrade button on the free-user no-AI experiment slide"
             }
             OnboardingEventDiscriminant::AgentSlideUpgradeClicked => {
-                "User clicked the Upgrade button on the Customize your agent slide"
+                "User clicked the Continue button on the Customize your agent slide"
             }
             OnboardingEventDiscriminant::WelcomeLoginClicked => {
                 "User clicked the Log in link on the welcome/intro slide"

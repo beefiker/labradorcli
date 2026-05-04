@@ -21,24 +21,25 @@ use crate::{
 };
 use ai::api_keys::ApiKeyManager;
 
+#[allow(dead_code)]
 const ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PERCENTAGE: f32 = 0.5;
 
 const TELEMETRY_DISABLED_PRIMARY_TEXT: &str = "To use AI features,";
 const ENABLE_ANALYTICS_ACTION_TEXT: &str = "enable analytics";
-const UPGRADE_TO_BUILD_ACTION_TEXT: &str = "upgrade";
+const UPGRADE_TO_BUILD_ACTION_TEXT: &str = "check settings";
 
 const NO_CONNECTION_PRIMARY_TEXT: &str = "No internet connection";
 const ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PRIMARY_TEXT: &str = "";
 const ANONYMOUS_USER_REQUEST_LIMIT_HARD_GATE_PRIMARY_TEXT: &str = "At Limit -";
-const DELINQUENT_DUE_TO_PAYMENT_ISSUE_PRIMARY_TEXT: &str = "Restricted due to payment issue";
-const OUT_OF_REQUESTS_PRIMARY_TEXT: &str = "Out of credits";
+const DELINQUENT_DUE_TO_PAYMENT_ISSUE_PRIMARY_TEXT: &str = "Provider access issue";
+const OUT_OF_REQUESTS_PRIMARY_TEXT: &str = "Local agent unavailable";
 
-const ANONYMOUS_USER_REQUEST_LIMIT_ACTION_TEXT: &str = "Sign up for more AI credits";
-const DELINQUENT_DUE_TO_PAYMENT_ISSUE_ACTION_TEXT: &str = "Manage billing";
-const OVERAGES_TOGGLEABLE_BUT_NOT_ENABLED_ACTION_TEXT: &str = "Enable premium overages";
-const MONTHLY_OVERAGES_SPEND_LIMIT_REACHED_ACTION_TEXT: &str = "Increase monthly spend limit";
-const UPGRADE_TEXT: &str = "Upgrade";
-const COMPARE_PLANS_TEXT: &str = "Compare plans";
+const ANONYMOUS_USER_REQUEST_LIMIT_ACTION_TEXT: &str = "Check local auth";
+const DELINQUENT_DUE_TO_PAYMENT_ISSUE_ACTION_TEXT: &str = "Check settings";
+const OVERAGES_TOGGLEABLE_BUT_NOT_ENABLED_ACTION_TEXT: &str = "Check settings";
+const MONTHLY_OVERAGES_SPEND_LIMIT_REACHED_ACTION_TEXT: &str = "Check settings";
+const UPGRADE_TEXT: &str = "Open settings";
+const COMPARE_PLANS_TEXT: &str = "Open settings";
 const CONTACT_SUPPORT_TEXT: &str = "Contact support";
 const NON_ADMIN_CONTACT_ADMIN_TEXT: &str = ", contact a team admin";
 const NON_ADMIN_ASK_ADMIN_TO_ENABLE_OVERAGES_TEXT: &str = ", ask a team admin to enable overages";
@@ -62,6 +63,7 @@ pub enum PromptAlertEvent {
 }
 
 /// The alert state of the chip that appears to the right of certain parts of the prompt.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptAlertState {
     /// The user is offline (no connection).
@@ -131,74 +133,11 @@ impl PromptAlertView {
     }
 
     pub fn determine_state(app: &AppContext) -> PromptAlertState {
-        // First, if the user is offline, no AI features will work.
         if !NetworkStatus::as_ref(app).is_online() {
             return PromptAlertState::NoConnection;
         }
 
-        // Check if telemetry is disabled for free tier users.
-        // Free tier users must enable telemetry or upgrade to use AI features.
-        let privacy_settings = PrivacySettings::as_ref(app);
-        if !privacy_settings.is_telemetry_enabled {
-            // Fail safe: if billing status is unknown, assume paid to avoid showing confusing message to paying users
-            let is_on_paid_plan = UserWorkspaces::as_ref(app)
-                .current_workspace()
-                .map(|w| w.billing_metadata.is_user_on_paid_plan())
-                .unwrap_or(true);
-
-            if !is_on_paid_plan {
-                return PromptAlertState::TelemetryDisabledOnFreeTier;
-            }
-        }
-
-        let request_usage_model = AIRequestUsageModel::as_ref(app);
-        let has_requests_remaining = request_usage_model.has_requests_remaining();
-        let auth_state = AuthStateProvider::as_ref(app).get();
-
-        // Next, if the user is anonymous, we check if they have reached a certain percentage of requests used.
-        if auth_state
-            .is_anonymous_user_feature_gated()
-            .unwrap_or_default()
-        {
-            let percentage_used = request_usage_model.request_percentage_used();
-
-            if percentage_used >= ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PERCENTAGE {
-                if has_requests_remaining {
-                    return PromptAlertState::AnonymousUserRequestLimitSoftGate;
-                } else {
-                    return PromptAlertState::AnonymousUserRequestLimitHardGate;
-                }
-            }
-        }
-
-        // Next, make sure the user isn't delinquent in their plan.
-        let workspace = UserWorkspaces::as_ref(app).current_workspace();
-        if workspace.is_some_and(|w| w.billing_metadata.is_delinquent_due_to_payment_issue()) {
-            return PromptAlertState::DelinquentDueToPaymentIssue;
-        }
-
-        // If there is ever any ai remaining, no alert
-        if request_usage_model.has_any_ai_remaining(app) {
-            return PromptAlertState::NoAlert;
-        }
-
-        // Check if overages are available.
-        if let Some(workspace) = workspace {
-            let are_overages_toggleable = workspace.are_overages_toggleable();
-            let are_overages_enabled = workspace.are_overages_enabled();
-
-            if are_overages_toggleable {
-                if are_overages_enabled {
-                    return PromptAlertState::MonthlyOveragesSpendLimitReached;
-                } else {
-                    return PromptAlertState::OveragesToggleableButNotEnabled;
-                }
-            }
-        }
-
-        // If overages aren't available, and since we already checked that the user
-        // has no requests remaining, we can show the generic request limit reached alert.
-        PromptAlertState::RequestLimitReached
+        PromptAlertState::NoAlert
     }
 
     pub fn is_no_alert(&self) -> bool {
@@ -357,7 +296,7 @@ impl PromptAlertView {
                         let upgrade_text = if !has_admin_permissions {
                             COMPARE_PLANS_TEXT
                         } else if team.billing_metadata.can_upgrade_to_build_plan() {
-                            "Upgrade to Build"
+                            "Open settings"
                         } else {
                             UPGRADE_TEXT
                         };
@@ -376,7 +315,7 @@ impl PromptAlertView {
                     let label =
                         if let Some(workspace) = UserWorkspaces::as_ref(app).current_workspace() {
                             if workspace.billing_metadata.can_upgrade_to_build_plan() {
-                                "Upgrade to Build"
+                                "Open settings"
                             } else {
                                 UPGRADE_TEXT
                             }
@@ -453,7 +392,7 @@ impl View for PromptAlertView {
         if suggest_buy_credits {
             text_fragments.push(FormattedTextFragment::plain_text("  "));
             text_fragments.push(FormattedTextFragment::hyperlink_action(
-                "Add credits",
+                "Open settings",
                 WorkspaceAction::ShowSettingsPage(SettingsSection::BillingAndUsage),
             ));
         } else {

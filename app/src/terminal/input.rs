@@ -385,7 +385,7 @@ pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_TOP_PADDING: f32 = 10.;
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_BOTTOM_PADDING: f32 = 8.;
 pub(super) const CLI_AGENT_RICH_INPUT_HINT_TEXT: &str = "Tell the agent what to build...";
 
-const CLOUD_MODE_V2_HINT_TEXT: &str = "Kick off a cloud agent";
+const CLOUD_MODE_V2_HINT_TEXT: &str = "Kick off a Dwarf agent";
 const SHORT_CIRCUIT_HIGHLIGHTING_ACTIONS: [Option<PlainTextEditorViewAction>; 7] = [
     Some(PlainTextEditorViewAction::Space),
     Some(PlainTextEditorViewAction::NonExpandingSpace),
@@ -3190,15 +3190,13 @@ impl Input {
         let buy_credits_banner = ctx.add_typed_action_view(BuyCreditsBanner::new);
         ctx.subscribe_to_view(&buy_credits_banner, |me, _, event, ctx| match event {
             BuyCreditsBannerEvent::OpenBillingAndUsage => {
-                ctx.emit(Event::OpenSettings(SettingsSection::BillingAndUsage));
+                ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent));
             }
             BuyCreditsBannerEvent::RefocusInput => {
                 ctx.focus(&me.editor);
             }
             BuyCreditsBannerEvent::OpenAutoReloadModal { purchased_credits } => {
-                ctx.emit(Event::OpenAutoReloadModal {
-                    purchased_credits: *purchased_credits,
-                });
+                let _ = purchased_credits;
             }
             BuyCreditsBannerEvent::ShowAutoReloadError { error_message } => {
                 ctx.emit(Event::ShowToast {
@@ -5371,20 +5369,16 @@ impl Input {
     ) {
         match prompt_alert {
             PromptAlertEvent::SignupAnonymousUser => {
-                ctx.emit(Event::SignupAnonymousUser {
-                    entrypoint: AnonymousUserSignupEntrypoint::SignUpAIPrompt,
-                });
+                let _ = ctx;
             }
             PromptAlertEvent::OpenBillingAndUsagePage => {
-                ctx.emit(Event::OpenSettings(SettingsSection::BillingAndUsage));
+                ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent));
             }
             PromptAlertEvent::OpenPrivacyPage => {
                 ctx.emit(Event::OpenSettings(SettingsSection::Privacy));
             }
             PromptAlertEvent::OpenBillingPortal { team_uid } => {
-                UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
-                    user_workspaces.generate_stripe_billing_portal_link(*team_uid, ctx);
-                });
+                let _ = (team_uid, ctx);
             }
         }
     }
@@ -13959,11 +13953,11 @@ impl Input {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            PromptSuggestionsEvent::SignupAnonymousUser => ctx.emit(Event::SignupAnonymousUser {
-                entrypoint: AnonymousUserSignupEntrypoint::SignUpAIPrompt,
-            }),
+            PromptSuggestionsEvent::SignupAnonymousUser => {
+                let _ = ctx;
+            }
             PromptSuggestionsEvent::OpenBillingAndUsagePage => {
-                ctx.emit(Event::OpenSettings(SettingsSection::BillingAndUsage))
+                ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent))
             }
             PromptSuggestionsEvent::OpenPrivacyPage => {
                 ctx.emit(Event::OpenSettings(SettingsSection::Privacy))

@@ -126,6 +126,7 @@ pub struct CommandSearchView {
     zero_state_handle: ViewHandle<CommandSearchZeroStateView>,
     handle: WeakViewHandle<Self>,
     menu_positioning: MenuPositioning,
+    #[allow(dead_code)]
     auth_state: Arc<AuthState>,
     ai_client: Arc<dyn AIClient>,
     state: CommandSearchViewState,
@@ -134,6 +135,7 @@ pub struct CommandSearchView {
     search_bar: ViewHandle<SearchBar<CommandSearchItemAction>>,
     search_bar_state: ModelHandle<SearchBarState<CommandSearchItemAction>>,
     mixer: ModelHandle<CommandSearchMixer>,
+    #[allow(dead_code)]
     upgrade_link: MouseStateHandle,
 }
 
@@ -607,27 +609,12 @@ impl CommandSearchView {
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         if is_ratelimit_error {
-            let current_user_id = self.auth_state.user_id().unwrap_or_default();
-            if let Some(team) = UserWorkspaces::as_ref(app).current_team() {
-                let current_user_email = self.auth_state.user_email().unwrap_or_default();
-                let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-                if team.billing_metadata.can_upgrade_to_higher_tier_plan() {
-                    if has_admin_permissions {
-                        self.render_error_header_with_upgrade_link(
-                            app,
-                            appearance,
-                            Some(team.uid),
-                            current_user_id,
-                        )
-                    } else {
-                        self.render_error_header_text("Looks like you're out of credits. Contact a team admin to upgrade for more credits.".to_string(), appearance)
-                    }
-                } else {
-                    self.render_error_header_text(message, appearance)
-                }
-            } else {
-                self.render_error_header_with_upgrade_link(app, appearance, None, current_user_id)
-            }
+            let _ = app;
+            self.render_error_header_text(
+                "The hosted assistant reported a usage limit. Local Dwarf does not sell credits."
+                    .to_string(),
+                appearance,
+            )
         } else {
             self.render_error_header_text(message, appearance)
         }
@@ -663,6 +650,7 @@ impl CommandSearchView {
         .finish()
     }
 
+    #[allow(dead_code)]
     fn render_error_header_with_upgrade_link(
         &self,
         app: &AppContext,

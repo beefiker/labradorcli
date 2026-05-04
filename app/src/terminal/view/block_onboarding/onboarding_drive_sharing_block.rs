@@ -22,7 +22,7 @@ use crate::{
     workspace::WorkspaceAction,
 };
 
-/// A rich onboarding block that prompts the user to share a newly-created personal Warp Drive
+/// A rich onboarding block that prompts the user to share a newly-created personal Dwarf Drive
 /// object.
 pub struct OnboardingDriveSharingBlock {
     object_id: CloudObjectTypeAndId,
@@ -51,9 +51,9 @@ impl Entity for OnboardingDriveSharingBlock {
     type Event = ();
 }
 
-const TITLE_TEXT: &str = "Sharing in Warp Drive";
+const TITLE_TEXT: &str = "Sharing in Dwarf Drive";
 const BODY_TEXT: &[&str] = &[
-    "You can now share drive objects, in Warp or on the web, with anyone - Warp user or not. Click Share in the Warp Drive menu or the pane header to share via link or email.",
+    "You can now share drive objects, in Dwarf or on the web, with anyone - Dwarf user or not. Click Share in the Dwarf Drive menu or the pane header to share via link or email.",
     "You’ll be able to modify the access permissions any time.",
 ];
 

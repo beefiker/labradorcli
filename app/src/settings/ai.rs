@@ -25,6 +25,7 @@ use warpui::{
 use settings::{
     define_settings_group, RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud,
 };
+use warp_core::channel::{Channel, ChannelState};
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
 
@@ -34,6 +35,10 @@ use strum_macros::EnumIter;
 
 pub enum FocusedTerminalInfoEvent {
     TerminalInfoUpdated,
+}
+
+fn local_agent_terminal_only() -> bool {
+    matches!(ChannelState::channel(), Channel::Oss)
 }
 
 /// Singleton model that is used to track the remote sessions in the terminal.
@@ -323,7 +328,7 @@ impl DefaultSessionMode {
         match self {
             DefaultSessionMode::Terminal => "Terminal",
             DefaultSessionMode::Agent => "Agent",
-            DefaultSessionMode::CloudAgent => "Cloud Oz",
+            DefaultSessionMode::CloudAgent => "Dwarf Agent",
             DefaultSessionMode::TabConfig => "Tab Config",
             DefaultSessionMode::DockerSandbox => "Local Docker Sandbox",
         }
@@ -1015,7 +1020,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "cloud_platform.third_party_api_keys.aws_bedrock_credentials_enabled",
-        description: "Whether Warp should use your local AWS credentials for Bedrock-enabled requests.",
+        description: "Whether Dwarf should use your local AWS credentials for Bedrock-enabled requests.",
     }
     // Whether to automatically run the AWS login command when Bedrock credentials are expired.
     //
@@ -1078,7 +1083,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "agents.knowledge.warp_drive_context_enabled",
-        description: "Whether Warp Drive context is included in AI requests.",
+        description: "Whether Dwarf Drive context is included in AI requests.",
     }
 
     // Whether the codebase speedbump banner has been permanently dismissed for a given repo path.
@@ -1170,7 +1175,7 @@ define_settings_group!(AISettings, settings: [
         private: true,
     }
 
-    // Used to determine whether the "What's new in Oz" section of the agent view
+    // Used to determine whether the "What's new in Dwarf" section of the agent view
     // zero state is expanded or collapsed by default.
     should_expand_oz_updates: ShouldExpandOzUpdates {
         type: bool,
@@ -1180,7 +1185,7 @@ define_settings_group!(AISettings, settings: [
         private: true,
     }
 
-    // Used to determine whether the "What's new in Oz" section of the agent view
+    // Used to determine whether the "What's new in Dwarf" section of the agent view
     // zero state is shown or hidden.
     should_show_oz_updates_in_zero_state: ShouldShowOzUpdatesInZeroState {
         type: bool,
@@ -1192,7 +1197,7 @@ define_settings_group!(AISettings, settings: [
         description: "Whether the \"What's new\" section is shown in the agent view.",
     }
 
-    // Whether or not the user has enabled the ability to use Warp credits even when providing
+    // Whether or not the user has enabled the ability to use Dwarf credits even when providing
     // their own LLM provider API key.
     can_use_warp_credits_with_byok: CanUseWarpCreditsWithByok {
         type: bool,
@@ -1201,7 +1206,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "cloud_platform.third_party_api_keys.can_use_warp_credits_with_byok",
-        description: "Whether Warp credits can be used even when providing your own API key.",
+        description: "Whether Dwarf credits can be used even when providing your own API key.",
     }
 
     should_render_use_agent_footer_for_user_commands: ShouldRenderUseAgentToolbarForUserCommands {
@@ -1458,7 +1463,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
         private: false,
         toml_path: "agents.warp_agent.other.agent_attribution_enabled",
-        description: "Whether the Warp Agent adds an attribution co-author line to commit messages and pull requests it creates.",
+        description: "Whether the Dwarf Agent adds an attribution co-author line to commit messages and pull requests it creates.",
     }
 ]);
 
@@ -1497,18 +1502,23 @@ impl AISettings {
     }
 
     pub fn is_any_ai_enabled(&self, app: &AppContext) -> bool {
-        // Disable AI for anonymous and logged-out users.
-        let is_anonymous_or_logged_out = AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out();
+        let auth_allows_ai = local_agent_terminal_only()
+            || !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out();
 
         *self.is_any_ai_enabled
-            && !is_anonymous_or_logged_out
+            && auth_allows_ai
             && !self.is_ai_disabled_due_to_remote_session_org_policy(app)
     }
 
     pub fn default_session_mode(&self, app: &AppContext) -> DefaultSessionMode {
-        let mode = *self.default_session_mode_internal.value();
+        let mode = if local_agent_terminal_only() {
+            DefaultSessionMode::Agent
+        } else {
+            *self.default_session_mode_internal.value()
+        };
+
         match mode {
             // Terminal and TabConfig don't require AI.
             DefaultSessionMode::Terminal | DefaultSessionMode::TabConfig => mode,

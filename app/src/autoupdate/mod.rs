@@ -831,7 +831,7 @@ pub fn apply_update(
     }
 }
 
-/// Relaunch Warp to apply an update.
+/// Relaunch Dwarf to apply an update.
 ///
 /// This will:
 /// 1. Perform any last update steps.

@@ -49,7 +49,7 @@ impl LocalWorkflows {
         self.app_workflows.iter()
     }
 
-    /// Returns an iterator over the static set of workflows for 3rd party tools loaded from Warp's
+    /// Returns an iterator over the static set of workflows for 3rd party tools loaded from Dwarf's
     /// workflows GitHub repo.
     pub fn global_workflows(
         &self,
@@ -224,7 +224,7 @@ pub fn prompt_chip_logging_workflow(shell_family: ShellFamily) -> Option<Workflo
         ),
         arguments: vec![],
         source_url: None,
-        author: Some("Warp".into()),
+        author: Some("Dwarf".into()),
         author_url: None,
         shells: vec![],
         environment_variables: None,

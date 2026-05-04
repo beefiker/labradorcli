@@ -312,7 +312,7 @@ impl TerminalView {
         if cli_agent.is_some() {
             // For CLI agent commands, only check the CLI agent footer setting.
             // This is independent of the global AI toggle so that users who
-            // disable Warp AI still get the footer for third-party coding agents.
+            // disable Dwarf AI still get the footer for third-party coding agents.
             if !*ai_settings.should_render_cli_agent_footer {
                 return false;
             }
@@ -973,7 +973,7 @@ impl UseAgentToolbar {
             .with_icon(Icon::Oz)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
-            .with_tooltip("Ask the Warp agent to assist")
+            .with_tooltip("Ask the Dwarf agent to assist")
             .with_tooltip_alignment(TooltipAlignment::Left)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(TerminalAction::SetInputModeAgent);
@@ -987,7 +987,7 @@ impl UseAgentToolbar {
             .with_icon(Icon::Oz)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
-            .with_tooltip("Ask the Warp agent to resume")
+            .with_tooltip("Ask the Dwarf agent to resume")
             .with_tooltip_alignment(TooltipAlignment::Left)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(TerminalAction::SetInputModeAgent);

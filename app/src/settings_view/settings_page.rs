@@ -14,7 +14,6 @@ use super::{
     environments_page::EnvironmentsPageView,
     features_page::FeaturesPageView,
     keybindings::KeybindingsView,
-    main_page::MainSettingsPageView,
     mcp_servers_page::MCPServersSettingsPageView,
     privacy_page::PrivacyPageView,
     referrals_page::ReferralsPageView,
@@ -103,7 +102,6 @@ pub trait SettingsPageMeta {
 /// It is required to allow for SettingsPage struct be put in the collection (ie. vector).
 #[derive(Clone)]
 pub enum SettingsPageViewHandle {
-    Main(ViewHandle<MainSettingsPageView>),
     Appearance(ViewHandle<AppearanceSettingsPageView>),
     Features(ViewHandle<FeaturesPageView>),
     SharedBlocks(ViewHandle<ShowBlocksView>),
@@ -126,7 +124,6 @@ impl SettingsPageViewHandle {
     pub fn child_view(&self) -> Box<dyn Element> {
         use SettingsPageViewHandle::*;
         match self {
-            Main(view_handle) => ChildView::new(view_handle).finish(),
             Appearance(view_handle) => ChildView::new(view_handle).finish(),
             Features(view_handle) => ChildView::new(view_handle).finish(),
             SharedBlocks(view_handle) => ChildView::new(view_handle).finish(),

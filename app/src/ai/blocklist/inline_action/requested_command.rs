@@ -238,7 +238,7 @@ pub struct RequestedCommandView {
     header_mouse_state: MouseStateHandle,
     is_editing: bool,
 
-    // A requested command can either be copied directly off of one citation (such as a Warp Drive
+    // A requested command can either be copied directly off of one citation (such as a Dwarf Drive
     // object), derived from one or more citations, or be unrelated to any citations.
     // A given citation should only appear once per block.
     copied_from_citation: Option<AIAgentCitation>,
@@ -709,7 +709,7 @@ impl RequestedCommandView {
             ) if show_for_action_id == &self.action_id => {
                 *shown.lock() = true;
                 Some(render_autonomy_checkbox_setting_speedbump_footer(
-                    "Always allow Oz to execute read-only commands (relies on model)",
+                    "Always allow Dwarf to execute read-only commands (relies on model)",
                     *checked,
                     AIBlockAction::ToggleAutoexecuteReadonlyCommandsSpeedbumpCheckbox,
                     self.autoexecute_readonly_commands_speedbump_checkbox_handle

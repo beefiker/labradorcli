@@ -341,7 +341,7 @@ pub fn init(app: &mut AppContext) {
         ),
         EditableBinding::new(
             "terminal:warpify_subshell",
-            "Warpify subshell",
+            "Dwarfify subshell",
             TerminalAction::TriggerSubshellBootstrap,
         )
         .with_key_binding("ctrl-i")
@@ -350,7 +350,7 @@ pub fn init(app: &mut AppContext) {
         ),
         EditableBinding::new(
             "terminal:warpify_ssh_session",
-            "Warpify ssh session",
+            "Dwarfify ssh session",
             TerminalAction::WarpifySSHSession,
         )
         .with_key_binding("ctrl-i")
@@ -575,13 +575,14 @@ pub fn init(app: &mut AppContext) {
         ),
         EditableBinding::new(
             "terminal:open_share_block_modal",
-            "Share selected block",
+            "Disabled hosted action",
             TerminalAction::OpenShareModal,
         )
         .with_custom_action(CustomAction::CreateBlockPermalink)
         .with_context_predicate(
             id!("Terminal") & eq!("TerminalView_BlockSelectionCardinality", "One"),
-        ),
+        )
+        .with_enabled(|| false),
         EditableBinding::new(
             "terminal:bookmark_selected_block",
             "Bookmark selected block",
@@ -780,7 +781,7 @@ pub fn init(app: &mut AppContext) {
         // this is a block selection or text selection later on.
         EditableBinding::new(
             "terminal:ask_ai_assistant",
-            "Ask Warp AI about Selection",
+            "Ask Dwarf AI about Selection",
             TerminalAction::ContextMenu(ContextMenuAction::AskAI(AskAISource::SelectedBlockOrText)),
         )
         .with_enabled(|| !FeatureFlag::AgentMode.is_enabled())
@@ -798,7 +799,7 @@ pub fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "terminal:ask_ai_assistant_last_block",
-            "Ask Warp AI about last block",
+            "Ask Dwarf AI about last block",
             TerminalAction::ContextMenu(ContextMenuAction::AskAI(AskAISource::LastBlock)),
         )
         .with_enabled(|| !FeatureFlag::AgentMode.is_enabled())
@@ -809,7 +810,7 @@ pub fn init(app: &mut AppContext) {
         ),
         EditableBinding::new(
             "terminal:ask_ai_assistant",
-            "Ask Warp AI",
+            "Ask Dwarf AI",
             TerminalAction::ContextMenu(ContextMenuAction::AskAI(AskAISource::SelectedInputText)),
         )
         .with_enabled(|| !FeatureFlag::AgentMode.is_enabled())
@@ -935,7 +936,7 @@ pub fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "terminal:share_current_session",
-            "Share current session",
+            "Disabled hosted action",
             TerminalAction::OpenShareSessionModal {
                 source: SharedSessionActionSource::CommandPalette,
             },
@@ -1106,7 +1107,7 @@ fn register_input_mode_bindings(app: &mut AppContext) {
 
     // A context predicate that matches when the input mode bindings are
     // available for use. Disabled when a CLI agent session is active — the
-    // Warp agent should not be tagged into a CLI agent's command, and the
+    // Dwarf agent should not be tagged into a CLI agent's command, and the
     // `!` prefix is the only way to toggle shell mode in the rich input.
     let base_context = id!(flags::IS_ANY_AI_ENABLED)
         & (id!("Input") | id!("Terminal"))

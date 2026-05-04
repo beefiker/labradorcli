@@ -593,9 +593,9 @@ impl BuyCreditsBanner {
             } else {
                 // Default message when not at limit
                 let banner_description = if has_admin_permissions {
-                    "Add more credits to your account to continue using Oz agents."
+                    "Local agent usage is managed by your local provider credentials."
                 } else {
-                    "Contact a team admin to purchase more credits to continue."
+                    "Local agent usage is managed by local provider credentials."
                 };
 
                 banner_text_children.push(

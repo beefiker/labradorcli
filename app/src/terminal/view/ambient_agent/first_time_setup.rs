@@ -147,20 +147,16 @@ impl FirstTimeCloudAgentSetupView {
 
         // Title - 20px medium weight
         column.add_child(
-            Text::new(
-                "Start a new Oz cloud agent",
-                appearance.ui_font_family(),
-                20.,
-            )
-            .with_style(Properties::default().weight(Weight::Medium))
-            .with_color(theme.foreground().into())
-            .finish(),
+            Text::new("Start a new Dwarf agent", appearance.ui_font_family(), 20.)
+                .with_style(Properties::default().weight(Weight::Medium))
+                .with_color(theme.foreground().into())
+                .finish(),
         );
 
         // Description with "Visit docs" link
         let description_fragments = vec![
             FormattedTextFragment::plain_text(
-                "Use Oz cloud agents to run parallel agents, build agents that run autonomously, and check in on your agents from anywhere. ",
+                "Use Dwarf agents to run commands, inspect code, and manage local development work. ",
             ),
             FormattedTextFragment::hyperlink(
                 "Visit docs",
@@ -202,7 +198,7 @@ impl FirstTimeCloudAgentSetupView {
         .finish()
     }
 
-    /// Renders the free credits banner - displayed INSIDE the form card at the top.
+    /// Renders the local access banner - displayed inside the form card at the top.
     fn render_free_credits_banner(
         &self,
         credits: i32,
@@ -212,7 +208,7 @@ impl FirstTimeCloudAgentSetupView {
 
         // Badge with blue border
         let badge = Container::new(
-            Text::new("Free credits", appearance.ui_font_family(), 12.)
+            Text::new("Local", appearance.ui_font_family(), 12.)
                 .with_style(Properties::default().weight(Weight::Semibold))
                 .with_color(theme.accent().into())
                 .finish(),
@@ -225,10 +221,10 @@ impl FirstTimeCloudAgentSetupView {
 
         // Banner text - dynamic based on credits
         let credits_text = if credits == 1 {
-            "You have 1 free credit to use on Oz cloud agents.".to_string()
+            "Dwarf local agent mode is free with your local credentials.".to_string()
         } else {
             format!(
-                "You have {} free credits to use on Oz cloud agents.",
+                "Dwarf local agent mode is free with your local credentials. Local run marker: {}.",
                 credits
             )
         };

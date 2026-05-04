@@ -188,7 +188,7 @@ use session_sharing_protocol::common::LongRunningCommandAgentInteractionState;
 use session_sharing_protocol::sharer::{RoleUpdateReason, SessionEndedReason, SessionSourceType};
 use ssh_file_upload::{FileUpload, FileUploadEvent};
 use uuid::Uuid;
-use warp_core::channel::ChannelState;
+use warp_core::channel::{Channel, ChannelState};
 use warpui::elements::{shimmering_text::ShimmeringTextStateHandle, Border, ChildView};
 use warpui::fonts::Properties;
 use warpui::{ViewHandle, WeakModelHandle};
@@ -6404,24 +6404,24 @@ impl TerminalView {
                 .get_pending_action(app)
                 .map(|action| match &action.action {
                     AIAgentActionType::RequestCommandOutput { command, .. } => {
-                        format!("Oz needs your permission to run `{command}`")
+                        format!("Dwarf needs your permission to run `{command}`")
                     }
                     AIAgentActionType::ReadFiles(..) => {
-                        "Oz needs your permission to read files".to_string()
+                        "Dwarf needs your permission to read files".to_string()
                     }
                     AIAgentActionType::SearchCodebase(..) => {
-                        "Oz needs your permission to search your codebase".to_string()
+                        "Dwarf needs your permission to search your codebase".to_string()
                     }
                     AIAgentActionType::RequestFileEdits { .. } => {
-                        "Oz needs your permission to edit a file".to_string()
+                        "Dwarf needs your permission to edit a file".to_string()
                     }
                     AIAgentActionType::WriteToLongRunningShellCommand { .. } => {
-                        "Oz needs your permission to interact with a running shell command"
+                        "Dwarf needs your permission to interact with a running shell command"
                             .to_string()
                     }
-                    _ => "Oz needs your confirmation to continue".to_string(),
+                    _ => "Dwarf needs your confirmation to continue".to_string(),
                 })
-                .unwrap_or("Oz needs your confirmation to continue".to_string());
+                .unwrap_or("Dwarf needs your confirmation to continue".to_string());
             return Some(AIBlockNotificationSummary {
                 success: false,
                 title,
@@ -8618,7 +8618,7 @@ impl TerminalView {
                 keystroke.displayed(),
                 lowercase_title
             ),
-            None => format!("You can Warpify this {lowercase_title} for more Warp features."),
+            None => format!("You can Dwarfify this {lowercase_title} for more Dwarf features."),
         };
 
         model
@@ -8781,7 +8781,7 @@ impl TerminalView {
 
         let a11y_content = AccessibilityContent::new(
             banner_title,
-            "Make sure you have enabled access for Warp notifications in System Preferences.",
+            "Make sure you have enabled access for Dwarf notifications in System Preferences.",
             WarpA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
@@ -9340,32 +9340,7 @@ impl TerminalView {
     }
 
     fn insert_anonymous_user_ai_sign_up_banner(&mut self, ctx: &mut ViewContext<Self>) {
-        if *GeneralSettings::as_ref(ctx)
-            .anonymous_user_ai_sign_up_banner_shown
-            .value()
-        {
-            return;
-        }
-
-        let banner_id = self.inline_banners_state.next_banner_id();
-        let banner_state = AnonymousUserAISignUpBannerState::new(banner_id);
-
-        self.model
-            .lock()
-            .block_list_mut()
-            .append_inline_banner_with_custom_height(
-                InlineBannerItem::new(banner_id, InlineBannerType::AnonymousUserAISignUp),
-                3.0,
-            );
-
-        self.inline_banners_state.anonymous_user_ai_sign_up_banner = Some(banner_state);
-        GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
-            let _ = settings
-                .anonymous_user_ai_sign_up_banner_shown
-                .set_value(true, ctx);
-        });
-
-        ctx.notify();
+        let _ = (self, ctx);
     }
 
     fn remove_anonymous_user_ai_sign_up_banner(&mut self, ctx: &mut ViewContext<Self>) {
@@ -12068,7 +12043,7 @@ impl TerminalView {
 
         // Now that the session is bootstrapped, update any restored AI blocks that were
         // created before bootstrapping with the shell launch data. This enables file link
-        // detection and the "Open in Warp" button on code blocks in restored conversations.
+        // detection and the "Open in Dwarf" button on code blocks in restored conversations.
         if let Some(shell_launch_data) = self.active_session.as_ref(ctx).shell_launch_data(ctx) {
             let ai_block_handles: Vec<_> = self
                 .rich_content_views
@@ -15053,7 +15028,7 @@ impl TerminalView {
 
                             if is_markdown_file(&path) {
                                 items.push(
-                                    MenuItemFields::new("Open in Warp")
+                                    MenuItemFields::new("Open in Dwarf")
                                         .with_on_select_action(TerminalAction::OpenFileInWarp(path))
                                         .into_item(),
                                 );
@@ -15137,13 +15112,6 @@ impl TerminalView {
                 };
 
                 let is_single_selection = self.selected_blocks.is_singleton();
-                let is_active_block_selected = self
-                    .selected_blocks
-                    .is_selected(model.block_list().active_block_index());
-                let is_active_block_running = model
-                    .block_list()
-                    .active_block()
-                    .is_active_and_long_running();
 
                 let copy_commands_str = if is_single_selection {
                     "Copy command"
@@ -15167,24 +15135,12 @@ impl TerminalView {
                     "Scroll to bottom of blocks"
                 };
 
-                // currently, we don't support share for multi selections
-                let is_share_disabled =
-                    !is_single_selection || (is_active_block_selected && is_active_block_running);
-
                 let is_ask_ai_disabled = !is_single_selection;
 
                 let is_copy_commands_disabled =
                     is_single_selection && tail_block.command_to_string().trim().is_empty();
                 let is_copy_both_disabled =
                     is_copy_commands_disabled && tail_block.output_to_string().trim().is_empty();
-
-                let share_block_label = if FeatureFlag::CreatingSharedSessions.is_enabled()
-                    && ContextFlag::CreateSharedSession.is_enabled()
-                {
-                    "Share block..."
-                } else {
-                    "Share..."
-                };
 
                 let mut items = vec![
                     MenuItemFields::new(copy_str)
@@ -15206,18 +15162,6 @@ impl TerminalView {
                             ctx,
                         ))
                         .with_disabled(is_copy_commands_disabled)
-                        .into_item(),
-                    MenuItemFields::new(share_block_label)
-                        .with_on_select_action(TerminalAction::ContextMenu(
-                            ContextMenuAction::OpenShareBlockModal {
-                                block_index: tail_block_index,
-                            },
-                        ))
-                        .with_key_shortcut_label(keybinding_name_to_display_string(
-                            "terminal:open_share_block_modal",
-                            ctx,
-                        ))
-                        .with_disabled(is_share_disabled)
                         .into_item(),
                 ];
 
@@ -15271,7 +15215,7 @@ impl TerminalView {
                     } else {
                         items.extend([
                             MenuItem::Separator,
-                            MenuItemFields::new("Ask Warp AI")
+                            MenuItemFields::new("Ask Dwarf AI")
                                 .with_on_select_action(TerminalAction::ContextMenu(
                                     ContextMenuAction::AskAI(AskAISource::SelectedBlockOrText),
                                 ))
@@ -15894,7 +15838,7 @@ impl TerminalView {
 
             if !selected_input_text.is_empty() && !FeatureFlag::AgentMode.is_enabled() {
                 items.push(
-                    MenuItemFields::new("Ask Warp AI")
+                    MenuItemFields::new("Ask Dwarf AI")
                         .with_on_select_action(TerminalAction::InputContextMenuItem(
                             InputContextMenuAction::AskWarpAI,
                         ))
@@ -19461,6 +19405,11 @@ impl TerminalView {
         block_index: BlockIndex,
         ctx: &mut ViewContext<Self>,
     ) {
+        if !FeatureFlag::CreatingSharedSessions.is_enabled() {
+            let _ = (block_index, ctx);
+            return;
+        }
+
         if AuthStateProvider::as_ref(ctx)
             .get()
             .is_anonymous_or_logged_out()
@@ -19493,6 +19442,11 @@ impl TerminalView {
     }
 
     fn open_share_block_modal(&mut self, ctx: &mut ViewContext<Self>) {
+        if !FeatureFlag::CreatingSharedSessions.is_enabled() {
+            let _ = ctx;
+            return;
+        }
+
         if let Some(selected_index) = self.selected_blocks.tail() {
             self.context_menu_open_share_block_modal(selected_index, ctx);
         }
@@ -20081,7 +20035,17 @@ impl TerminalView {
                 });
             }
             InputEvent::OpenSettings(section) => {
-                ctx.emit(Event::OpenSettings(*section));
+                if !matches!(
+                    section,
+                    SettingsSection::BillingAndUsage
+                        | SettingsSection::CloudEnvironments
+                        | SettingsSection::Referrals
+                        | SettingsSection::SharedBlocks
+                        | SettingsSection::Teams
+                        | SettingsSection::WarpDrive
+                ) {
+                    ctx.emit(Event::OpenSettings(*section));
+                }
             }
             #[cfg(feature = "local_fs")]
             InputEvent::OpenCodeInWarp { source, layout } => {
@@ -24881,6 +24845,10 @@ impl TypedActionView for TerminalView {
             }
             VimModeBanner(action) => self.handle_vim_banner_action(*action, ctx),
             OnboardingFlow(version) => {
+                if matches!(ChannelState::channel(), Channel::Oss) {
+                    return;
+                }
+
                 // Don't show onboarding if it's already active or if this is a shared session or if user is anonymous
                 if self
                     .model
@@ -25069,13 +25037,7 @@ impl TypedActionView for TerminalView {
                 ctx.open_url(&hyperlink.url);
             }
             AttemptLoginGatedFeature => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager.attempt_login_gated_feature(
-                        "Upgrade AI Usage",
-                        AuthViewVariant::RequireLoginCloseable,
-                        ctx,
-                    )
-                });
+                let _ = ctx;
             }
             StartFileDropTarget => {
                 let Some(session) = self
@@ -25106,7 +25068,7 @@ impl TypedActionView for TerminalView {
                 });
             }
             OpenTeamSettingsPage => {
-                ctx.emit(Event::OpenSettings(SettingsSection::Teams));
+                ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent));
             }
             SetMarkedText {
                 marked_text,
@@ -25348,7 +25310,7 @@ impl TypedActionView for TerminalView {
                 });
             }
             OpenBillingAndUsagePane => {
-                ctx.emit(Event::OpenSettings(SettingsSection::BillingAndUsage));
+                ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent));
             }
             OpenAddRulePane => {
                 ctx.emit(Event::OpenAddRulePane);

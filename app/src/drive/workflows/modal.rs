@@ -28,7 +28,6 @@ use warpui::{
     ViewHandle,
 };
 
-use crate::auth::UserUid;
 use crate::{
     appearance::Appearance,
     cloud_object::{
@@ -49,7 +48,7 @@ use crate::{
     network::NetworkStatus,
     server::{
         cloud_objects::update_manager::UpdateManager,
-        ids::{ClientId, ServerId, SyncId},
+        ids::{ClientId, SyncId},
         server_api::ai::AIClient,
     },
     themes::theme::AnsiColorIdentifier,
@@ -195,7 +194,7 @@ pub enum WorkflowModalEvent {
     Close,
     UpdatedWorkflow(SyncId),
     AiAssistError(String),
-    AiAssistUpgradeError(Option<ServerId>, UserUid),
+    AiAssistUpgradeError,
     ViewInWarpDrive(WarpDriveItemId),
 }
 
@@ -439,7 +438,7 @@ impl WorkflowModal {
     #[allow(dead_code)]
     fn populate(&mut self, workflow: Workflow, ctx: &mut ViewContext<Self>) {
         // Sanitize the arguments generated for the workflow by removing any illegal characters.
-        // Necessary since Warp AI command search sometimes provides arguments in an invalid argument format.
+        // Necessary since Dwarf AI command search sometimes provides arguments in an invalid argument format.
         let mut sanitized_content = workflow.content().to_string();
         let sanitized_arguments = workflow
             .arguments()
@@ -1740,7 +1739,7 @@ impl WorkflowModal {
                 .finish();
 
             let button_with_tool_tip = appearance.ui_builder().tool_tip_on_element(
-                "Generate a title, descriptions, or parameters with Warp AI".to_string(),
+                "Generate a title, descriptions, or parameters with Dwarf AI".to_string(),
                 self.button_mouse_states.ai_assist_tool_tip.clone(),
                 rendered_button,
                 ParentAnchor::BottomMiddle,

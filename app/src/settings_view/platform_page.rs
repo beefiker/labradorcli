@@ -378,7 +378,7 @@ impl PlatformPageWidget {
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let text = vec![
-            FormattedTextFragment::plain_text("Create and manage API keys to allow other Oz cloud agents to access your Warp account.\nFor more information, visit the "),
+            FormattedTextFragment::plain_text("Create and manage API keys for Dwarf integrations.\nFor more information, visit the "),
             FormattedTextFragment::hyperlink("Documentation.", API_KEY_DOCS_URL),
         ];
 
@@ -413,7 +413,7 @@ impl PlatformPageWidget {
             Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(
-                    Text::new_inline("Oz Cloud API Keys", appearance.ui_font_family(), 16.)
+                    Text::new_inline("Dwarf API Keys", appearance.ui_font_family(), 16.)
                         .with_style(Properties::default().weight(Weight::Bold))
                         .with_color(appearance.theme().active_ui_text_color().into())
                         .finish(),
@@ -669,7 +669,7 @@ impl PlatformPageWidget {
                     .with_child(
                         Container::new(
                             Text::new(
-                                "Create a key to manage external access to Warp",
+                                "Create a key to manage external access to Dwarf",
                                 appearance.ui_font_family(),
                                 CONTENT_FONT_SIZE,
                             )
@@ -698,7 +698,8 @@ impl SettingsPageMeta for PlatformPageView {
             .get()
             .is_anonymous_or_logged_out();
 
-        !is_anonymous && FeatureFlag::APIKeyManagement.is_enabled()
+        let _ = is_anonymous;
+        false && FeatureFlag::APIKeyManagement.is_enabled()
     }
 
     fn on_page_selected(&mut self, _allow_steal_focus: bool, ctx: &mut ViewContext<Self>) {

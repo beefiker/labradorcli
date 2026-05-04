@@ -157,7 +157,7 @@ const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(4.);
 pub struct LoginSlideView {
     /// Whether AI will be enabled once onboarding is applied. Used to hide the
     /// cloud-conversation-storage toggle in the privacy settings step when the
-    /// user has disabled Warp Agent during onboarding (or is on the terminal
+    /// user has disabled Dwarf Agent during onboarding (or is on the terminal
     /// intention path, which disables AI). The actual `AISettings` value may
     /// not have been written yet at this point, since onboarding settings are
     /// applied after login.
@@ -165,7 +165,7 @@ pub struct LoginSlideView {
     /// Onboarding intention selected by the user, used to render Drive-focused
     /// copy on the Terminal+Drive path. On the login slide, `intention ==
     /// OnboardingIntention::Terminal` is equivalent to "Terminal+Drive":
-    /// `RootView` only routes Terminal-intent users here when Warp Drive is
+    /// `RootView` only routes Terminal-intent users here when Dwarf Drive is
     /// enabled.
     intention: OnboardingIntention,
     theme_visual_path: &'static str,
@@ -477,7 +477,7 @@ impl LoginSlideView {
 
         let is_terminal = matches!(self.intention, OnboardingIntention::Terminal);
         let title_text = if is_terminal {
-            "Get started with Warp Drive"
+            "Get started with Dwarf Drive"
         } else {
             "Get started with AI"
         };
@@ -513,7 +513,7 @@ impl LoginSlideView {
         let tos_line = Flex::row()
             .with_child(
                 ui_builder
-                    .span("By continuing, you agree to Warp's ")
+                    .span("By continuing, you agree to Dwarf's ")
                     .with_style(disclaimer_styles)
                     .build()
                     .finish(),
@@ -601,7 +601,7 @@ impl LoginSlideView {
 
         let cmd_enter = Keystroke::parse("cmdorctrl-enter").unwrap_or_default();
         let skip_label = if matches!(self.intention, OnboardingIntention::Terminal) {
-            "Disable Warp Drive"
+            "Disable Dwarf Drive"
         } else {
             "Disable AI features"
         };
@@ -898,7 +898,7 @@ impl LoginSlideView {
 
         let is_terminal = matches!(self.intention, OnboardingIntention::Terminal);
         let title_text = if is_terminal {
-            "Are you sure you want to disable Warp Drive?"
+            "Are you sure you want to disable Dwarf Drive?"
         } else {
             "Are you sure you want to disable AI features?"
         };
@@ -934,9 +934,9 @@ impl LoginSlideView {
             .finish();
 
         let body_text_str = if is_terminal {
-            "Warp Drive lets you save workflows and knowledge across devices and share them with your team. By continuing, you won't have access to the following features:"
+            "Dwarf Drive lets you save workflows and knowledge across devices and share them with your team. By continuing, you won't have access to the following features:"
         } else {
-            "Warp is better with AI. By continuing, you won't have access to any of the following features:"
+            "Dwarf is better with AI. By continuing, you won't have access to any of the following features:"
         };
         let body_text =
             FormattedTextElement::from_str(body_text_str, appearance.ui_font_family(), 14.)
@@ -989,7 +989,7 @@ impl LoginSlideView {
             .finish();
 
         let cancel_label = if is_terminal {
-            "Enable Warp Drive"
+            "Enable Dwarf Drive"
         } else {
             "Enable AI features"
         };

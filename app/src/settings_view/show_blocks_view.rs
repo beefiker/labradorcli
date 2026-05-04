@@ -5,7 +5,6 @@ use super::{
     },
     SettingsSection,
 };
-use crate::auth::AuthStateProvider;
 use crate::{
     appearance::Appearance,
     channel::{Channel, ChannelState},
@@ -614,11 +613,8 @@ impl SettingsPageMeta for ShowBlocksView {
     }
 
     fn should_render(&self, ctx: &AppContext) -> bool {
-        let is_anonymous = AuthStateProvider::as_ref(ctx)
-            .get()
-            .is_anonymous_or_logged_out();
-
-        !is_anonymous
+        let _ = ctx;
+        false
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {

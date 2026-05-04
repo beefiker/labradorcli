@@ -486,7 +486,7 @@ pub struct ConversationDetailsPanel {
     show_open_button: bool,
     #[cfg(not(target_family = "wasm"))]
     continue_locally_button: ViewHandle<ActionButton>,
-    /// Text button "View in Oz" shown next to "Continue locally".
+    /// Text button "View in Dwarf" shown next to "Continue locally".
     open_in_oz_button: ViewHandle<ActionButton>,
     /// Tracks when each copy button was last clicked (for checkmark feedback).
     copy_feedback_times: HashMap<CopyButtonKind, Instant>,
@@ -519,8 +519,8 @@ impl ConversationDetailsPanel {
                 })
         });
         let open_in_oz_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("View in Oz", SecondaryTheme)
-                .with_tooltip("View this run in the Oz web app")
+            ActionButton::new("View in Dwarf", SecondaryTheme)
+                .with_tooltip("View this run in Dwarf")
                 .with_size(ButtonSize::Small)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(ConversationDetailsPanelAction::OpenInOz);
@@ -1061,7 +1061,7 @@ impl ConversationDetailsPanel {
         let oz_link = appearance
             .ui_builder()
             .link(
-                "Open in Oz".to_string(),
+                "Open in Dwarf".to_string(),
                 Some(skill_url),
                 None,
                 self.mouse_states.skill_link.clone(),

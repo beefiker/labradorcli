@@ -402,6 +402,73 @@ impl ModelsByFeature {
     }
 }
 
+const LOCAL_CODEX_MODEL_IDS: &[&str] = &[
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.3-codex",
+    "gpt-5.3-codex-spark",
+    "gpt-5.2",
+];
+
+fn local_codex_llm_info(id: &str) -> LLMInfo {
+    LLMInfo {
+        display_name: id.to_owned(),
+        base_model_name: id.to_owned(),
+        id: id.to_owned().into(),
+        reasoning_level: None,
+        usage_metadata: LLMUsageMetadata {
+            request_multiplier: 1,
+            credit_multiplier: None,
+        },
+        description: None,
+        disable_reason: None,
+        vision_supported: true,
+        spec: None,
+        provider: LLMProvider::OpenAI,
+        host_configs: HashMap::new(),
+        discount_percentage: None,
+        context_window: LLMContextWindow::default(),
+    }
+}
+
+fn local_codex_available_llms() -> AvailableLLMs {
+    let mut choices = vec![LLMInfo {
+        display_name: "Codex default".to_owned(),
+        base_model_name: "Codex default".to_owned(),
+        id: "auto".to_owned().into(),
+        reasoning_level: None,
+        usage_metadata: LLMUsageMetadata {
+            request_multiplier: 1,
+            credit_multiplier: None,
+        },
+        description: None,
+        disable_reason: None,
+        vision_supported: true,
+        spec: None,
+        provider: LLMProvider::OpenAI,
+        host_configs: HashMap::new(),
+        discount_percentage: None,
+        context_window: LLMContextWindow::default(),
+    }];
+
+    choices.extend(
+        LOCAL_CODEX_MODEL_IDS
+            .iter()
+            .map(|id| local_codex_llm_info(id)),
+    );
+
+    AvailableLLMs {
+        default_id: "gpt-5.5".to_owned().into(),
+        choices,
+        preferred_codex_model_id: Some("gpt-5.5".to_owned().into()),
+    }
+}
+
+fn use_local_codex_agent_models(models: &mut ModelsByFeature) {
+    models.agent_mode = local_codex_available_llms();
+}
+
 /// Returns the default AvailableLLMs for computer use.
 /// Used both in `ModelsByFeature::default()` and as a fallback in `get_computer_use_available()`.
 fn default_computer_use_llms() -> AvailableLLMs {
@@ -431,7 +498,7 @@ fn default_computer_use_llms() -> AvailableLLMs {
 
 impl Default for ModelsByFeature {
     fn default() -> Self {
-        Self {
+        let mut models = Self {
             agent_mode: AvailableLLMs {
                 default_id: "auto".to_owned().into(),
                 choices: vec![LLMInfo {
@@ -499,7 +566,9 @@ impl Default for ModelsByFeature {
                 preferred_codex_model_id: None,
             }),
             computer_use: Some(default_computer_use_llms()),
-        }
+        };
+        use_local_codex_agent_models(&mut models);
+        models
     }
 }
 
@@ -528,7 +597,8 @@ pub struct LLMPreferences {
 
 impl LLMPreferences {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        let models_by_feature = get_cached_models(ctx).unwrap_or_default();
+        let mut models_by_feature = get_cached_models(ctx).unwrap_or_default();
+        use_local_codex_agent_models(&mut models_by_feature);
 
         ctx.subscribe_to_model(&NetworkStatus::handle(ctx), |me, event, ctx| {
             if let NetworkStatusEvent::NetworkStatusChanged {
@@ -926,7 +996,9 @@ impl LLMPreferences {
         }
     }
 
-    fn on_server_update(&mut self, update: ModelsByFeature, ctx: &mut ModelContext<Self>) {
+    fn on_server_update(&mut self, mut update: ModelsByFeature, ctx: &mut ModelContext<Self>) {
+        use_local_codex_agent_models(&mut update);
+
         let has_existing_persisted_config = get_cached_models(ctx).is_some();
 
         let old = std::mem::replace(&mut self.models_by_feature, update);

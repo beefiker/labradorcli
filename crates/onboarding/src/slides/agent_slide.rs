@@ -190,13 +190,9 @@ fn model_row_position_id(index: usize) -> String {
     format!("agent_slide_model_row_{index}")
 }
 
-/// Returns the slide's view of the model list: free-tier before premium,
-/// with server order preserved within each tier. The slide owns this sort so
-/// state storage can stay in server order.
+/// Returns the slide's view of the model list with server order preserved.
 fn sorted_models(models: &[OnboardingModelInfo]) -> Vec<OnboardingModelInfo> {
-    let (free, premium): (Vec<_>, Vec<_>) =
-        models.iter().cloned().partition(|m| !m.requires_upgrade);
-    free.into_iter().chain(premium).collect()
+    models.to_vec()
 }
 
 impl AgentSlide {
@@ -323,7 +319,7 @@ impl AgentSlide {
     fn render_header(&self, appearance: &Appearance) -> Box<dyn Element> {
         let title = appearance
             .ui_builder()
-            .paragraph("Customize your Warp Agent")
+            .paragraph("Customize your Dwarf Agent")
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),
@@ -378,7 +374,7 @@ impl AgentSlide {
             );
 
         // Apply a semi-transparent overlay to visually disable the upper sections
-        // when the "Disable Oz" checkbox is checked.
+        // when the "Disable Dwarf Agent" checkbox is checked.
         let upper_sections: Box<dyn Element> = if settings.disable_oz {
             let bg = appearance.theme().background().into_solid();
             let overlay_color = ColorU::new(bg.r, bg.g, bg.b, 128);
@@ -458,12 +454,7 @@ impl AgentSlide {
             );
         }
 
-        let has_disabled = self
-            .onboarding_state
-            .as_ref(app)
-            .models()
-            .iter()
-            .any(|m| m.requires_upgrade);
+        let has_disabled = false;
 
         let mut col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
@@ -596,8 +587,7 @@ impl AgentSlide {
 
     /// Renders the vertical list of model rows shown inside the floating dropdown
     /// overlay. Each row: provider icon + title on the left, pill on the right
-    /// (Premium for paywalled rows). Disabled rows are rendered dimmed and are
-    /// not clickable or hover-selectable.
+    /// (Recommended for the default row). Rows are always selectable in Dwarf.
     fn render_model_list_rows(
         &self,
         appearance: &Appearance,
@@ -695,7 +685,7 @@ impl AgentSlide {
         let background_for_text = theme.background().into_solid();
         let ui_font_family = appearance.ui_font_family();
 
-        let is_disabled = model.requires_upgrade;
+        let is_disabled = false;
 
         let title_color: ColorU = if is_disabled {
             internal_colors::text_disabled(theme, background_for_text)
@@ -706,7 +696,6 @@ impl AgentSlide {
         let row_id = model.id.clone();
         let title = model.title.clone();
         let icon = model.icon;
-        let requires_upgrade = model.requires_upgrade;
         let is_default = model.is_default;
 
         let hoverable_body = Hoverable::new(mouse_state, move |_| {
@@ -730,10 +719,7 @@ impl AgentSlide {
                 .with_child(Container::new(title_el).with_margin_left(8.).finish())
                 .finish();
 
-            // Trailing pills: "Recommended" on the server-designated default
-            // model, "Premium" on paywalled rows. In practice a single row is
-            // at most one of these, but both can be shown side-by-side if the
-            // default is also premium for any reason.
+            // Trailing pill: "Recommended" on the server-designated default model.
             let make_pill = |label: &'static str| -> Box<dyn Element> {
                 let badge = Text::new(label.to_string(), ui_font_family, 11.0)
                     .with_color(internal_colors::text_sub(theme, background_for_text))
@@ -755,8 +741,6 @@ impl AgentSlide {
 
             let trailing: Box<dyn Element> = if is_default {
                 make_pill("Recommended")
-            } else if requires_upgrade {
-                make_pill("Premium")
             } else {
                 Empty::new().finish()
             };
@@ -955,7 +939,7 @@ impl AgentSlide {
             .on_click(|ctx, _, _| ctx.dispatch_typed_action(AgentSlideAction::ToggleDisableOz))
             .finish();
 
-        let label = Text::new("Disable Warp Agent", appearance.ui_font_family(), 14.0)
+        let label = Text::new("Disable Dwarf Agent", appearance.ui_font_family(), 14.0)
             .with_color(internal_colors::text_sub(theme, background_for_text))
             .with_style(Properties {
                 weight: Weight::Normal,
@@ -1019,8 +1003,7 @@ impl AgentSlide {
     }
 
     fn render_upgrade_banner(&self, appearance: &Appearance) -> Box<dyn Element> {
-        // Diagonal magenta → yellow gradient (top-left to bottom-right). Chosen
-        // to match the "premium" glow styling in the Figma mocks.
+        // Diagonal magenta -> yellow gradient (top-left to bottom-right).
         const GRADIENT_START_MAGENTA: ColorU = ColorU {
             r: 0xE2,
             g: 0x48,
@@ -1040,7 +1023,7 @@ impl AgentSlide {
 
         // Primary "heading" line: bolder, full-contrast.
         let title = Text::new(
-            "Upgrade for access to premium models.",
+            "All configured models are available locally.",
             ui_font_family,
             13.0,
         )
@@ -1054,7 +1037,7 @@ impl AgentSlide {
 
         // Secondary subtext: muted, normal weight.
         let subtitle = Text::new(
-            "State-of-the-art models require paid plans.",
+            "Dwarf uses your local credentials instead of Dwarf plan gating.",
             ui_font_family,
             12.0,
         )
@@ -1076,7 +1059,7 @@ impl AgentSlide {
         let upgrade_button = self.upgrade_button.render(
             appearance,
             button::Params {
-                content: button::Content::Label("Upgrade".into()),
+                content: button::Content::Label("Continue".into()),
                 theme: &UpgradeButtonTheme,
                 options: button::Options {
                     size: button::Size::Small,
@@ -1270,7 +1253,7 @@ impl AgentSlide {
         .finish();
 
         let text = ui_builder
-            .span("Plan successfully activated. All premium models are available.")
+            .span("Local model access is enabled.")
             .with_style(UiComponentStyles {
                 font_color: Some(text_color),
                 font_size: Some(FONT_SIZE),
@@ -1532,13 +1515,12 @@ impl OnboardingSlide for AgentSlide {
         // and collapses the list. Does NOT advance to the next slide.
         if self.is_model_list_expanded {
             if let Some(id) = self.highlighted_model_id.clone() {
-                // Only select if the highlighted row is still enabled.
                 let enabled = self
                     .onboarding_state
                     .as_ref(ctx)
                     .models()
                     .iter()
-                    .any(|m| m.id == id && !m.requires_upgrade);
+                    .any(|m| m.id == id);
                 if enabled {
                     self.select_model(id, ctx);
                 }
@@ -1578,15 +1560,15 @@ impl TypedActionView for AgentSlide {
                 self.set_model_list_expanded(!self.is_model_list_expanded, ctx);
             }
             AgentSlideAction::HighlightModel(model_id) => {
-                // Only update if the id corresponds to an enabled row. Callers
-                // (hover handlers) already filter this out, but we defend against
-                // stale actions fired while the list was re-rendering.
+                // Only update if the id still exists. Callers already filter this
+                // out, but we defend against stale actions fired while the list was
+                // re-rendering.
                 let enabled = self
                     .onboarding_state
                     .as_ref(ctx)
                     .models()
                     .iter()
-                    .any(|m| m.id == *model_id && !m.requires_upgrade);
+                    .any(|m| m.id == *model_id);
                 if enabled && self.highlighted_model_id.as_ref() != Some(model_id) {
                     self.highlighted_model_id = Some(model_id.clone());
                     ctx.notify();

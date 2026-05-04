@@ -256,7 +256,7 @@ impl PromptRenderHelper {
                     RemoteServerSetupState::Checking => "Starting shell...".to_string(),
                     RemoteServerSetupState::Installing {
                         progress_percent: Some(p),
-                    } => format!("Installing Warp SSH tools... ({p}%)"),
+                    } => format!("Installing Dwarf SSH tools... ({p}%)"),
                     RemoteServerSetupState::Installing {
                         progress_percent: None,
                     } => "Installing Warp SSH tools...".to_string(),

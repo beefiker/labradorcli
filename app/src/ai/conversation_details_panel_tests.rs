@@ -198,7 +198,7 @@ fn test_from_task_resolves_harness() {
             let data = ConversationDetailsData::from_task(&base_task, None, None, ctx);
             assert_eq!(data.harness, None);
 
-            // Snapshot without an explicit harness → default to Warp Agent.
+            // Snapshot without an explicit harness → default to Dwarf Agent.
             let mut task = base_task.clone();
             task.agent_config_snapshot = Some(AgentConfigSnapshot::default());
             let data = ConversationDetailsData::from_task(&task, None, None, ctx);

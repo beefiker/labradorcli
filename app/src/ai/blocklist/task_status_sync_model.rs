@@ -261,14 +261,14 @@ pub(crate) fn classify_renderable_error(
         RenderableAIError::QuotaLimit => (
             AgentTaskState::Failed,
             Some(TaskStatusUpdate::with_error_code(
-                "Your team has run out of credits. Purchase more credits to continue.",
+                "The configured provider reported a quota limit. Check your local agent credentials or provider limits.",
                 PlatformErrorCode::InsufficientCredits,
             )),
         ),
         RenderableAIError::ServerOverloaded => (
             AgentTaskState::Error,
             Some(TaskStatusUpdate::with_error_code(
-                "Warp is temporarily overloaded. Please try again shortly.",
+                "Dwarf is temporarily overloaded. Please try again shortly.",
                 PlatformErrorCode::ResourceUnavailable,
             )),
         ),

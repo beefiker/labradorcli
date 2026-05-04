@@ -71,7 +71,7 @@ impl WarpDriveItemId {
         }
     }
 }
-/// This uniquely identifies an item in Warp Drive index
+/// This uniquely identifies an item in Dwarf Drive index
 /// Includes spaces (which CloudObjectTypeAndId does not entail)
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum WarpDriveItemId {

@@ -1,9 +1,7 @@
+use super::DriveSortOrder;
 use settings::{
     macros::define_settings_group, RespectUserSyncSetting, SupportedPlatforms, SyncToCloud,
 };
-use warp_core::features::FeatureFlag;
-
-use super::DriveSortOrder;
 
 pub const HAS_AUTO_OPENED_WELCOME_FOLDER: &str = "HasAutoOpenedWelcomeFolder";
 
@@ -15,7 +13,7 @@ define_settings_group!(WarpDriveSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "warp_drive.sorting_choice",
-        description: "The sort order for items in Warp Drive.",
+        description: "The sort order for items in Dwarf Drive.",
     },
     sharing_onboarding_block_shown: WarpDriveSharingOnboardingBlockShown {
         type: bool,
@@ -24,7 +22,7 @@ define_settings_group!(WarpDriveSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: true,
     },
-    // Controls whether Warp Drive appears in the tools panel, command palette, and command search.
+    // Controls whether Dwarf Drive appears in the tools panel, command palette, and command search.
     enable_warp_drive: EnableWarpDrive {
         type: bool,
         default: true,
@@ -32,20 +30,15 @@ define_settings_group!(WarpDriveSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "warp_drive.enabled",
-        description: "Whether Warp Drive is enabled.",
+        description: "Whether Dwarf Drive is enabled.",
     },
 ]);
 
 impl WarpDriveSettings {
-    /// Returns whether Warp Drive should be considered enabled.
-    /// Returns `false` when the user is anonymous or fully logged out,
-    /// regardless of the user setting.
+    /// Dwarf Drive remains disabled in local-only builds because it still depends on hosted
+    /// Warp collaboration/storage surfaces.
     pub fn is_warp_drive_enabled(app: &warpui::AppContext) -> bool {
-        use warpui::SingletonEntity as _;
-        let is_anonymous_or_logged_out = FeatureFlag::SkipFirebaseAnonymousUser.is_enabled()
-            && crate::auth::AuthStateProvider::as_ref(app)
-                .get()
-                .is_anonymous_or_logged_out();
-        *Self::as_ref(app).enable_warp_drive && !is_anonymous_or_logged_out
+        let _ = app;
+        false
     }
 }

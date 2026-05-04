@@ -1,3 +1,4 @@
+use crate::channel::{Channel, ChannelState};
 use crate::pane_group::{NewTerminalOptions, PanesLayout};
 use crate::settings::AISettings;
 use crate::terminal;
@@ -238,6 +239,10 @@ impl Workspace {
     }
 
     pub(crate) fn should_show_agent_onboarding(&self, _ctx: &mut ViewContext<Self>) -> bool {
+        if matches!(ChannelState::channel(), Channel::Oss) {
+            return false;
+        }
+
         FeatureFlag::AgentOnboarding.is_enabled()
     }
 }

@@ -850,7 +850,7 @@ fn prepare_docker_sandbox(starter: &DockerSandboxShellStarter) -> Result<()> {
     // cannot traverse into them, which (combined with the parent living under
     // the per-user Warp cache dir rather than `/tmp`) prevents the init
     // script from being read or symlink-attacked by anyone other than the
-    // Warp user. The file itself is left at the default mode so the
+    // Dwarf user. The file itself is left at the default mode so the
     // container's shell (which may run as a different uid than the host
     // user) can still read it via `--rcfile`.
     let mk_owner_only_dir = |path: &Path| -> Result<()> {

@@ -50,6 +50,7 @@ impl ServerExperiments {
     }
 
     /// Returns true iff the `experiment` is enabled.
+    #[allow(dead_code)]
     pub fn is_experiment_enabled(&self, experiment: &ServerExperiment) -> bool {
         self.latest.contains(experiment)
     }

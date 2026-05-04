@@ -32,7 +32,7 @@ impl CliAgentPluginManager for CodexPluginManager {
 static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
     PluginInstructions {
     title: "Enable Warp Notifications for Codex",
-    subtitle: "Update Codex to the latest version, then enable in-focus notifications so Warp can display them while you work.",
+    subtitle: "Update Codex to the latest version, then enable in-focus notifications so Dwarf can display them while you work.",
     steps: &[
         PluginInstructionStep {
             description: "Update Codex to the latest version.",

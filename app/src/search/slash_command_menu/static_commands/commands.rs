@@ -47,7 +47,7 @@ pub const PR_COMMENTS: StaticCommand = StaticCommand {
 
 pub static CREATE_ENVIRONMENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/create-environment",
-    description: "Create an Oz environment (Docker image + repos) via guided setup",
+    description: "Create a Dwarf environment (Docker image + repos) via guided setup",
     icon_path: "bundled/svg/dataflow.svg",
     availability: Availability::AI_ENABLED,
     auto_enter_ai_mode: false,
@@ -69,7 +69,7 @@ pub const CREATE_DOCKER_SANDBOX: StaticCommand = StaticCommand {
 
 pub static CREATE_NEW_PROJECT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/create-new-project",
-    description: "Have Oz walk you through creating a new coding project",
+    description: "Have Dwarf walk you through creating a new coding project",
     icon_path: "bundled/svg/plus.svg",
     availability: Availability::LOCAL | Availability::AI_ENABLED,
     auto_enter_ai_mode: true,
@@ -78,7 +78,7 @@ pub static CREATE_NEW_PROJECT: LazyLock<StaticCommand> = LazyLock::new(|| Static
 
 pub static EDIT_SKILL: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/open-skill",
-    description: "Open a skill's markdown file in Warp's built-in editor",
+    description: "Open a skill's markdown file in Dwarf's built-in editor",
     icon_path: "bundled/svg/file-code-02.svg",
     availability: Availability::AI_ENABLED,
     auto_enter_ai_mode: false,
@@ -118,7 +118,7 @@ pub const ADD_RULE: StaticCommand = StaticCommand {
 
 pub static EDIT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/open-file",
-    description: "Open a file in Warp's code editor",
+    description: "Open a file in Dwarf's code editor",
     icon_path: "bundled/svg/file-code-02.svg",
     availability: Availability::LOCAL,
     auto_enter_ai_mode: false,
@@ -403,7 +403,7 @@ pub static CONTINUE_LOCALLY: LazyLock<StaticCommand> = LazyLock::new(|| {
     let hint_text = "<optional prompt to send in forked conversation>";
     StaticCommand {
         name: "/continue-locally",
-        description: "Continue this cloud conversation locally",
+        description: "Fork this conversation into a local session",
         icon_path: "bundled/svg/arrow-split.svg",
         availability: Availability::AGENT_VIEW
             | Availability::ACTIVE_CONVERSATION
@@ -415,7 +415,7 @@ pub static CONTINUE_LOCALLY: LazyLock<StaticCommand> = LazyLock::new(|| {
 
 pub const USAGE: StaticCommand = StaticCommand {
     name: "/usage",
-    description: "Open billing and usage settings",
+    description: "Usage settings are disabled in local Dwarf",
     icon_path: "bundled/svg/bar-chart-04.svg",
     availability: Availability::AI_ENABLED,
     auto_enter_ai_mode: false,
@@ -433,7 +433,7 @@ pub const REMOTE_CONTROL: StaticCommand = StaticCommand {
 
 pub const COST: StaticCommand = StaticCommand {
     name: "/cost",
-    description: "Toggle credit usage details",
+    description: "Toggle token usage details",
     icon_path: "bundled/svg/bar-chart-04.svg",
     availability: Availability::AGENT_VIEW
         .union(Availability::AI_ENABLED)
@@ -579,7 +579,6 @@ fn all_commands() -> Vec<StaticCommand> {
         PLAN.clone(),
         RENAME_TAB.clone(),
         SET_TAB_COLOR.clone(),
-        USAGE,
         CONVERSATIONS,
         EXPORT_TO_CLIPBOARD,
         MODEL.clone(),

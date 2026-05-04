@@ -379,6 +379,11 @@ impl TerminalView {
         open_source: SharedSessionActionSource,
         ctx: &mut ViewContext<Self>,
     ) {
+        if !FeatureFlag::CreatingSharedSessions.is_enabled() {
+            let _ = (open_source, ctx);
+            return;
+        }
+
         if !matches!(
             open_source,
             SharedSessionActionSource::BlocklistContextMenu { .. }
@@ -431,6 +436,17 @@ impl TerminalView {
         bypass_conversation_guard: bool,
         ctx: &mut ViewContext<Self>,
     ) {
+        if !FeatureFlag::CreatingSharedSessions.is_enabled() {
+            let _ = (
+                scrollback_type,
+                source,
+                source_type,
+                bypass_conversation_guard,
+                ctx,
+            );
+            return;
+        }
+
         // We should only be attempting to share a session
         // if it is bootstrapped.
         //

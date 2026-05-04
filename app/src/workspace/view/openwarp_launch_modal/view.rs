@@ -26,7 +26,6 @@ const HERO_HEIGHT: f32 = 92.;
 const HERO_IMAGE_PATH: &str = "async/png/onboarding/openwarp_launch_banner.png";
 const REPO_URL: &str = "https://github.com/warpdotdev/warp";
 const CONTRIBUTING_URL: &str = "https://github.com/warpdotdev/warp/blob/master/CONTRIBUTING.md";
-const OZ_URL: &str = "https://oz.warp.dev";
 
 struct InlineLink {
     text: &'static str,
@@ -45,7 +44,7 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
     FeatureItem {
         icon: Icon::HeartHand,
         title: "Contribute",
-        description: "Warp's client code is now open source. Get started by using the /feedback skill to open an issue, and follow the contribution guidelines here.",
+        description: "Dwarf's client code is now open source. Get started by using the /feedback skill to open an issue, and follow the contribution guidelines here.",
         inline_link: Some(InlineLink {
             text: "here",
             url: CONTRIBUTING_URL,
@@ -54,10 +53,10 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
     FeatureItem {
         icon: Icon::Oz,
         title: "Open Automated Development",
-        description: "The Warp repo is managed by an agent-first workflow powered by Oz, our cloud agent orchestration platform.",
+        description: "The Dwarf repo is managed by a local agent-first workflow.",
         inline_link: Some(InlineLink {
-            text: "Oz",
-            url: OZ_URL,
+            text: "Dwarf",
+            url: REPO_URL,
         }),
     },
     FeatureItem {
@@ -203,7 +202,7 @@ impl OpenWarpLaunchModal {
     }
 
     fn render_title(appearance: &Appearance) -> Box<dyn Element> {
-        Text::new("Warp is now open-source", appearance.ui_font_family(), 20.)
+        Text::new("Dwarf is now open-source", appearance.ui_font_family(), 20.)
             .with_color(PhenomenonStyle::modal_title_text())
             .with_style(Properties::default().weight(Weight::Semibold))
             .finish()
@@ -211,7 +210,7 @@ impl OpenWarpLaunchModal {
 
     fn render_description(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "You, our community, can participate in building Warp using an agent-first workflow.",
+            "You, our community, can participate in building Dwarf using an agent-first workflow.",
             appearance.ui_font_family(),
             14.,
         )

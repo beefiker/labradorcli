@@ -121,7 +121,7 @@ impl HiddenComputerUseArgs {
 /// The execution harness for an agent run.
 #[derive(Debug, Copy, Clone, ValueEnum, Eq, PartialEq, Default)]
 pub enum Harness {
-    /// Use Warp's built-in MAA infrastructure (default).
+    /// Use Dwarf's built-in agent infrastructure (default).
     #[default]
     #[value(name = "oz")]
     Oz,
@@ -161,7 +161,7 @@ impl Harness {
 
     pub fn display_name(self) -> &'static str {
         match self {
-            Self::Oz => "Oz",
+            Self::Oz => "Dwarf",
             Self::Claude => "Claude Code",
             Self::OpenCode => "OpenCode",
             Self::Gemini => "Gemini CLI",
@@ -195,9 +195,9 @@ pub enum AgentProfileCommand {
 /// Agent-related subcommands.
 #[derive(Debug, Clone, Subcommand)]
 pub enum AgentCommand {
-    /// Run a new Oz agent.
+    /// Run a new Dwarf agent.
     Run(RunAgentArgs),
-    /// Dispatch an Oz agent that runs remotely.
+    /// Dispatch a Dwarf agent that runs remotely.
     RunCloud(RunCloudArgs),
     /// Manage agent profiles.
     #[command(subcommand)]

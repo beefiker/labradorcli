@@ -84,7 +84,6 @@ pub const TERMINAL_KEYBINDINGS: &[&str] = &[
     "workspace:set_a11y_verbose_verbosity_level",
     "workspace:show_command_search",
     "workspace:show_keybinding_settings",
-    "workspace:show_settings_account_page",
     "workspace:show_settings",
     "workspace:toggle_command_palette",
     "workspace:toggle_launch_config_palette",
@@ -124,7 +123,7 @@ pub fn get_additional_keybindings() -> Vec<CommandBinding> {
         ),
         CommandBinding::new(
             "workspace:hide_warp".into(),
-            "Hide Warp".into(),
+            "Hide Dwarf".into(),
             Some(Keystroke::parse("cmd-h").expect("Valid keystroke")),
         ),
         CommandBinding::new(
@@ -134,7 +133,7 @@ pub fn get_additional_keybindings() -> Vec<CommandBinding> {
         ),
         CommandBinding::new(
             "workspace:quit_warp".into(),
-            "Quit Warp".into(),
+            "Quit Dwarf".into(),
             Some(Keystroke::parse("cmd-q").expect("Valid keystroke")),
         ),
         CommandBinding::new(

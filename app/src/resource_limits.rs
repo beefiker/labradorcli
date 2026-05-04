@@ -6,7 +6,7 @@ pub fn adjust_resource_limits() {
         /// Our desired limit on the maximum number of file descriptors we can open.
         ///
         /// MacOS sets this value to 256, by default, which can interfere with
-        /// normal usage of Warp for users who open lots of tabs.
+        /// normal usage of Dwarf for users who open lots of tabs.
         const TARGET_FD_LIMIT: u64 = 2560;
 
         use nix::sys::resource::{getrlimit, setrlimit, Resource::RLIMIT_NOFILE};

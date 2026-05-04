@@ -260,7 +260,7 @@ pub fn render_models_section(
         .with_child(render_filterable_dropdown_row(
             appearance,
             "Base model",
-            "This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Warp may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
+            "This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Dwarf may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
             &view.base_model_dropdown,
         ));
 
@@ -726,7 +726,7 @@ fn render_command_allowlist_section(
 
     render_list_section(
         "Command allowlist",
-        "Regular expressions to match commands that can be automatically executed by Oz.",
+        "Regular expressions to match commands that can be automatically executed by Dwarf.",
         &profile_data.command_allowlist,
         &view.command_allowlist_mouse_state_handles,
         Some(&view.command_allowlist_editor),
@@ -752,7 +752,7 @@ fn render_command_denylist_section(
 
     render_list_section(
         "Command denylist",
-        "Regular expressions to match commands that Oz should always ask permission to execute.",
+        "Regular expressions to match commands that Dwarf should always ask permission to execute.",
         &profile_data.command_denylist,
         &view.command_denylist_mouse_state_handles,
         Some(&view.command_denylist_editor),
@@ -785,7 +785,7 @@ fn render_mcp_allowlist_section(
 
     render_list_section(
         "MCP allowlist",
-        "MCP servers that are allowed to be called by Oz.",
+        "MCP servers that are allowed to be called by Dwarf.",
         &profile_data.mcp_allowlist,
         &view.mcp_allowlist_mouse_state_handles,
         None,
@@ -811,7 +811,7 @@ fn render_mcp_denylist_section(
 
     render_list_section(
         "MCP denylist",
-        "MCP servers that are not allowed to be called by Oz.",
+        "MCP servers that are not allowed to be called by Dwarf.",
         &profile_data.mcp_denylist,
         &view.mcp_denylist_mouse_state_handles,
         None,
@@ -853,7 +853,7 @@ pub fn render_plan_auto_sync_toggle(
     .finish();
 
     let desc_elem = Text::new(
-        "The plans this agent creates will be automatically added and synced to Warp Drive."
+        "The plans this agent creates will be automatically added and synced to Dwarf Drive."
             .to_string(),
         appearance.ui_font_family(),
         11.,

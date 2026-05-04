@@ -458,16 +458,7 @@ impl UserWorkspaces {
     /// Note that the value may be incorrect if called before the team's billing metadata has been fetched.
     /// If voice input support is not compiled into this build, always returns `false`.
     pub fn is_voice_enabled(&self) -> bool {
-        cfg!(feature = "voice_input")
-            && self
-                .current_team()
-                // If the user has no team, they can toggle Voice (no restrictions).
-                .is_none_or(|team| {
-                    team.billing_metadata
-                        .tier
-                        .warp_ai_policy
-                        .is_some_and(|policy| policy.is_voice_enabled)
-                })
+        false
     }
 
     /// Whether BYO API key is enabled for the current user, based on the active policies.
@@ -1486,21 +1477,8 @@ impl UserWorkspaces {
             return;
         }
 
-        // If we have experiment state to unconditionally enable / disable the feature,
-        // then we defer to that.
-        let server_experiments = ServerExperiments::as_ref(ctx);
-        if server_experiments.is_experiment_enabled(&ServerExperiment::SessionSharingControl)
-            || server_experiments.is_experiment_enabled(&ServerExperiment::SessionSharingExperiment)
-        {
-            return;
-        }
-
-        let is_session_sharing_enabled_via_tier_policy = self
-            .current_team()
-            .and_then(|t| t.billing_metadata.tier.session_sharing_policy)
-            .map(|policy| policy.is_enabled)
-            .unwrap_or(true);
-        FeatureFlag::CreatingSharedSessions.set_enabled(is_session_sharing_enabled_via_tier_policy);
+        let _ = (self, ctx);
+        FeatureFlag::CreatingSharedSessions.set_enabled(false);
     }
 }
 

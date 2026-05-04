@@ -222,8 +222,8 @@ impl ConversationEndedTombstoneView {
         #[cfg(target_family = "wasm")]
         let open_in_warp_button = conversation_id.map(|conv_id| {
             ctx.add_typed_action_view(move |_| {
-                ActionButton::new("Open in Warp", PrimaryTheme)
-                    .with_tooltip("Open this conversation in the Warp desktop app")
+                ActionButton::new("Open in Dwarf", PrimaryTheme)
+                    .with_tooltip("Open this conversation in the Dwarf desktop app")
                     .on_click(move |ctx| {
                         ctx.dispatch_typed_action(ConversationEndedTombstoneAction::OpenInWarp(
                             conv_id,
@@ -423,7 +423,7 @@ impl ConversationEndedTombstoneView {
         }
 
         if let Some(credits) = &self.display_data.credits {
-            parts.push(format!("Credits used: {credits}"));
+            parts.push(format!("Usage: {credits}"));
         }
 
         if parts.is_empty() {

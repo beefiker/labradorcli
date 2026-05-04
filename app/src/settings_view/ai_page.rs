@@ -65,7 +65,6 @@ use warpui::{
         Container, Flex, FormattedTextElement, HighlightedHyperlink, HyperlinkUrl, ParentElement,
     },
     ui_components::{
-        button::ButtonVariant,
         components::{Coords, UiComponent, UiComponentStyles},
         switch::{SwitchStateHandle, TooltipConfig},
     },
@@ -275,8 +274,8 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![ToggleSettingActionPair::custom(
             SettingActionPairDescriptions::new(
-                "Show Oz changelog in new agent conversation view",
-                "Hide Oz changelog in new agent conversation view",
+                "Show Dwarf changelog in new agent conversation view",
+                "Hide Dwarf changelog in new agent conversation view",
             ),
             builder(SettingsAction::AI(
                 AISettingsPageAction::ToggleShowOzUpdatesInZeroState,
@@ -355,7 +354,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             flags::IS_VOICE_INPUT_ENABLED,
         )
         .with_group(bindings::BindingGroup::WarpAi)
-        .with_enabled(|| cfg!(feature = "voice_input"))],
+        .with_enabled(|| false)],
         app,
     );
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
@@ -739,7 +738,7 @@ impl AISettingsPageView {
         });
         // The coding agent footer command editor is always enabled,
         // independent of the global AI toggle, because it controls
-        // third-party coding agents rather than Warp's own AI.
+        // third-party coding agents rather than Dwarf's own AI.
         Self::update_editor_interaction_state(
             cli_agent_footer_command_editor.as_ref(ctx).editor().clone(),
             true,
@@ -2277,7 +2276,7 @@ impl From<&AISettingsPageAction> for LoginGatedFeature {
     fn from(val: &AISettingsPageAction) -> LoginGatedFeature {
         use AISettingsPageAction::*;
         match val {
-            AttemptLoginGatedUpgrade => "Upgrade AI Usage",
+            AttemptLoginGatedUpgrade => "AI Usage",
             _ => "Unknown reason",
         }
     }
@@ -3236,7 +3235,6 @@ fn render_ai_list(
 #[derive(Default)]
 struct GlobalAIWidget {
     switch_state: SwitchStateHandle,
-    sign_up_button: MouseStateHandle,
 }
 
 impl SettingsWidget for GlobalAIWidget {
@@ -3257,17 +3255,13 @@ impl SettingsWidget for GlobalAIWidget {
         let is_ai_disabled_due_to_remote_session_org_policy =
             AISettings::as_ref(app).is_ai_disabled_due_to_remote_session_org_policy(app);
 
-        let is_anonymous = AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out();
-
         let mut row = Flex::row()
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
                 Text::new_inline(
-                    "Warp Agent",
+                    "Dwarf Agent",
                     appearance.ui_font_family(),
                     PRIMARY_HEADER_FONT_SIZE,
                 )
@@ -3293,75 +3287,20 @@ impl SettingsWidget for GlobalAIWidget {
             );
         }
 
-        // Show sign-up button for anonymous users, toggle for logged-in users
-        if is_anonymous {
-            row.add_child(
-                Flex::row()
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        Container::new(
-                            Text::new_inline(
-                                "To use AI features, please create an account.",
-                                appearance.ui_font_family(),
-                                14.,
-                            )
-                            .with_color(
-                                appearance
-                                    .theme()
-                                    .sub_text_color(appearance.theme().surface_2())
-                                    .into_solid(),
-                            )
-                            .finish(),
-                        )
-                        .with_margin_right(16.)
-                        .finish(),
-                    )
-                    .with_child(
-                        Container::new(
-                            ui_builder
-                                .button(ButtonVariant::Accent, self.sign_up_button.clone())
-                                .with_style(UiComponentStyles {
-                                    font_size: Some(14.),
-                                    font_weight: Some(Weight::Semibold),
-                                    border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
-                                    padding: Some(Coords {
-                                        top: 8.,
-                                        bottom: 8.,
-                                        left: 24.,
-                                        right: 24.,
-                                    }),
-                                    ..Default::default()
-                                })
-                                .with_text_label("Sign up".to_owned())
-                                .build()
-                                .on_click(move |ctx, _, _| {
-                                    ctx.dispatch_typed_action(
-                                        AISettingsPageAction::SignupAnonymousUser,
-                                    );
-                                })
-                                .finish(),
-                        )
-                        .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
-                        .finish(),
-                    )
+        row.add_child(
+            Container::new(
+                ui_builder
+                    .switch(self.switch_state.clone())
+                    .check(AISettings::as_ref(app).is_any_ai_enabled(app))
+                    .build()
+                    .on_click(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(AISettingsPageAction::ToggleGlobalAI);
+                    })
                     .finish(),
-            );
-        } else {
-            row.add_child(
-                Container::new(
-                    ui_builder
-                        .switch(self.switch_state.clone())
-                        .check(AISettings::as_ref(app).is_any_ai_enabled(app))
-                        .build()
-                        .on_click(move |ctx, _, _| {
-                            ctx.dispatch_typed_action(AISettingsPageAction::ToggleGlobalAI);
-                        })
-                        .finish(),
-                )
-                .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
-                .finish(),
-            );
-        }
+            )
+            .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
+            .finish(),
+        );
 
         Container::new(row.finish())
             .with_padding_bottom(15.)
@@ -3398,7 +3337,7 @@ impl UsageWidget {
         }
 
         let request_count_label = if workspace_is_delinquent_due_to_payment_issue {
-            "Restricted due to billing issue".to_string()
+            "Provider access restricted".to_string()
         } else if is_unlimited {
             "Unlimited".to_string()
         } else {
@@ -3572,12 +3511,12 @@ impl SettingsWidget for UsageWidget {
         .finish();
 
         let request_limit_description = format!(
-            "This is the {} limit of AI credits for your account.",
+            "This is the {} request limit reported for this account.",
             ai_request_usage_model.refresh_duration_to_string()
         );
 
         let request_usage_row = self.render_ai_usage_limit_row(
-            "Credits",
+            "Requests",
             request_limit_description,
             ai_request_usage_model.requests_used(),
             ai_request_usage_model.request_limit(),
@@ -3586,40 +3525,9 @@ impl SettingsWidget for UsageWidget {
             appearance,
         );
 
-        let auth_state = AuthStateProvider::as_ref(app).get();
-        let upgrade_cta_text_fragments = if let Some(team) =
-            UserWorkspaces::as_ref(app).current_team()
-        {
-            let current_user_email = auth_state.user_email().unwrap_or_default();
-            let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-            if team.billing_metadata.can_upgrade_to_higher_tier_plan() {
-                let upgrade_url = UserWorkspaces::upgrade_link_for_team(team.uid);
-                if has_admin_permissions {
-                    vec![
-                        FormattedTextFragment::hyperlink("Upgrade", upgrade_url),
-                        FormattedTextFragment::plain_text(" to get more AI usage."),
-                    ]
-                } else {
-                    // The /upgrade page says to contact their administrator.
-                    vec![
-                        FormattedTextFragment::hyperlink("Compare plans", upgrade_url),
-                        FormattedTextFragment::plain_text(" for more AI usage."),
-                    ]
-                }
-            } else {
-                vec![
-                    FormattedTextFragment::hyperlink("Contact support", "mailto:support@warp.dev"),
-                    FormattedTextFragment::plain_text(" for more AI usage."),
-                ]
-            }
-        } else {
-            let user_id = auth_state.user_id().unwrap_or_default();
-            let upgrade_url = UserWorkspaces::upgrade_link(user_id);
-            vec![
-                FormattedTextFragment::hyperlink("Upgrade", upgrade_url),
-                FormattedTextFragment::plain_text(" to get more AI usage."),
-            ]
-        };
+        let upgrade_cta_text_fragments = vec![FormattedTextFragment::plain_text(
+            "Dwarf local agent mode uses your local provider credentials.",
+        )];
 
         let mut upgrade_cta = FormattedTextElement::new(
             FormattedText::new([FormattedTextLine::Line(upgrade_cta_text_fragments)]),
@@ -4504,7 +4412,7 @@ impl AgentsWidget {
         );
         render_ai_list(
             "Command denylist",
-            "Regular expressions to match commands that the Warp Agent should always ask permission to execute.",
+            "Regular expressions to match commands that the Dwarf Agent should always ask permission to execute.",
             list,
             view,
             ai_settings,
@@ -4537,7 +4445,7 @@ impl AgentsWidget {
 
         render_ai_list(
             "Command allowlist",
-            "Regular expressions to match commands that can be automatically executed by the Warp Agent.",
+            "Regular expressions to match commands that can be automatically executed by the Dwarf Agent.",
             list,
             view,
             ai_settings,
@@ -4637,7 +4545,7 @@ impl AgentsWidget {
             appearance,
             "Base model",
             Some(
-                "This model serves as the primary engine behind the Warp Agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Warp may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
+                "This model serves as the primary engine behind the Dwarf Agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Dwarf may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
             ),
             Some(show_in_prompt_checkbox),
             LocalOnlyIconState::Hidden,
@@ -4668,7 +4576,7 @@ impl AgentsWidget {
 
         let codebase_context_description = vec![
             FormattedTextFragment::plain_text(
-                "Allow the Warp Agent to generate an outline of your codebase that can be used for context. No code is ever stored on our servers. ",
+                "Allow the Dwarf Agent to generate an outline of your codebase that can be used for context. No code is ever stored on our servers. ",
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
@@ -4741,7 +4649,7 @@ impl AgentsWidget {
         let subtext = {
             let subtext_fragments = vec![
                 FormattedTextFragment::plain_text(
-                    "You haven't added any MCP servers yet. Once you do, you'll be able to control how much autonomy the Warp Agent has when interacting with them. ",
+                    "You haven't added any MCP servers yet. Once you do, you'll be able to control how much autonomy the Dwarf Agent has when interacting with them. ",
                 ),
                 FormattedTextFragment::hyperlink_action(
                     "Add a server",
@@ -4822,7 +4730,7 @@ impl AgentsWidget {
         {
             let allowlist = self.render_mcp_list(
                 "MCP allowlist",
-                "Allow the Warp Agent to call these MCP servers.",
+                "Allow the Dwarf Agent to call these MCP servers.",
                 &view.mcp_allowlist_dropdown,
                 BlocklistAIPermissions::as_ref(app).get_mcp_allowlist(app, None),
                 view.mcp_allowlist_mouse_state_handles.clone(),
@@ -4839,7 +4747,7 @@ impl AgentsWidget {
         {
             let denylist = self.render_mcp_list(
                 "MCP denylist",
-                "The Warp Agent will always ask for permission before calling any MCP servers on this list.",
+                "The Dwarf Agent will always ask for permission before calling any MCP servers on this list.",
                 &view.mcp_denylist_dropdown,
                 BlocklistAIPermissions::as_ref(app).get_mcp_denylist(app, None),
                 view.mcp_denylist_mouse_state_handles.clone(),
@@ -5209,7 +5117,7 @@ impl SettingsWidget for MCPServersWidget {
 
         let mcp_description = vec![
             FormattedTextFragment::plain_text(
-                "Add MCP servers to extend the Warp Agent's capabilities. \
+                "Add MCP servers to extend the Dwarf Agent's capabilities. \
             MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. ",
             ),
             FormattedTextFragment::hyperlink(
@@ -5341,7 +5249,7 @@ impl AIFactWidget {
 
         let rules_description = vec![
             FormattedTextFragment::plain_text(
-                "Rules help the Warp Agent follow your conventions, whether for codebases or specific workflows. ",
+                "Rules help the Dwarf Agent follow your conventions, whether for codebases or specific workflows. ",
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
@@ -5409,7 +5317,7 @@ impl AIFactWidget {
         app: &warpui::AppContext,
     ) -> Box<dyn Element> {
         let toggle = render_ai_setting_toggle::<WarpDriveContextEnabled>(
-            "Warp Drive as agent context",
+            "Dwarf Drive as agent context",
             AISettingsPageAction::ToggleWarpDriveContext,
             *ai_settings.warp_drive_context_enabled,
             ai_settings.is_any_ai_enabled(app),
@@ -5419,7 +5327,7 @@ impl AIFactWidget {
         );
 
         let description = render_ai_setting_description(
-            "The Warp Agent can leverage your Warp Drive Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
+            "The Dwarf Agent can leverage your Dwarf Drive Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
             ai_settings.is_any_ai_enabled(app),
             app,
         );
@@ -5509,7 +5417,7 @@ impl VoiceWidget {
 
         let voice_input_description_text_fragments = vec![
             FormattedTextFragment::plain_text(
-                "Voice input allows you to control Warp by speaking directly to your terminal (powered by ",
+                "Voice input allows you to control Dwarf by speaking directly to your terminal (powered by ",
             ),
             FormattedTextFragment::hyperlink("Wispr Flow", WISPR_FLOW_URL),
             FormattedTextFragment::plain_text(")."),
@@ -5563,11 +5471,12 @@ impl SettingsWidget for VoiceWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "voice agent oz ai a.i. speech input natural language talk english"
+        "voice agent dwarf ai a.i. speech input natural language talk english"
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        cfg!(feature = "voice_input") && UserWorkspaces::as_ref(app).is_voice_enabled()
+        let _ = app;
+        false
     }
 
     fn render(
@@ -5656,7 +5565,7 @@ impl SettingsWidget for OtherAIWidget {
         if FeatureFlag::AgentView.is_enabled() {
             let mut agent_view_column = Flex::column()
                 .with_child(render_ai_setting_toggle::<ShouldShowOzUpdatesInZeroState>(
-                    "Show Oz changelog in new conversation view",
+                    "Show Dwarf changelog in new conversation view",
                     AISettingsPageAction::ToggleShowOzUpdatesInZeroState,
                     *ai_settings.should_show_oz_updates_in_zero_state,
                     is_toggleable,
@@ -5771,7 +5680,7 @@ impl SettingsWidget for CLIAgentWidget {
 
         // The Coding Agents section is always enabled, independent of the
         // global AI toggle, because these settings control third-party coding
-        // agents (Claude Code, Codex, Gemini CLI) rather than Warp's own AI.
+        // agents (Claude Code, Codex, Gemini CLI) rather than Dwarf's own AI.
         let cli_agent_footer_toggle = render_ai_setting_toggle::<ShouldRenderCLIAgentToolbar>(
             "Show coding agent toolbar",
             AISettingsPageAction::ToggleCLIAgentToolbar,
@@ -5841,7 +5750,7 @@ impl SettingsWidget for CLIAgentWidget {
                         on_click_action: None,
                         secondary_text: None,
                         tooltip_override_text: Some(
-                            "Requires the Warp plugin for your coding agent".to_owned(),
+                            "Requires the Dwarf plugin for your coding agent".to_owned(),
                         ),
                     }),
                     LocalOnlyIconState::for_setting(
@@ -6140,7 +6049,7 @@ impl SettingsWidget for AgentAttributionWidget {
             )
             .with_child(toggle_row)
             .with_child(render_ai_setting_description(
-                "Oz can add attribution to commit messages and pull requests it creates",
+                "Dwarf can add attribution to commit messages and pull requests it creates",
                 !state.is_disabled,
                 app,
             ))
@@ -6162,7 +6071,7 @@ impl SettingsWidget for CloudAgentComputerUseWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "oz cloud agent computer use orchestration multi-agent"
+        "dwarf local agent computer use orchestration multi-agent"
     }
 
     fn render(
@@ -6244,7 +6153,7 @@ impl SettingsWidget for CloudAgentComputerUseWidget {
             )
             .with_child(toggle_row)
             .with_child(render_ai_setting_description(
-                "Enable computer use in cloud agent conversations started from the Warp app.",
+                "Enable computer use in agent conversations started from the Dwarf app.",
                 !is_disabled,
                 app,
             ));
@@ -6277,7 +6186,6 @@ struct ApiKeysWidget {
     google_api_key_editor: ViewHandle<EditorView>,
 
     can_use_warp_credits_with_byok: SwitchStateHandle,
-    upgrade_highlight_index: HighlightedHyperlink,
 }
 
 impl ApiKeysWidget {
@@ -6385,7 +6293,6 @@ impl ApiKeysWidget {
             google_api_key_editor,
 
             can_use_warp_credits_with_byok: Default::default(),
-            upgrade_highlight_index: Default::default(),
         }
     }
 
@@ -6393,18 +6300,18 @@ impl ApiKeysWidget {
         &self,
         appearance: &Appearance,
         app: &AppContext,
-        is_byo_enabled: bool,
+        _is_byo_enabled: bool,
     ) -> Box<dyn Element> {
         let ai_settings = AISettings::as_ref(app);
         let is_any_ai_enabled = ai_settings.is_any_ai_enabled(app);
-        let is_enabled = is_any_ai_enabled && is_byo_enabled;
+        let is_enabled = is_any_ai_enabled;
 
         let mut column = Flex::column()
             .with_spacing(16.)
             .with_child(
                 Container::new(
                     render_ai_setting_description(
-                        "Use your own API keys from model providers for the Warp Agent to use. API keys are stored locally and never synced to the cloud. Using auto models or models from providers you have not provided API keys for will consume Warp credits.",
+                        "Use your own API keys from model providers for the Dwarf Agent to use. API keys are stored locally and never synced to the cloud.",
                         is_enabled,
                         app,
                     ))
@@ -6473,64 +6380,6 @@ impl ApiKeysWidget {
             app,
         ));
 
-        // Show upgrade CTA if BYOK is not enabled
-        if !is_byo_enabled {
-            let auth_state = AuthStateProvider::as_ref(app).get();
-            let upgrade_text_fragments = if let Some(team) =
-                UserWorkspaces::as_ref(app).current_team()
-            {
-                // Enterprise teams don't have a self-serve upgrade path; route them
-                // to sales to enable BYOK on their existing plan.
-                if team.billing_metadata.customer_type == CustomerType::Enterprise {
-                    vec![
-                        FormattedTextFragment::hyperlink("Contact sales", "mailto:sales@warp.dev"),
-                        FormattedTextFragment::plain_text(
-                            " to enable bringing your own API keys on your Enterprise plan.",
-                        ),
-                    ]
-                } else {
-                    let current_user_email = auth_state.user_email().unwrap_or_default();
-                    let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-                    let upgrade_url = UserWorkspaces::upgrade_link_for_team(team.uid);
-                    if has_admin_permissions {
-                        vec![
-                            FormattedTextFragment::hyperlink(
-                                "Upgrade to the Build plan",
-                                upgrade_url,
-                            ),
-                            FormattedTextFragment::plain_text(" to use your own API keys."),
-                        ]
-                    } else {
-                        vec![FormattedTextFragment::plain_text(
-                            "Ask your team's admin to upgrade to the Build plan to use your own API keys.",
-                        )]
-                    }
-                }
-            } else {
-                let user_id = auth_state.user_id().unwrap_or_default();
-                let upgrade_url = UserWorkspaces::upgrade_link(user_id);
-                vec![
-                    FormattedTextFragment::hyperlink("Upgrade to the Build plan", upgrade_url),
-                    FormattedTextFragment::plain_text(" to use your own API keys."),
-                ]
-            };
-
-            let upgrade_text_element = FormattedTextElement::new(
-                FormattedText::new([FormattedTextLine::Line(upgrade_text_fragments)]),
-                appearance.ui_font_size(),
-                appearance.ui_font_family(),
-                appearance.ui_font_family(),
-                blended_colors::text_sub(appearance.theme(), appearance.theme().surface_1()),
-                self.upgrade_highlight_index.clone(),
-            )
-            .with_hyperlink_font_color(appearance.theme().accent().into_solid())
-            .register_default_click_handlers(|url, ctx, _| {
-                ctx.dispatch_typed_action(AISettingsPageAction::HyperlinkClick(url));
-            });
-
-            column.add_child(Container::new(upgrade_text_element.finish()).finish());
-        }
-
         column.finish()
     }
 
@@ -6542,7 +6391,7 @@ impl ApiKeysWidget {
         let ai_settings = AISettings::as_ref(app);
 
         let toggle = render_ai_setting_toggle::<CanUseWarpCreditsWithByok>(
-            "Warp credit fallback",
+            "Dwarf model fallback",
             AISettingsPageAction::ToggleCanUseWarpCreditsWithByok,
             *ai_settings.can_use_warp_credits_with_byok,
             ai_settings.is_any_ai_enabled(app),
@@ -6552,7 +6401,7 @@ impl ApiKeysWidget {
         );
 
         let description = render_ai_setting_description(
-            "When enabled, agent requests may be routed to one of Warp's provided models in the event of an error. Warp will prioritize using your API keys over your Warp credits.",
+            "When enabled, agent requests may be routed to one of Dwarf's provided models in the event of an error. Dwarf will prioritize using your local provider credentials.",
             ai_settings.is_any_ai_enabled(app),
             app,
         );
@@ -6824,9 +6673,9 @@ impl AwsBedrockWidget {
         let are_credentials_enabled = user_workspaces.is_aws_bedrock_credentials_enabled(app);
         let is_usage_enabled = is_section_enabled && are_credentials_enabled;
         let toggle_description = if is_admin_enforced {
-            "Warp loads and sends local AWS CLI credentials for Bedrock-supported models. This setting is managed by your organization.".to_string()
+            "Dwarf loads and sends local AWS CLI credentials for Bedrock-supported models. This setting is managed by your organization.".to_string()
         } else {
-            "Warp loads and sends local AWS CLI credentials for Bedrock-supported models."
+            "Dwarf loads and sends local AWS CLI credentials for Bedrock-supported models."
                 .to_string()
         };
 

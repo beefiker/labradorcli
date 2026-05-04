@@ -409,7 +409,7 @@ impl FileBasedMCPManager {
     /// when its config does not specify `working_directory`.
     ///
     /// The spawn root is the directory the config was discovered in, with one
-    /// exception: global Warp installs are discovered in `~/.warp/` (Warp's data
+    /// exception: global Warp installs are discovered in `~/.warp/` (Dwarf's data
     /// dir) which isn't a useful cwd for spawned processes, so they are remapped
     /// to the home directory instead.
     /// - Project-scoped installations: the repo root.

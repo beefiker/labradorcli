@@ -6,7 +6,7 @@
 //! - `staged/` holds newly observed message IDs from the event stream.
 //! - `surfaced/` holds the fully hydrated records currently exposed to Claude.
 //! - `pending-hook-output.json` plus `pending-hook-output.ack` coordinates the
-//!   handoff between Warp's driver and the Claude hook process.
+//!   handoff between Dwarf's driver and the Claude hook process.
 use std::fmt::Write as _;
 use std::fs;
 use std::io::Write;
@@ -38,7 +38,7 @@ const PARENT_BRIDGE_HOOK_OUTPUT_FILE_NAME: &str = "pending-hook-output.json";
 const PARENT_BRIDGE_HOOK_OUTPUT_ACK_FILE_NAME: &str = "pending-hook-output.ack";
 const PARENT_BRIDGE_MAX_CONTEXT_CHARS_ENV: &str = "OZ_PARENT_MAX_CONTEXT_CHARS";
 const PARENT_BRIDGE_DEFAULT_MAX_CONTEXT_CHARS: usize = 6000;
-pub(super) const MESSAGE_BRIDGE_CONTEXT_PREAMBLE: &str = "Lead-agent updates arrived from Oz. Treat the latest lead-agent instructions below as authoritative.\n";
+pub(super) const MESSAGE_BRIDGE_CONTEXT_PREAMBLE: &str = "Lead-agent updates arrived from Dwarf. Treat the latest lead-agent instructions below as authoritative.\n";
 const PARENT_BRIDGE_REMAINING_MESSAGES_NOTE: &str =
     "\n\nMore lead-agent messages are still staged and will be surfaced on a later turn.";
 

@@ -392,7 +392,7 @@ impl SharingDialog {
         }
     }
 
-    /// The Warp Drive server ID for the target object. `None` if the target is not a Warp Drive
+    /// The Dwarf Drive server ID for the target object. `None` if the target is not a Dwarf Drive
     /// object or AI conversation.
     fn target_cloud_object_id(&self, app: &AppContext) -> Option<ServerId> {
         match self.target.as_ref() {
@@ -404,7 +404,7 @@ impl SharingDialog {
         }
     }
 
-    /// The targeted Warp Drive object, or `None` if the target is not a known Warp Drive object.
+    /// The targeted Dwarf Drive object, or `None` if the target is not a known Dwarf Drive object.
     fn target_cloud_object<'a>(&self, app: &'a AppContext) -> Option<&'a dyn CloudObject> {
         self.target_cloud_object_id(app)
             .and_then(|id| CloudModel::as_ref(app).get_by_uid(&id.uid()))
@@ -578,7 +578,7 @@ impl SharingDialog {
     /// Report a telemetry event for opening this sharing dialog.
     ///
     /// This should be called by views that contain a sharing dialog whenever they open it (i.e.
-    /// panes and the Warp Drive index).
+    /// panes and the Dwarf Drive index).
     pub fn report_open(&self, source: SharingDialogSource, ctx: &mut ViewContext<Self>) {
         let event = match self.target.as_ref() {
             Some(ShareableObject::WarpDriveObject(id)) => {
@@ -1433,7 +1433,7 @@ impl SharingDialog {
             invite_button = invite_button.disabled();
         }
 
-        // For Warp Drive targets, we can't update permissions while there's a pending change.
+        // For Dwarf Drive targets, we can't update permissions while there's a pending change.
         if self
             .target_cloud_object(app)
             .is_some_and(|object| object.metadata().has_pending_online_only_change())

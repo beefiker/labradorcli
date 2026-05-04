@@ -41,11 +41,12 @@ pub fn init(app: &mut AppContext) {
 
     app.register_editable_bindings([EditableBinding::new(
         "pane:share_pane_contents",
-        "Share pane",
+        "Disabled hosted action",
         PaneAction::ShareContents,
     )
     .with_custom_action(CustomAction::SharePaneContents)
-    .with_context_predicate(id!("PaneView") & id!(HAS_SHARED_OBJECT_CONTEXT_KEY))]);
+    .with_context_predicate(id!("PaneView") & id!(HAS_SHARED_OBJECT_CONTEXT_KEY))
+    .with_enabled(|| false)]);
 }
 
 pub enum PaneViewEvent {

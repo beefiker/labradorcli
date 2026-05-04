@@ -66,6 +66,10 @@ pub enum ResourceCenterMainAction {
 }
 
 impl ResourceCenterMainView {
+    fn referrals_enabled() -> bool {
+        false
+    }
+
     pub fn new(
         ctx: &mut ViewContext<Self>,
         tips_completed: ModelHandle<TipsCompleted>,
@@ -394,7 +398,7 @@ impl ResourceCenterMainView {
                 .with_text_and_icon_label(
                     TextAndIcon::new(
                         TextAndIconAlignment::IconFirst,
-                        "Invite a friend to Warp",
+                        "Invite a friend to Dwarf",
                         Icon::new(SEND_SVG_PATH, appearance.theme().accent()),
                         MainAxisSize::Max,
                         MainAxisAlignment::Center,
@@ -507,16 +511,17 @@ impl View for ResourceCenterMainView {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let body = self.render_body(appearance);
-        let invite_button = self.render_invite_button(appearance);
         let skip_tips = self.render_skip_tips_button(appearance);
 
         let mut main_page = Flex::column();
 
-        if !AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
+        if Self::referrals_enabled()
+            && !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out()
             && !FeatureFlag::AvatarInTabBar.is_enabled()
         {
+            let invite_button = self.render_invite_button(appearance);
             main_page = main_page.with_child(invite_button);
         }
 

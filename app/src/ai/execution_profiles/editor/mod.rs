@@ -47,8 +47,7 @@ use warpui::{
 
 const MODEL_MENU_WIDTH: f32 = 250.;
 
-/// Renders a footer banner for model dropdowns informing free-plan users that
-/// frontier models require an upgrade, with a clickable "Upgrade" link.
+/// Renders a footer banner for model dropdowns.
 fn render_upgrade_footer(
     upgrade_mouse_state: MouseStateHandle,
     app: &AppContext,
@@ -67,8 +66,8 @@ fn render_upgrade_footer(
     .with_height(16.)
     .finish();
 
-    let label = "Frontier models are unavailable on free plans. Upgrade";
-    let upgrade_start = label.len() - "Upgrade".len();
+    let label = "All configured models are available in Dwarf.";
+    let upgrade_start = label.len();
     let info_text = Text::new(
         label,
         appearance.ui_font_family(),

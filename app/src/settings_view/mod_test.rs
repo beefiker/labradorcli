@@ -170,7 +170,7 @@ fn match_data_countable_zero_is_not_truthy() {
 
 #[test]
 fn subpage_display_names_are_correct() {
-    assert_eq!(SettingsSection::WarpAgent.to_string(), "Warp Agent");
+    assert_eq!(SettingsSection::WarpAgent.to_string(), "Dwarf Agent");
     assert_eq!(SettingsSection::AgentProfiles.to_string(), "Profiles");
     assert_eq!(SettingsSection::AgentMCPServers.to_string(), "MCP servers");
     assert_eq!(SettingsSection::Knowledge.to_string(), "Knowledge");
@@ -192,22 +192,15 @@ fn subpage_display_names_are_correct() {
     );
     assert_eq!(
         SettingsSection::OzCloudAPIKeys.to_string(),
-        "Oz Cloud API Keys"
+        "Dwarf API Keys"
     );
 }
 
 #[test]
 fn subpage_from_str_parses_display_names() {
-    // Both the legacy "Oz" name and the new "Warp Agent" display name must
-    // resolve to SettingsSection::WarpAgent so existing deep links, persisted
-    // telemetry strings, and external callers continue to work after the
-    // user-facing rename (see specs/GH1063/product.md, Behavior #8).
+    // Dwarf Agent resolves to SettingsSection::WarpAgent after the local rename.
     assert_eq!(
-        SettingsSection::from_str("Oz"),
-        Ok(SettingsSection::WarpAgent)
-    );
-    assert_eq!(
-        SettingsSection::from_str("Warp Agent"),
+        SettingsSection::from_str("Dwarf Agent"),
         Ok(SettingsSection::WarpAgent)
     );
     assert_eq!(
@@ -227,7 +220,7 @@ fn subpage_from_str_parses_display_names() {
         Ok(SettingsSection::EditorAndCodeReview)
     );
     assert_eq!(
-        SettingsSection::from_str("Oz Cloud API Keys"),
+        SettingsSection::from_str("Dwarf API Keys"),
         Ok(SettingsSection::OzCloudAPIKeys)
     );
 }

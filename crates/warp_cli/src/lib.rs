@@ -74,7 +74,7 @@ pub struct RemoteServerIdentityArgs {
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct GlobalOptions {
     /// API key for server authentication.
-    #[arg(long = "api-key", global = true, env = "WARP_API_KEY")]
+    #[arg(long = "api-key", global = true, env = "WARP_API_KEY", hide = true)]
     pub api_key: Option<String>,
 
     /// Set the output format.
@@ -91,16 +91,15 @@ pub struct GlobalOptions {
 /// Command-line argument parser for the main Warp binary. This is used across all channels.
 #[derive(Debug, Default, Parser, Clone)]
 #[command(
-    name = "oz",
-    display_name = "Oz",
-    about = r#"The orchestration platform for cloud agents
+    name = "dwarf",
+    display_name = "Dwarf",
+    about = r#"The local agent platform for Dwarf
 
-The Oz CLI is a tool for running, managing, and orchestrating coding agents at scale.
+The Dwarf CLI is a tool for running, managing, and orchestrating coding agents locally.
 Use the CLI to:
-* Launch and inspect cloud agents
-* Schedule cloud agents to run in the future
-* Manage the environments that cloud agents run in
-* Upload secrets to Oz's secure storage"#
+* Launch and inspect local agents
+* Manage MCP servers
+* Inspect local model and provider configuration"#
 )]
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Args {
@@ -361,7 +360,7 @@ impl Args {
 
 <bold><underline>Learn more:</underline></bold>
 * Use <bold>{bin_name} help</bold> to learn more about each command
-* Read the documentation at https://docs.warp.dev/reference/cli
+* Dwarf runs locally and does not require a hosted Warp account
 "#
         ));
 
@@ -476,12 +475,12 @@ pub enum WorkerCommand {
 /// but it allows scripting some Warp functionality.
 #[derive(Debug, Clone, Subcommand)]
 pub enum CliCommand {
-    /// Interact with Oz.
+    /// Interact with Dwarf.
     #[command(subcommand)]
     Agent(crate::agent::AgentCommand),
 
     /// Manage cloud environments.
-    #[command(subcommand)]
+    #[command(subcommand, hide = true)]
     Environment(crate::environment::EnvironmentCommand),
 
     /// Manage MCP servers.
@@ -496,11 +495,14 @@ pub enum CliCommand {
     #[command(subcommand)]
     Model(crate::model::ModelCommand),
 
-    /// Log in to Warp.
+    /// Hidden hosted auth command.
+    #[command(hide = true)]
     Login,
-    /// Log out of Warp.
+    /// Hidden hosted auth command.
+    #[command(hide = true)]
     Logout,
     /// Print information about the logged-in user.
+    #[command(hide = true)]
     Whoami,
 
     /// Manage providers.
@@ -511,20 +513,21 @@ pub enum CliCommand {
     #[command(subcommand)]
     Integration(crate::integration::IntegrationCommand),
 
-    /// Create and manage scheduled Oz agents. Scheduled agents run a user-defined task periodically, according to a cron schedule.
+    /// Create and manage scheduled agents. Scheduled agents run a user-defined task periodically, according to a cron schedule.
     ///
     /// As a shorthand, the `schedule` command behaves identically to `schedule create`.
+    #[command(hide = true)]
     Schedule(crate::schedule::ScheduleCommand),
 
     /// Manage secrets.
-    #[command(subcommand)]
+    #[command(subcommand, hide = true)]
     Secret(crate::secret::SecretCommand),
 
     /// Issue and manage federated identity tokens.
-    #[command(subcommand)]
+    #[command(subcommand, hide = true)]
     Federate(crate::federate::FederateCommand),
 
-    /// Support commands for agent harnesses to integrate with Oz.
+    /// Support commands for agent harnesses to integrate with Dwarf.
     #[command(hide = true)]
     HarnessSupport(crate::harness_support::HarnessSupportArgs),
 

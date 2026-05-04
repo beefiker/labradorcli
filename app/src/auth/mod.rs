@@ -158,7 +158,7 @@ pub fn maybe_log_out(app: &mut AppContext) {
                 "object"
             };
             info_text_vec.push(format!(
-                "You have {num_unsaved_objects} unsynced Warp Drive {plural}. \
+                "You have {num_unsaved_objects} unsynced Dwarf Drive {plural}. \
             Logging out will cause you to lose the {plural}."
             ));
         }

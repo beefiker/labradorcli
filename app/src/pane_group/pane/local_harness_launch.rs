@@ -87,7 +87,7 @@ pub(super) async fn prepare_local_harness_child_launch(
     };
     validate_local_harness_shell(shell_type)?;
     let command = match harness {
-        Harness::Oz => unreachable!("normalize_local_child_harness filters out Oz"),
+        Harness::Oz => unreachable!("normalize_local_child_harness filters out Dwarf"),
         Harness::Unknown => unreachable!("normalize_local_child_harness filters out Unknown"),
         Harness::Codex => unreachable!("normalize_local_child_harness filters out Codex"),
         Harness::Claude => {

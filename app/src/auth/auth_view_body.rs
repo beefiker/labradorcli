@@ -81,7 +81,6 @@ pub fn init(app: &mut AppContext) {
 
 #[derive(Default)]
 struct MouseStateHandles {
-    login_link_mouse_state_handle: MouseStateHandle,
     enter_login_later_mouse_state_handle: MouseStateHandle,
     confirm_login_later_mouse_state_handle: MouseStateHandle,
     show_auth_token_input_mouse_state_handle: MouseStateHandle,
@@ -127,7 +126,6 @@ pub enum AuthStep {
 
 #[derive(Clone, Copy, Debug)]
 pub enum AuthViewBodyAction {
-    Login,
     InitiateLoginLater,
     LoginLater,
     EnterToken,
@@ -332,7 +330,7 @@ impl AuthViewBody {
             Flex::row()
                 .with_child(
                     ui_builder
-                        .span("By continuing, you agree to Warp's ")
+                        .span("By continuing, you agree to Dwarf's ")
                         .with_style(disclaimer_styles)
                         .build()
                         .finish(),
@@ -486,33 +484,6 @@ impl AuthViewBody {
             .finish()
     }
 
-    fn render_sign_in_row(&self, ui_builder: &UiBuilder) -> Box<dyn Element> {
-        Flex::row()
-            .with_child(
-                ui_builder
-                    .span("Already have an account? ")
-                    .build()
-                    .finish(),
-            )
-            .with_child(
-                ui_builder
-                    .link(
-                        "Sign in".into(),
-                        None,
-                        Some(Box::new(|ctx| {
-                            ctx.dispatch_typed_action(AuthViewBodyAction::Login);
-                        })),
-                        self.mouse_state_handles
-                            .login_link_mouse_state_handle
-                            .clone(),
-                    )
-                    .soft_wrap(false)
-                    .build()
-                    .finish(),
-            )
-            .finish()
-    }
-
     fn render_sign_up_later_row(&self, ui_builder: &UiBuilder) -> Box<dyn Element> {
         Container::new(
             Flex::row()
@@ -608,10 +579,10 @@ impl AuthViewBody {
 
         let text = match self.variant {
             AuthViewVariant::RequireLoginCloseable  => {
-                "In order to use Warp’s AI features or collaborate with others, please create an account."
+                "In order to use Dwarf’s AI features or collaborate with others, please create an account."
             }
             AuthViewVariant::HitDriveObjectLimitCloseable => {
-                "In order to create more objects in Warp Drive, please create an account."
+                "In order to create more objects in Dwarf Drive, please create an account."
             }
             AuthViewVariant::ShareRequirementCloseable => {
                 "In order to share, please create an account."
@@ -640,10 +611,10 @@ impl AuthViewBody {
         };
 
         let text = match self.variant {
-            AuthViewVariant::Initial => "Welcome to Warp!",
+            AuthViewVariant::Initial => "Welcome to Dwarf!",
             AuthViewVariant::RequireLoginCloseable
             | AuthViewVariant::HitDriveObjectLimitCloseable
-            | AuthViewVariant::ShareRequirementCloseable => "Sign up for Warp",
+            | AuthViewVariant::ShareRequirementCloseable => "Sign up for Dwarf",
         };
 
         ui_builder
@@ -696,9 +667,6 @@ impl AuthViewBody {
             .with_margin_bottom(AUTH_MODAL_GAP)
             .finish();
         let sign_up_button = self.render_sign_up_button(is_anonymous, appearance, ui_builder);
-        let sign_in_row = Container::new(self.render_sign_in_row(ui_builder))
-            .with_margin_top(AUTH_MODAL_GAP)
-            .finish();
         let force_login_disclaimer = self.render_force_login_disclaimer(appearance, ui_builder);
 
         match self.variant {
@@ -721,9 +689,9 @@ impl AuthViewBody {
                                 self.render_sign_in_later_confirm_row(ui_builder)
                             }
                         };
-                        vec![logo, header, sign_up_button, sign_in_row, sign_up_later_row]
+                        vec![logo, header, sign_up_button, sign_up_later_row]
                     } else {
-                        vec![logo, header, sign_up_button, sign_in_row]
+                        vec![logo, header, sign_up_button]
                     };
 
                     contents.append(&mut self.render_privacy_information(appearance, ui_builder));
@@ -844,20 +812,6 @@ impl TypedActionView for AuthViewBody {
 
     fn handle_action(&mut self, action: &AuthViewBodyAction, ctx: &mut ViewContext<Self>) {
         match action {
-            AuthViewBodyAction::Login => {
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::LoginButtonClicked {
-                        source: LoginEventSource::AuthModal,
-                    },
-                    ctx
-                );
-                self.auth_step = AuthStep::BrowserOpen;
-
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    let sign_in_url = auth_manager.sign_in_url();
-                    ctx.open_url(&sign_in_url);
-                });
-            }
             AuthViewBodyAction::InitiateLoginLater => {
                 send_telemetry_from_ctx!(
                     TelemetryEvent::LoginLaterButtonClicked {
@@ -998,7 +952,7 @@ impl View for AuthViewBody {
 
     fn accessibility_contents(&self, _: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new(
-            "Welcome to Warp!",
+            "Welcome to Dwarf!",
             "Press enter to open your browser to Sign Up or Sign In.",
             WarpA11yRole::HelpRole,
         ))

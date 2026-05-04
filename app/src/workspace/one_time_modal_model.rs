@@ -19,7 +19,7 @@ use warpui::{Entity, ModelContext, SingletonEntity, WindowId};
 /// conditions are met (e.g., user becomes onboarded).
 pub struct OneTimeModalModel {
     is_build_plan_migration_modal_open: bool,
-    /// Whether the Oz launch modal is currently being shown.
+    /// Whether the Dwarf launch modal is currently being shown.
     is_oz_launch_modal_open: bool,
     /// Whether the OpenWarp launch modal is currently being shown.
     is_openwarp_launch_modal_open: bool,
@@ -70,7 +70,7 @@ impl OneTimeModalModel {
                         .did_check_to_trigger_oz_launch_modal
                         .set_value(true, ctx)
                     {
-                        log::warn!("Failed to mark Oz launch modal as dismissed: {e}");
+                        log::warn!("Failed to mark Dwarf launch modal as dismissed: {e}");
                     }
                 });
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -182,6 +182,10 @@ impl OneTimeModalModel {
             return;
         }
 
+        if matches!(ChannelState::channel(), Channel::Oss) {
+            return;
+        }
+
         // Existing users should never see the code toolbelt new feature popup.
         CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
             if let Err(e) = settings
@@ -257,11 +261,12 @@ impl OneTimeModalModel {
                 .did_check_to_trigger_oz_launch_modal
                 .set_value(true, ctx)
             {
-                log::warn!("Failed to mark Oz launch modal as dismissed: {e}");
+                log::warn!("Failed to mark Dwarf launch modal as dismissed: {e}");
             }
         });
 
-        let should_show_oz_modal = !matches!(ChannelState::channel(), Channel::Integration);
+        let should_show_oz_modal =
+            !matches!(ChannelState::channel(), Channel::Integration | Channel::Oss);
         self.set_oz_launch_modal_open(should_show_oz_modal, ctx);
         should_show_oz_modal
     }
@@ -290,7 +295,8 @@ impl OneTimeModalModel {
             }
         });
 
-        let should_show_openwarp_modal = !matches!(ChannelState::channel(), Channel::Integration);
+        let should_show_openwarp_modal =
+            !matches!(ChannelState::channel(), Channel::Integration | Channel::Oss);
         self.set_openwarp_launch_modal_open(should_show_openwarp_modal, ctx);
         should_show_openwarp_modal
     }
@@ -325,52 +331,8 @@ impl OneTimeModalModel {
         &mut self,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
-        use crate::workspaces::user_workspaces::UserWorkspaces;
-
-        // Check if already dismissed
-        let general_settings = GeneralSettings::as_ref(ctx);
-        if *general_settings
-            .build_plan_migration_modal_dismissed
-            .value()
-        {
-            return false;
-        }
-
-        // Check if user is authenticated
-        let auth_state = crate::auth::AuthStateProvider::as_ref(ctx).get();
-
-        if auth_state.is_anonymous_or_logged_out() {
-            return false;
-        }
-
-        // Check if current workspace has sunsetted_to_build_ts set
-        let user_workspaces = UserWorkspaces::as_ref(ctx);
-        let Some(current_team) = user_workspaces.current_team() else {
-            return false;
-        };
-
-        // Check if user is admin of the team
-        let Some(user_email) = auth_state.user_email() else {
-            return false;
-        };
-
-        if !current_team.has_admin_permissions(&user_email) {
-            return false;
-        }
-
-        // Check if service agreement has sunsetted_to_build_ts set
-        let has_sunsetted_to_build = current_team
-            .billing_metadata
-            .service_agreements
-            .first()
-            .is_some_and(|sa| sa.sunsetted_to_build_ts.is_some());
-
-        if !has_sunsetted_to_build {
-            return false;
-        }
-
-        // All conditions met, show the modal
-        self.set_build_plan_migration_modal_open(true, ctx)
+        let _ = ctx;
+        false
     }
 }
 

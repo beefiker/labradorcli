@@ -1,5 +1,5 @@
 //! Inline block view that asks the user whether they want to install
-//! Warp's SSH extension on the remote host the shell just connected to,
+//! Dwarf's SSH extension on the remote host the shell just connected to,
 //! or continue without installing (falling back to the existing
 //! ControlMaster warpification path).
 //!
@@ -8,7 +8,7 @@
 //!
 //! The view owns:
 //! - a child [`KeyboardNavigableButtons`] handle for the two selectable
-//!   cards ("Install Warp's SSH extension" / "Continue without installing"),
+//!   cards ("Install Dwarf's SSH extension" / "Continue without installing"),
 //! - the [`SessionId`] this prompt is scoped to (used for event forwarding),
 //! - the current "Don't ask me this again" checked state (purely local to
 //!   this prompt instance; persisted to `ssh_extension_install_mode` only
@@ -75,9 +75,9 @@ impl SshRemoteServerChoiceView {
         let buttons = ctx.add_typed_action_view(|_| {
             KeyboardNavigableButtons::new(vec![
                 rich_navigation_button(
-                    "Install Warp's SSH extension".to_string(),
+                    "Install Dwarf's SSH extension".to_string(),
                     Some(
-                        "Install Warp's extension to enable agent features like file browsing, \
+                        "Install Dwarf's extension to enable agent features like file browsing, \
                          code review, and intelligent command completions in this session."
                             .to_string(),
                     ),
@@ -172,11 +172,11 @@ impl SshRemoteServerChoiceView {
             .with_child(Container::new(checkbox_label).with_margin_left(4.).finish())
             .finish();
 
-        // Right: "Manage Warpify settings" link.
+        // Right: "Manage Dwarfify settings" link.
         let manage_settings_link = appearance
             .ui_builder()
             .link(
-                "Manage Warpify settings".into(),
+                "Manage Dwarfify settings".into(),
                 None,
                 Some(Box::new(|ctx| {
                     ctx.dispatch_typed_action(SshRemoteServerChoiceViewAction::OpenWarpifySettings);

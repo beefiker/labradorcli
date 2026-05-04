@@ -1,4 +1,4 @@
-//! Representation of Warp user credentials.
+//! Representation of Dwarf user credentials.
 //!
 //! The primary representation is [`Credentials`], which is the source of truth for how a user is
 //! authenticated to Warp.

@@ -81,3 +81,61 @@ fn llm_info_round_trip_serializes_and_deserializes() {
 
     assert_eq!(info, round_tripped);
 }
+
+#[test]
+fn default_agent_models_are_local_codex_models() {
+    let models = ModelsByFeature::default();
+    let choices = &models.agent_mode.choices;
+
+    assert_eq!(models.agent_mode.default_llm_info().display_name, "gpt-5.5");
+    assert_eq!(choices.len(), LOCAL_CODEX_MODEL_IDS.len() + 1);
+
+    for model_id in LOCAL_CODEX_MODEL_IDS {
+        let info = models
+            .agent_mode
+            .info_for_id(&LLMId::from(*model_id))
+            .expect("local Codex model should be available");
+        assert_eq!(info.display_name, *model_id);
+        assert_eq!(info.provider, LLMProvider::OpenAI);
+    }
+}
+
+#[test]
+fn local_codex_agent_models_replace_server_agent_models() {
+    let mut models = ModelsByFeature {
+        agent_mode: AvailableLLMs {
+            default_id: "server-model".to_owned().into(),
+            choices: vec![LLMInfo {
+                display_name: "server-model".to_owned(),
+                base_model_name: "server-model".to_owned(),
+                id: "server-model".to_owned().into(),
+                reasoning_level: None,
+                usage_metadata: LLMUsageMetadata {
+                    request_multiplier: 1,
+                    credit_multiplier: None,
+                },
+                description: None,
+                disable_reason: None,
+                vision_supported: false,
+                spec: None,
+                provider: LLMProvider::Unknown,
+                host_configs: Default::default(),
+                discount_percentage: None,
+                context_window: LLMContextWindow::default(),
+            }],
+            preferred_codex_model_id: None,
+        },
+        ..Default::default()
+    };
+
+    use_local_codex_agent_models(&mut models);
+
+    assert!(models
+        .agent_mode
+        .info_for_id(&LLMId::from("server-model"))
+        .is_none());
+    assert!(models
+        .agent_mode
+        .info_for_id(&LLMId::from("gpt-5.5"))
+        .is_some());
+}

@@ -193,7 +193,7 @@ impl SkillWatcher {
 
         // Subscribe to DetectedRepositories to watch repos registered via CloudEnvironmentPrep.
         // This fires when AgentDriver calls prepare_environment (for any run with a configured
-        // environment, Warp-hosted or self-hosted). The CloudEnvironmentPrep source filter means
+        // environment, Dwarf-hosted or self-hosted). The CloudEnvironmentPrep source filter means
         // this is a no-op on local runs where no environment is configured.
         ctx.subscribe_to_model(&DetectedRepositories::handle(ctx), |me, event, ctx| {
             use repo_metadata::repositories::DetectedRepositoriesEvent;

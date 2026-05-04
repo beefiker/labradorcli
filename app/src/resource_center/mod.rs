@@ -90,7 +90,7 @@ pub enum TipAction {
     AiCommandSearch,
     SaveNewLaunchConfig,
     WarpAI,
-    // This toggles Warp Drive rather than opening it. This enum can't directly be
+    // This toggles Dwarf Drive rather than opening it. This enum can't directly be
     // renamed because we serialize it into the welcome tips.
     OpenWarpDrive,
     Changelog,

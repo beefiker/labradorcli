@@ -124,12 +124,12 @@ pub async fn load_conversation_from_server(
                         RestorationMode::Continue,
                     ) {
                         Some(conversation) => {
-                            log::info!("Loaded Oz conversation {conversation_id} from server");
+                            log::info!("Loaded Dwarf conversation {conversation_id} from server");
                             Some(CloudConversationData::Oz(Box::new(conversation)))
                         }
                         None => {
                             log::warn!(
-                                "Failed to convert Oz server conversation data for {conversation_id}"
+                                "Failed to convert Dwarf server conversation data for {conversation_id}"
                             );
                             None
                         }
@@ -137,7 +137,7 @@ pub async fn load_conversation_from_server(
                 }
                 AIAgentHarness::ClaudeCode | AIAgentHarness::Gemini | AIAgentHarness::Codex => {
                     if !FeatureFlag::AgentHarness.is_enabled() {
-                        log::warn!("Ignoring non-Oz conversation {conversation_id}: AgentHarness flag is disabled");
+                        log::warn!("Ignoring non-Dwarf conversation {conversation_id}: AgentHarness flag is disabled");
                         return None;
                     }
                     // Fetch snapshot data for third-party harness conversations.

@@ -29,11 +29,11 @@ pub use warp_server_client::drive::sharing::{
     LinkSharingSubjectType, SharingAccessLevel, Subject, TeamKind, UserKind,
 };
 
-/// Identifier for an object that's shareable via the Warp Drive ACL model. Not all sharing in Warp
+/// Identifier for an object that's shareable via the Dwarf Drive ACL model. Not all sharing in Warp
 /// is _currently_ tied into this model (e.g. block sharing).
 #[derive(Debug, Clone)]
 pub enum ShareableObject {
-    /// A shareable Warp Drive object.
+    /// A shareable Dwarf Drive object.
     WarpDriveObject(ServerId),
     /// A shared terminal session. Shared sessions are identified by the participating terminal
     /// pane.

@@ -72,7 +72,7 @@ pub enum AuthManagerEvent {
     AttemptedLoginGatedFeature {
         auth_view_variant: AuthViewVariant,
     },
-    // The current user is anonymous and the client has received a browser intent to sign in with a different Warp account.
+    // The current user is anonymous and the client has received a browser intent to sign in with a different Dwarf account.
     // Holds an auth payload from the received browser intent.
     LoginOverrideDetected(AuthRedirectPayload),
     /// Failed to mint a new custom token for an anonymous user.
@@ -267,7 +267,7 @@ impl AuthManager {
 
     /// Authenticate asynchronously using the OAuth2 device authorization flow.
     ///
-    /// This is only used by the Warp CLI if running on a devic that does not have the Warp app installed.
+    /// This is only used by the Warp CLI if running on a devic that does not have the Dwarf app installed.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub fn authorize_device(&self, ctx: &mut ModelContext<Self>) {
         // Clear any stale user state so old credentials don't interfere

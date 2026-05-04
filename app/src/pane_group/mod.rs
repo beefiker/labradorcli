@@ -2429,6 +2429,11 @@ impl PaneGroup {
         open_source: SharedSessionActionSource,
         ctx: &mut ViewContext<Self>,
     ) {
+        if !FeatureFlag::CreatingSharedSessions.is_enabled() {
+            let _ = (terminal_pane_id, open_source, ctx);
+            return;
+        }
+
         let Some(terminal_view) = self.terminal_view_from_pane_id(terminal_pane_id, ctx) else {
             log::warn!("Tried to open share session modal for non-existent terminal pane");
             return;
@@ -2542,7 +2547,6 @@ impl PaneGroup {
                 if let Some(pane) = self.focused_pane_content(ctx) {
                     pane.focus(ctx);
                 }
-                ctx.emit(Event::OpenSettings(SettingsSection::Teams));
                 ctx.notify();
 
                 send_telemetry_from_ctx!(TelemetryEvent::SharedSessionModalUpgradePressed, ctx);

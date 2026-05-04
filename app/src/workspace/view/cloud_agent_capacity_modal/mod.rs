@@ -71,10 +71,6 @@ impl CloudAgentCapacityModal {
         }
     }
 
-    pub fn set_variant(&mut self, variant: CloudAgentCapacityModalVariant) {
-        self.variant = variant;
-    }
-
     fn get_upgrade_url(ctx: &ViewContext<Self>) -> Option<String> {
         let auth_state = AuthStateProvider::handle(ctx).as_ref(ctx).get();
         if let Some(team) = UserWorkspaces::handle(ctx).as_ref(ctx).current_team() {

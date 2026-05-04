@@ -5,10 +5,11 @@ use settings::Setting;
 use std::{borrow::Cow, cmp::Reverse, path::Path, sync::Arc};
 use warp_core::{features::FeatureFlag, report_if_error, ui::Icon};
 use warpui::{
+    assets::asset_cache::AssetSource,
     elements::{
-        Clipped, Container, CornerRadius, CrossAxisAlignment, Flex, FormattedTextElement,
-        HighlightedHyperlink, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable,
-        Text,
+        CacheOption, Clipped, Container, CornerRadius, CrossAxisAlignment, Flex,
+        FormattedTextElement, HighlightedHyperlink, Image, MainAxisSize, MouseStateHandle,
+        ParentElement, Radius, Shrinkable, Text,
     },
     fonts::{Properties, Weight},
     keymap::Keystroke,
@@ -25,7 +26,6 @@ use crate::{
             agent_view::{
                 agent_view_bg_color, AgentViewController, AgentViewEntryOrigin,
                 ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE,
-                ENTER_CLOUD_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE,
             },
             history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel},
         },
@@ -54,7 +54,7 @@ use crate::{
 };
 
 const CLOUD_AGENT_DOCS_URL: &str = "https://docs.warp.dev/agent-platform/cloud-agents/overview";
-const OZ_UPDATES_SECTION_HEADER: &str = "What's new in Oz";
+const OZ_UPDATES_SECTION_HEADER: &str = "What's new in Dwarf";
 
 // The maximum number of Oz updates from the changelog rendered in-line in the 'What's new in Oz section'.
 const MAX_OZ_UPDATE_COUNT: usize = 4;
@@ -64,7 +64,6 @@ const MAX_RECENT_CONVERSATION_COUNT: usize = 3;
 #[derive(Default)]
 struct StateHandles {
     start_new_conversation: MouseStateHandle,
-    start_cloud_conversation: MouseStateHandle,
     switch_model: MouseStateHandle,
     exit: MouseStateHandle,
     init_callout: MouseStateHandle,
@@ -394,9 +393,8 @@ impl View for AgentViewZeroStateBlock {
 
         let header_props = if self.origin.is_cloud_agent() {
             HeaderProps {
-                title: "New Oz cloud agent conversation".into(),
+                title: "New Dwarf agent conversation".into(),
                 description: AgentViewDescription::CloudModeWithDocsLink,
-                icon: Icon::OzCloud,
             }
         } else {
             let mut local_description =
@@ -410,9 +408,8 @@ impl View for AgentViewZeroStateBlock {
             }
 
             HeaderProps {
-                title: "New Oz agent conversation".into(),
+                title: "New Dwarf agent conversation".into(),
                 description: AgentViewDescription::PlainText(vec![local_description.into()]),
-                icon: Icon::Oz,
             }
         };
 
@@ -559,35 +556,31 @@ enum AgentViewDescription {
 struct HeaderProps {
     title: Cow<'static, str>,
     description: AgentViewDescription,
-    icon: Icon,
 }
 
 fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box<dyn Element>> {
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
 
-    let HeaderProps {
-        title,
-        description,
-        icon,
-    } = props;
+    let HeaderProps { title, description } = props;
 
     let title_font_size = styles::title_font_size(appearance);
+    let title_icon_size = title_font_size + 2.;
     let title = Flex::row()
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
         .with_child(
             Container::new(
                 ConstrainedBox::new(
-                    icon.to_warpui_icon(
-                        theme
-                            .main_text_color(theme.background())
-                            .into_solid()
-                            .into(),
+                    Image::new(
+                        AssetSource::Bundled {
+                            path: "bundled/png/local.png",
+                        },
+                        CacheOption::BySize,
                     )
                     .finish(),
                 )
-                .with_height(title_font_size)
-                .with_width(title_font_size)
+                .with_height(title_icon_size)
+                .with_width(title_icon_size)
                 .finish(),
             )
             .with_margin_right(8.)
@@ -651,7 +644,7 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
             // Second line: text with "Visit docs" hyperlink.
             let description_with_link = FormattedText::new([FormattedTextLine::Line(vec![
                 FormattedTextFragment::plain_text(
-                    "Use cloud agents to run parallel agents, build agents that run autonomously, and check in on your agents from anywhere. ",
+                    "Use Dwarf agents to run commands, analyze code, and manage local development work. ",
                 ),
                 FormattedTextFragment::hyperlink("Visit docs", CLOUD_AGENT_DOCS_URL),
             ])]);
@@ -729,21 +722,6 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
                         ctx.dispatch_typed_action(TerminalAction::StartNewAgentConversation);
                     },
                     state_handles.start_new_conversation.clone(),
-                )]),
-                app,
-            ),
-            render_standard_message(
-                Message::new(vec![MessageItem::clickable(
-                    vec![
-                        MessageItem::keystroke(
-                            ENTER_CLOUD_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE.clone(),
-                        ),
-                        MessageItem::text("start a new cloud agent conversation"),
-                    ],
-                    |ctx| {
-                        ctx.dispatch_typed_action(TerminalAction::EnterCloudAgentView);
-                    },
-                    state_handles.start_cloud_conversation.clone(),
                 )]),
                 app,
             ),
@@ -836,6 +814,13 @@ struct RecentConversationProps<'a> {
     state_handles: &'a StateHandles,
 }
 
+fn format_recent_conversation_timestamp(
+    last_updated: chrono::DateTime<chrono::Local>,
+) -> Option<String> {
+    (last_updated.timestamp() > 0)
+        .then(|| format_approx_duration_from_now_utc(last_updated.to_utc()))
+}
+
 fn render_recent_conversations_section(
     props: RecentConversationProps<'_>,
     app: &AppContext,
@@ -907,7 +892,8 @@ fn render_recent_conversations_section(
     for (i, recent_conversation) in recent_conversations.iter().enumerate() {
         let conversation_id = recent_conversation.id;
         let title = recent_conversation.title.clone();
-        let last_updated = recent_conversation.last_updated;
+        let last_updated_label =
+            format_recent_conversation_timestamp(recent_conversation.last_updated);
 
         let row = Hoverable::new(
             state_handles.recent_conversations[i].clone(),
@@ -924,9 +910,9 @@ fn render_recent_conversations_section(
                     )
                 };
 
-                Flex::row()
+                let mut row = Flex::row()
                     .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_children([
+                    .with_child(
                         Container::new(
                             Text::new_inline(
                                 title.clone(),
@@ -937,18 +923,24 @@ fn render_recent_conversations_section(
                             .soft_wrap(false)
                             .finish(),
                         )
-                        .with_margin_right(8.)
+                        .with_margin_right(if last_updated_label.is_some() { 8. } else { 0. })
                         .finish(),
+                    );
+
+                if let Some(last_updated_label) = last_updated_label.as_ref() {
+                    row.add_child(
                         Text::new_inline(
-                            format_approx_duration_from_now_utc(last_updated.to_utc()),
+                            last_updated_label.clone(),
                             appearance.ui_font_family(),
                             appearance.monospace_font_size() - 1.,
                         )
                         .with_color(secondary_text_color)
                         .soft_wrap(false)
                         .finish(),
-                    ])
-                    .finish()
+                    );
+                }
+
+                row.finish()
             },
         )
         .on_click(move |ctx, _, _| {
@@ -1206,33 +1198,6 @@ fn render_oz_updates(props: OzUpdatesProps<'_>, app: &AppContext) -> Option<Box<
     )
 }
 
-/// Renders the ambient credits banner showing free cloud credits.
-/// If `link_mouse_state` is provided, a "Launch cloud agent" link is shown.
-pub fn render_ambient_credits_banner(credits: i32, app: &AppContext) -> Box<dyn Element> {
-    let appearance = Appearance::as_ref(app);
-    let theme = appearance.theme();
-    let font_family = appearance.ui_font_family();
-    let font_size = styles::CREDITS_BANNER_FONT_SIZE;
-
-    // Use ANSI terminal colors for the pill styling.
-    let text_color = theme.terminal_colors().normal.blue;
-
-    let credits_text = format!("{credits} free cloud agent credits");
-    let text = Text::new(credits_text, font_family, font_size)
-        .with_color(text_color.into())
-        .with_style(Properties::default().weight(Weight::Semibold))
-        .soft_wrap(false)
-        .finish();
-
-    Container::new(text)
-        .with_border(Border::all(1.).with_border_color(text_color.into()))
-        .with_corner_radius(CornerRadius::with_all(Radius::Percentage(50.)))
-        .with_vertical_padding(2.)
-        .with_horizontal_padding(6.)
-        .with_margin_left(8.)
-        .finish()
-}
-
 mod styles {
     use warp_core::ui::appearance::Appearance;
 
@@ -1240,8 +1205,6 @@ mod styles {
     pub const TITLE_MARGIN_BOTTOM: f32 = 8.;
     pub const SECTION_HEADER_MARGIN_BOTTOM: f32 = 8.;
     pub const DESCRIPTION_LINE_MARGIN_BOTTOM: f32 = 6.;
-    pub const CREDITS_BANNER_FONT_SIZE: f32 = 12.;
-
     pub fn title_font_size(appearance: &Appearance) -> f32 {
         appearance.monospace_font_size() + 6.
     }

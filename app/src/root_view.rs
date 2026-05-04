@@ -30,6 +30,7 @@ use onboarding::{
     AgentOnboardingEvent, AgentOnboardingView, OnboardingIntention, SelectedSettings,
 };
 
+use crate::features::FeatureFlag;
 use crate::persistence::ModelEvent;
 use crate::report_if_error;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -73,10 +74,10 @@ use crate::{
 use crate::{
     auth::auth_override_warning_modal::{AuthOverrideWarningModal, AuthOverrideWarningModalEvent},
     auth::auth_view_modal::{AuthView, AuthViewVariant},
+    channel::{Channel, ChannelState},
     server::server_api::ServerApi,
     workspace::{view::OnboardingTutorial, PaneViewLocator, Workspace},
 };
-use crate::{features::FeatureFlag, ChannelState};
 use crate::{send_telemetry_from_app_ctx, GlobalResourceHandles, GlobalResourceHandlesProvider};
 use anyhow::Result;
 use cfg_if::cfg_if;
@@ -122,7 +123,7 @@ use warpui::{FocusContext, NextNewWindowsHasThisWindowsBoundsUponClose};
 #[cfg(target_family = "wasm")]
 use crate::auth::web_handoff::{WebHandoffEvent, WebHandoffView};
 
-const WINDOW_TITLE: &str = "Warp";
+const WINDOW_TITLE: &str = "Dwarf";
 
 lazy_static! {
     static ref FALLBACK_WINDOW_SIZE: Vector2F = vec2f(800.0, 600.0);
@@ -1672,6 +1673,10 @@ fn mark_local_onboarding_completed(ctx: &AppContext) {
     );
 }
 
+fn local_agent_terminal_only() -> bool {
+    matches!(ChannelState::channel(), Channel::Oss)
+}
+
 /// Whether auth and onboarding have completed and we should render the `Workspace`.
 enum AuthOnboardingState {
     Auth(Box<WorkspaceArgs>),
@@ -1754,6 +1759,10 @@ impl RootView {
         };
 
         let auth_onboarding_state = if auth_state.is_logged_in() {
+            AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
+        } else if local_agent_terminal_only() {
+            mark_local_onboarding_completed(ctx);
+            mark_hoa_onboarding_completed(ctx);
             AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
         } else {
             cfg_if! {
@@ -2877,17 +2886,7 @@ impl RootView {
     }
 
     pub fn open_team_settings_page(&mut self, _: &(), ctx: &mut ViewContext<Self>) -> bool {
-        let window_id = ctx.window_id();
-        if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
-            ctx.dispatch_typed_action_for_view(
-                window_id,
-                handle.id(),
-                &WorkspaceAction::ShowSettingsPage(SettingsSection::Teams),
-            );
-            ctx.windows().show_window_and_focus_app(window_id);
-        } else {
-            log::error!("Auth not complete before trying to open team settings page");
-        }
+        let _ = ctx;
         true
     }
 
@@ -3510,7 +3509,8 @@ impl AuthOnboardingState {
 
         let has_completed_local_onboarding = has_completed_local_onboarding(ctx);
 
-        if !is_onboarded
+        if !local_agent_terminal_only()
+            && !is_onboarded
             && !is_anonymous
             && !has_completed_local_onboarding
             && FeatureFlag::AgentOnboarding.is_enabled()

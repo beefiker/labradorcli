@@ -24,15 +24,13 @@ use warpui::{
     ViewContext,
 };
 
-const SUBSCRIBE_ITEMS: &[&str] = &[
-    "1,500 credits per month",
-    "Access to frontier OpenAI, Anthropic, and Google models",
-    "Access to Reload credits and volume-based discounts",
-    "Extended cloud agents access",
-    "Highest codebase indexing limits",
-    "Unlimited Warp Drive objects and collaboration",
-    "Private email support",
-    "Unlimited cloud conversation storage",
+const LOCAL_AGENT_ITEMS: &[&str] = &[
+    "Uses your local Codex auth.json",
+    "No Dwarf account or API key required",
+    "Local agent conversations in the terminal",
+    "Command and script execution",
+    "Codebase context",
+    "Model switching for each session",
 ];
 
 #[derive(Debug, Clone)]
@@ -51,7 +49,6 @@ pub struct FreeUserNoAiSlide {
     subscribe_panel_mouse_state: MouseStateHandle,
     back_button: button::Button,
     next_button: button::Button,
-    subscribe_nav_button: button::Button,
     scroll_state: ClippedScrollStateHandle,
 }
 
@@ -64,7 +61,6 @@ impl FreeUserNoAiSlide {
             subscribe_panel_mouse_state: MouseStateHandle::default(),
             back_button: button::Button::default(),
             next_button: button::Button::default(),
-            subscribe_nav_button: button::Button::default(),
             scroll_state: ClippedScrollStateHandle::new(),
         }
     }
@@ -77,10 +73,9 @@ impl FreeUserNoAiSlide {
         &self,
         appearance: &Appearance,
         selected_index: usize,
-        // i.e. when window is small, the "subscribe" button replaces the "next" button instead of just
-        // living on the CTA in the right pane
+        // i.e. when the window is small, the local-agent CTA replaces the next button
+        // instead of living on the CTA in the right pane.
         subscribe_in_nav: bool,
-        agent_price_badge: &str,
     ) -> Box<dyn Element> {
         let bottom_nav =
             Align::new(self.render_bottom_nav(appearance, selected_index, subscribe_in_nav))
@@ -89,8 +84,7 @@ impl FreeUserNoAiSlide {
         slide_content::onboarding_slide_content(
             vec![
                 Align::new(self.render_header(appearance)).left().finish(),
-                Align::new(self.render_options(appearance, selected_index, agent_price_badge))
-                    .finish(),
+                Align::new(self.render_options(appearance, selected_index)).finish(),
             ],
             bottom_nav,
             self.scroll_state.clone(),
@@ -111,19 +105,14 @@ impl FreeUserNoAiSlide {
             .finish()
     }
 
-    fn render_options(
-        &self,
-        appearance: &Appearance,
-        selected_index: usize,
-        agent_price_badge: &str,
-    ) -> Box<dyn Element> {
+    fn render_options(&self, appearance: &Appearance, selected_index: usize) -> Box<dyn Element> {
         let agent_button = self.render_option_button(
             appearance,
             0,
             Icon::Code2,
-            "Agent driven development with Warp's built-in agent",
-            "Iterate, plan, and build with Oz: Warp's built-in agent. Available locally or in the cloud.",
-            agent_price_badge.to_string(),
+            "Agent driven development with Dwarf's built-in agent",
+            "Iterate, plan, and build with Dwarf's local agent, backed by your Codex authentication.",
+            "Free".to_string(),
             true, // badge is green
             self.agent_mouse_state.clone(),
             selected_index,
@@ -312,11 +301,11 @@ impl FreeUserNoAiSlide {
         );
 
         let enter = Keystroke::parse("enter").unwrap_or_default();
-        let next_button = if selected_index == 1 {
+        let next_button = if selected_index == 0 || selected_index == 1 {
             self.next_button.render(
                 appearance,
                 button::Params {
-                    content: button::Content::Label("Get Warping".into()),
+                    content: button::Content::Label("Get Dwarfing".into()),
                     theme: &button::themes::Primary,
                     options: button::Options {
                         keystroke: Some(enter),
@@ -327,21 +316,8 @@ impl FreeUserNoAiSlide {
                     },
                 },
             )
-        } else if subscribe_in_nav {
-            self.subscribe_nav_button.render(
-                appearance,
-                button::Params {
-                    content: button::Content::Label("Subscribe".into()),
-                    theme: &button::themes::Primary,
-                    options: button::Options {
-                        on_click: Some(Box::new(|ctx, _app, _pos| {
-                            ctx.dispatch_typed_action(FreeUserNoAiSlideAction::UpgradeClicked);
-                        })),
-                        ..button::Options::default(appearance)
-                    },
-                },
-            )
         } else {
+            let _ = subscribe_in_nav;
             self.next_button.render(
                 appearance,
                 button::Params {
@@ -359,7 +335,7 @@ impl FreeUserNoAiSlide {
         bottom_nav::onboarding_bottom_nav(appearance, 1, 4, Some(back_button), Some(next_button))
     }
 
-    fn render_subscribe_panel(&self, appearance: &Appearance) -> Box<dyn Element> {
+    fn render_local_agent_panel(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
         let ui_font_family = appearance.ui_font_family();
 
@@ -368,7 +344,7 @@ impl FreeUserNoAiSlide {
         let text_sub = internal_colors::text_sub(theme, internal_colors::neutral_2(theme));
 
         let title = FormattedTextElement::from_str(
-            "Subscribe to access agent driven development in Warp.",
+            "Local agent mode is free in Dwarf.",
             ui_font_family,
             24.,
         )
@@ -383,7 +359,7 @@ impl FreeUserNoAiSlide {
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(8.);
 
-        for item_text in SUBSCRIBE_ITEMS {
+        for item_text in LOCAL_AGENT_ITEMS {
             let bullet = appearance
                 .ui_builder()
                 .paragraph(format!("\u{2022} {item_text}"))
@@ -399,7 +375,7 @@ impl FreeUserNoAiSlide {
         }
 
         let fg_color = theme.foreground().into_solid();
-        let subscribe_btn = Hoverable::new(
+        let continue_btn = Hoverable::new(
             self.subscribe_panel_mouse_state.clone(),
             move |mouse_state| {
                 let bg = if mouse_state.is_clicked() {
@@ -416,7 +392,7 @@ impl FreeUserNoAiSlide {
                     .with_cross_axis_alignment(CrossAxisAlignment::Center)
                     .with_child(
                         warpui::elements::Text::new_inline(
-                            "Subscribe",
+                            "Continue",
                             appearance.ui_font_family(),
                             14.,
                         )
@@ -443,7 +419,7 @@ impl FreeUserNoAiSlide {
         )
         .with_cursor(Cursor::PointingHand)
         .on_click(|ctx, _, _| {
-            ctx.dispatch_typed_action(FreeUserNoAiSlideAction::UpgradeClicked);
+            ctx.dispatch_typed_action(FreeUserNoAiSlideAction::NextClicked);
         })
         .finish();
 
@@ -456,7 +432,7 @@ impl FreeUserNoAiSlide {
                     .with_margin_top(20.)
                     .finish(),
             )
-            .with_child(Container::new(subscribe_btn).with_margin_top(24.).finish())
+            .with_child(Container::new(continue_btn).with_margin_top(24.).finish())
             .finish();
 
         let card = Container::new(card_content)
@@ -484,23 +460,20 @@ impl View for FreeUserNoAiSlide {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let intention = self.model_intention(app);
-        let agent_price_badge = self.onboarding_state.as_ref(app).agent_price_badge();
-        let agent_price_badge = agent_price_badge.as_str();
-
         let selected_index = match intention {
             OnboardingIntention::AgentDrivenDevelopment => 0,
             OnboardingIntention::Terminal => 1,
         };
 
-        // Wide (right panel visible): greyed-out Next in nav.
-        // Narrow (right panel hidden): Subscribe in nav (the only CTA visible).
+        // Wide (right panel visible): right-panel CTA.
+        // Narrow (right panel hidden): local-agent CTA in nav.
         let wide = layout::static_left(
-            || self.render_content(appearance, selected_index, false, agent_price_badge),
-            || self.render_subscribe_panel(appearance),
+            || self.render_content(appearance, selected_index, false),
+            || self.render_local_agent_panel(appearance),
         );
         let narrow = layout::static_left(
-            || self.render_content(appearance, selected_index, true, agent_price_badge),
-            || self.render_subscribe_panel(appearance),
+            || self.render_content(appearance, selected_index, true),
+            || self.render_local_agent_panel(appearance),
         );
 
         SizeConstraintSwitch::new(

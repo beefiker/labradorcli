@@ -79,7 +79,11 @@ use uuid::Uuid;
 use warp_cli::agent::{Harness, OutputFormat};
 use warp_cli::mcp::MCPSpec;
 use warp_cli::share::ShareRequest;
-use warp_core::{features::FeatureFlag, report_error, report_if_error, safe_debug, safe_info};
+use warp_core::{
+    channel::{Channel, ChannelState},
+    features::FeatureFlag,
+    report_error, report_if_error, safe_debug, safe_info,
+};
 use warp_graphql::ai::AgentTaskState;
 use warp_managed_secrets::ManagedSecretValue;
 use warpui::{
@@ -238,7 +242,7 @@ pub struct AgentDriverOptions {
     pub snapshot_script_timeout: Option<Duration>,
 }
 
-/// `AgentDriver` is a model for driving an ambient Warp agent to completion.
+/// `AgentDriver` is a model for driving an ambient Dwarf agent to completion.
 ///
 /// Its primary responsibility is to configure a headless terminal pane and execute an AI query within it.
 pub struct AgentDriver {
@@ -369,7 +373,7 @@ pub enum AgentDriverError {
         #[source]
         error: terminal::ShareSessionError,
     },
-    #[error("Error syncing Warp Drive")]
+    #[error("Error syncing Dwarf Drive")]
     WarpDriveSyncFailed,
     #[error("Requested environment not found: {0}")]
     EnvironmentNotFound(String),
@@ -497,7 +501,9 @@ impl AgentDriver {
 
         // If we're not logged in, the root view will go to an auth screen, and all subsequent steps will fail.
         // This should be impossible, since we enforce login before reaching this point.
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
+        if !matches!(ChannelState::channel(), Channel::Oss)
+            && !AuthStateProvider::as_ref(ctx).get().is_logged_in()
+        {
             return Err(AgentDriverError::NotLoggedIn);
         }
 
@@ -1422,7 +1428,7 @@ impl AgentDriver {
     }
 
     /// Sets up the third-party harness by subscribing to CLI session events and
-    /// installing the Warp plugin and platform plugin, if applicable.
+    /// installing the Dwarf plugin and platform plugin, if applicable.
     ///
     /// Returns a oneshot receiver that fires when the harness should exit
     /// (either immediately on completion or after the idle-on-complete timeout).
@@ -1869,7 +1875,7 @@ impl AgentDriver {
             }
         });
 
-        // Subscribe to document model events to emit artifact_created when plans sync to Warp Drive.
+        // Subscribe to document model events to emit artifact_created when plans sync to Dwarf Drive.
         ctx.subscribe_to_model(&AIDocumentModel::handle(ctx), move |me, event, ctx| {
             let AIDocumentModelEvent::DocumentSaveStatusUpdated(document_id) = event else {
                 return;

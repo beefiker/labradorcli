@@ -293,7 +293,7 @@ impl AuthState {
     }
 
     /// Returns whether or not the user is anonymous.
-    /// Anonymous users are real Warp users, but have no providers linked in Firebase.
+    /// Anonymous users are real Dwarf users, but have no providers linked in Firebase.
     /// Returns `None` if there is no user data.
     pub fn is_user_anonymous(&self) -> Option<bool> {
         self.user
@@ -325,7 +325,7 @@ impl AuthState {
         })
     }
 
-    /// Returns whether or not the anonymous user is past any of their Warp Drive object limits.
+    /// Returns whether or not the anonymous user is past any of their Dwarf Drive object limits.
     pub fn is_anonymous_user_past_object_limit(
         &self,
         object_type: ObjectType,

@@ -2875,5 +2875,34 @@ pub fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::HandoffCloudCloud,
     ]);
 
+    // Dwarf is a local-only build. Keep the local terminal and local Codex agent
+    // features, but do not expose Warp-hosted surfaces that require login,
+    // metering, billing, hosted environments, or server-backed sharing.
+    for flag in [
+        FeatureFlag::AmbientAgentsCommandLine,
+        FeatureFlag::AgentManagementView,
+        FeatureFlag::AgentManagementDetailsView,
+        FeatureFlag::APIKeyAuthentication,
+        FeatureFlag::APIKeyManagement,
+        FeatureFlag::CloudConversations,
+        FeatureFlag::CloudEnvironments,
+        FeatureFlag::CloudModeFromLocalSession,
+        FeatureFlag::CloudModeHostSelector,
+        FeatureFlag::CloudModeImageContext,
+        FeatureFlag::CloudModeInputV2,
+        FeatureFlag::CloudModeSetupV2,
+        FeatureFlag::CreateEnvironmentSlashCommand,
+        FeatureFlag::CreatingSharedSessions,
+        FeatureFlag::HandoffCloudCloud,
+        FeatureFlag::HOARemoteControl,
+        FeatureFlag::OzIdentityFederation,
+        FeatureFlag::ScheduledAmbientAgents,
+        FeatureFlag::SessionSharingAcls,
+        FeatureFlag::TeamApiKeys,
+        FeatureFlag::WarpManagedSecrets,
+    ] {
+        flags.remove(&flag);
+    }
+
     flags
 }

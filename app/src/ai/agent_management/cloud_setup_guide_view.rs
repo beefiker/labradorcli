@@ -116,7 +116,7 @@ impl CloudSetupGuideView {
         );
 
         let visit_oz_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Visit Oz", SecondaryTheme)
+            ActionButton::new("Visit Dwarf", SecondaryTheme)
                 .on_click(|ctx| ctx.dispatch_typed_action(CloudSetupGuideAction::VisitOz))
         });
 
@@ -144,7 +144,7 @@ impl CloudSetupGuideView {
         let mut header_container = Flex::column().with_spacing(8.);
 
         let title = Text::new(
-            "Getting started with Oz cloud agents",
+            "Getting started with Dwarf agents",
             appearance.ui_font_family(),
             title_font_size,
         )
@@ -154,7 +154,7 @@ impl CloudSetupGuideView {
         header_container.add_child(title);
 
         let subtitle = Text::new(
-            "Start Oz cloud agents directly in Warp from an integration (Linear, Slack), with an event (GitHub, built-in schedule), or programmatically with the Oz SDK or CLI.",
+            "Start Dwarf agents directly from the local terminal with your Codex authentication.",
             appearance.ui_font_family(),
             subtitle_font_size,
         )
@@ -177,7 +177,7 @@ impl CloudSetupGuideView {
                 appearance
                     .ui_builder()
                     .link(
-                        "Oz documentation".to_string(),
+                        "Dwarf documentation".to_string(),
                         None,
                         Some(Box::new(|ctx| {
                             ctx.dispatch_typed_action(CloudSetupGuideAction::OpenDocs {
@@ -247,7 +247,7 @@ impl CloudSetupGuideView {
         let font_size = 16.;
 
         Text::new(
-            "Manual setup: Create a Slack or Linear integration with the Oz CLI",
+            "Manual setup: Configure local Dwarf integrations",
             appearance.ui_font_family(),
             font_size,
         )
@@ -453,7 +453,7 @@ impl CloudSetupGuideView {
         .finish();
 
         let sub_description = Container::new(Self::render_description_with_link(
-            "Use Warp's environment setup command to have an agent help you through it. ",
+            "Use Dwarf's environment setup command to have an agent help you through it. ",
             "Visit docs",
             self.env_docs_link_mouse_state.clone(),
             SetupGuideDocs::Environment,
@@ -526,7 +526,7 @@ impl CloudSetupGuideView {
             .finish();
 
         let sub_description = Container::new(Self::render_description_with_link(
-            "Integrate Slack or Linear to assign Warp's Agent tasks with @Warp. ",
+            "Integrate Slack or Linear to assign Dwarf's Agent tasks with @Dwarf. ",
             "Visit docs",
             self.integration_docs_link_mouse_state.clone(),
             SetupGuideDocs::Integration,

@@ -16,7 +16,6 @@ use crate::ai::agent::{
     AIAgentExchangeId, AIAgentOutputStatus, FinishedAIAgentOutput, RenderableAIError,
 };
 use crate::ai::blocklist::agent_view::shortcuts::AgentShortcutViewModel;
-use crate::ai::blocklist::agent_view::zero_state_block::render_ambient_credits_banner;
 use crate::ai::blocklist::agent_view::{
     agent_view_bg_fill, AgentViewController, AgentViewControllerEvent,
 };
@@ -339,21 +338,7 @@ impl View for AgentMessageBar {
             return Empty::new().finish();
         };
 
-        // Show credits banner when user has ambient credits remaining.
-        use crate::ai::request_usage_model::AMBIENT_AGENT_TRIAL_CREDIT_THRESHOLD;
-        let right_element = if cfg!(target_family = "wasm") {
-            None
-        } else if let Some(credits) =
-            AIRequestUsageModel::as_ref(app).ambient_only_credits_remaining()
-        {
-            if credits >= AMBIENT_AGENT_TRIAL_CREDIT_THRESHOLD {
-                Some(render_ambient_credits_banner(credits, app))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let right_element = None;
 
         // Append a Figma MCP chip to the message if applicable.
         match self.figma_button_status(app) {

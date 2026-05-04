@@ -294,12 +294,6 @@ impl OnboardingStateModel {
         self.free_user_no_ai_experiment
     }
 
-    pub(crate) fn agent_price_badge(&self) -> String {
-        const DEFAULT_AGENT_PRICE_CENTS: i32 = 1800;
-        let cents = self.agent_price_cents.unwrap_or(DEFAULT_AGENT_PRICE_CENTS);
-        format!("Starting at ${}/mo", cents / 100)
-    }
-
     pub(crate) fn set_agent_price_cents(
         &mut self,
         cents: Option<i32>,
@@ -513,10 +507,8 @@ impl OnboardingStateModel {
     }
 
     pub(crate) fn is_model_disabled(&self, model_id: &LLMId) -> bool {
-        self.models
-            .iter()
-            .find(|m| &m.id == model_id)
-            .is_some_and(|m| m.requires_upgrade)
+        let _ = model_id;
+        false
     }
 
     pub(crate) fn request_upgrade(&mut self, ctx: &mut ModelContext<Self>) {

@@ -307,7 +307,7 @@ impl QueryFilter {
             QueryFilter::Sessions => "sessions",
             QueryFilter::Conversations => "conversations",
             QueryFilter::LaunchConfigurations => "launch configurations",
-            QueryFilter::Drive => "Warp Drive",
+            QueryFilter::Drive => "Dwarf Drive",
             QueryFilter::EnvironmentVariables => "environment variables",
             QueryFilter::PromptHistory => "prompt history",
             QueryFilter::Files => "files",

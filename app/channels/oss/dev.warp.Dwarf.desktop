@@ -4,20 +4,20 @@ Version=1.0
 
 Type=Application
 
-Name=WarpOss
+Name=Dwarf
 GenericName=TerminalEmulator
 
-Exec=warp-oss %U
-StartupWMClass=dev.warp.WarpOss
+Exec=dwarf %U
+StartupWMClass=dev.warp.Dwarf
 
 Keywords=shell;prompt;command;commandline;cmd;
 
-Icon=dev.warp.WarpOss
+Icon=dev.warp.Dwarf
 
 Categories=System;TerminalEmulator;
 
 # Don't run this application within a terminal.
 Terminal=false
 
-# Register ourselves as the handler for warposs:// URLs.
-MimeType=x-scheme-handler/warposs;
+# Register ourselves as the handler for dwarf:// URLs.
+MimeType=x-scheme-handler/dwarf;

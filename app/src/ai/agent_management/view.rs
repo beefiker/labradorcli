@@ -1309,7 +1309,7 @@ impl AgentManagementView {
                 let copy_link_url = conversation.session_or_conversation_link(ctx);
 
                 // Prefer server-reported harness when available; otherwise treat as a pure
-                // local conversation (always Warp Agent).
+                // local conversation (always Dwarf Agent).
                 let harness = navigation_data
                     .and_then(|nav| history_model.get_server_conversation_metadata(&nav.id))
                     .map(|m| Harness::from(m.harness))
@@ -2001,7 +2001,7 @@ impl AgentManagementView {
             let mut stack = Stack::new().with_child(loading_icon);
             if mouse_state.is_hovered() {
                 let tooltip = ui_builder
-                    .tool_tip(String::from("Loading cloud agent runs"))
+                    .tool_tip(String::from("Loading Dwarf agent runs"))
                     .build()
                     .finish();
                 stack.add_positioned_overlay_child(

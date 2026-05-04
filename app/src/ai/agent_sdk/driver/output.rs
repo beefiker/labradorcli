@@ -523,11 +523,11 @@ pub mod text {
         )
     }
 
-    /// Report the run ID with a link to the Oz dashboard.
+    /// Report the run ID with a link to the Dwarf dashboard.
     pub fn run_started<W: Write>(run_id: &str, w: &mut W) -> io::Result<()> {
         let run_url = super::run_url(run_id);
         writeln!(w, "Run ID: {run_id}")?;
-        writeln!(w, "Open in Oz: {run_url}\n")
+        writeln!(w, "Open in Dwarf: {run_url}\n")
     }
 
     /// Report that a shared session has been established.

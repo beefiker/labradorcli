@@ -40,23 +40,23 @@ impl AITip for CloudModeTip {
 pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
     vec![
         CloudModeTip::new(
-            "Install the Oz Slack integration to trigger agents from any channel or DM.",
+            "Install local integrations to trigger agents from your tools.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/integrations/slack"),
         ),
         CloudModeTip::new(
-            "Build programmatic agents using Oz's TypeScript and Python SDKs.",
+            "Build programmatic agents using Dwarf integrations.",
             Some("https://docs.warp.dev/reference/api-and-sdk"),
         ),
         CloudModeTip::new(
-            "Set team or personal secrets for agents using the `oz secret` command.",
+            "Set local provider credentials before starting agents.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/secrets"),
         ),
         CloudModeTip::new(
-            "View all your agent runs and their status in the Oz web app.",
+            "View local agent runs and their status in Dwarf.",
             Some("https://oz.warp.dev"),
         ),
         CloudModeTip::new(
-            "Join any Oz cloud agent run in real-time using Agent Session Sharing.",
+            "Join Dwarf agent sessions in real time using Agent Session Sharing.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/viewing-cloud-agent-runs"),
         ),
         CloudModeTip::new(
@@ -72,11 +72,11 @@ pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
             Some("https://docs.warp.dev/agent-platform/cloud-agents/integrations/github-actions"),
         ),
         CloudModeTip::new(
-            "Run agents from GitHub Actions using the `oz-agent-action`.",
+            "Run agents from automation using Dwarf integrations.",
             Some("https://github.com/warpdotdev/oz-agent-action"),
         ),
         CloudModeTip::new(
-            "Call the Oz REST API to trigger agents from any backend service or internal tool.",
+            "Call local Dwarf integrations to trigger agents from internal tools.",
             Some("https://docs.warp.dev/reference/api-and-sdk"),
         ),
         CloudModeTip::new(
@@ -88,11 +88,11 @@ pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
             Some("https://docs.warp.dev/agent-platform/cloud-agents/viewing-cloud-agent-runs"),
         ),
         CloudModeTip::new(
-            "Use the `--share` flag with the Oz CLI to enable session sharing from anywhere.",
+            "Use session sharing to collaborate from another Dwarf window.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/platform"),
         ),
         CloudModeTip::new(
-            "Fork a completed Oz cloud agent session into Warp to continue the work locally.",
+            "Fork a completed Dwarf agent session to continue the work locally.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/viewing-cloud-agent-runs"),
         ),
         CloudModeTip::new(
@@ -104,23 +104,23 @@ pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
             Some("https://docs.warp.dev/agent-platform/cloud-agents/triggers/scheduled-agents"),
         ),
         CloudModeTip::new(
-            "Tag @Oz in Linear issues to automatically investigate and propose fixes.",
+            "Use Dwarf integrations to investigate issues and propose fixes.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/integrations/linear"),
         ),
         CloudModeTip::new(
-            "Run agents on remote dev boxes or CI runners using the Oz CLI.",
+            "Run agents on remote dev boxes or CI runners using Dwarf.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/platform"),
         ),
         CloudModeTip::new(
-            "Configure MCP servers to give Oz cloud agents access to GitHub, Linear, and Sentry.",
+            "Configure MCP servers to give Dwarf agents access to GitHub, Linear, and Sentry.",
             Some("https://docs.warp.dev/agent-platform/capabilities/mcp"),
         ),
         CloudModeTip::new(
-            "Use `oz agent run` to kick off tasks without opening the Warp terminal.",
+            "Use the Dwarf CLI to kick off tasks without opening the terminal.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/platform"),
         ),
         CloudModeTip::new(
-            "View your teammates' agent runs in the Oz web app for shared visibility.",
+            "View shared Dwarf agent runs for team visibility.",
             Some("https://oz.warp.dev"),
         ),
         CloudModeTip::new(
@@ -172,11 +172,11 @@ pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
             Some("https://docs.warp.dev/agent-platform/cloud-agents/triggers/scheduled-agents"),
         ),
         CloudModeTip::new(
-            "Use `oz mcp list` to see which MCP servers are available to your agents.",
+            "Use the MCP settings page to see which servers are available to your agents.",
             Some("https://docs.warp.dev/agent-platform/capabilities/mcp"),
         ),
         CloudModeTip::new(
-            "Build an internal Slack bot that delegates coding tasks to Oz agents.",
+            "Build an internal Slack bot that delegates coding tasks to Dwarf agents.",
             Some("https://docs.warp.dev/agent-platform/cloud-agents/integrations/slack"),
         ),
         CloudModeTip::new(
@@ -184,15 +184,15 @@ pub fn get_cloud_mode_tips() -> Vec<CloudModeTip> {
             Some("https://docs.warp.dev/agent-platform/cloud-agents/integrations/slack"),
         ),
         CloudModeTip::new(
-            "Use the Oz TypeScript SDK to build custom automation pipelines.",
+            "Use Dwarf integrations to build custom automation pipelines.",
             Some("https://docs.warp.dev/reference/api-and-sdk"),
         ),
         CloudModeTip::new(
-            "Use the Oz Python SDK to integrate agents into your data pipelines.",
+            "Use Dwarf integrations to connect agents to your data pipelines.",
             Some("https://docs.warp.dev/reference/api-and-sdk"),
         ),
         CloudModeTip::new(
-            "Monitor agent success rates and runtimes using the Oz API.",
+            "Monitor agent success rates and runtimes in Dwarf.",
             Some("https://docs.warp.dev/reference/api-and-sdk"),
         ),
         CloudModeTip::new(
