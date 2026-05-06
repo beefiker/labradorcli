@@ -65,7 +65,8 @@ use crate::terminal::input::conversations::{
 use crate::terminal::input::inline_history::InlineHistoryMenuView;
 use crate::terminal::input::inline_menu::InlineMenuPositioner;
 use crate::terminal::input::models::{
-    InlineModelSelectorEvent, InlineModelSelectorTab, InlineModelSelectorView,
+    local_auth_setup_for_model_id, InlineModelSelectorEvent, InlineModelSelectorTab,
+    InlineModelSelectorView,
 };
 use crate::terminal::input::plans::{InlinePlanMenuEvent, InlinePlanMenuView};
 use crate::terminal::input::profiles::{InlineProfileSelectorEvent, InlineProfileSelectorView};
@@ -3814,6 +3815,22 @@ impl Input {
                 selected_tab,
                 set_as_default,
             } => {
+                if let Some(setup_kind) = local_auth_setup_for_model_id(id) {
+                    if self
+                        .suggestions_mode_model
+                        .as_ref(ctx)
+                        .is_inline_model_selector()
+                    {
+                        self.suggestions_mode_model.update(ctx, |model, ctx| {
+                            model.close_and_restore_buffer(ctx);
+                        });
+                    }
+                    self.clear_buffer_and_reset_undo_stack(ctx);
+                    self.try_execute_command(setup_kind.command(), ctx);
+                    ctx.notify();
+                    return;
+                }
+
                 let profile_id = *AIExecutionProfilesModel::as_ref(ctx)
                     .active_profile(Some(self.terminal_view_id), ctx)
                     .id();

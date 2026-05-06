@@ -58,6 +58,7 @@ pub enum DisableReason {
     OutOfRequests,
     ProviderOutage,
     RequiresUpgrade,
+    LocalAuthMissing,
     Unavailable,
 }
 
@@ -71,6 +72,9 @@ impl DisableReason {
                 "This model is temporarily unavailable due to a provider outage."
             }
             DisableReason::RequiresUpgrade => "Please upgrade your plan to access this model.",
+            DisableReason::LocalAuthMissing => {
+                "Local provider auth is not set up yet. Use the setup row to sign in."
+            }
             DisableReason::Unavailable => "This model is unavailable.",
         }
     }

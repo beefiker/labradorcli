@@ -75,6 +75,50 @@ impl LocalAgentRuntime {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LocalAuthSetup {
+    runtime: LocalAgentRuntime,
+}
+
+impl LocalAuthSetup {
+    fn message(self) -> &'static str {
+        match self.runtime {
+            LocalAgentRuntime::Codex => {
+                "Local Codex auth is not set up yet. I can run `codex login` in Dwarf to open Codex's sign-in flow and create ~/.codex/auth.json."
+            }
+            LocalAgentRuntime::Claude => {
+                "Local Claude auth is not set up yet. I can run `claude auth login --claudeai` in Dwarf to open Claude Code's sign-in flow and create ~/.claude.json."
+            }
+        }
+    }
+
+    fn command(self) -> &'static str {
+        match self.runtime {
+            LocalAgentRuntime::Codex => "codex login",
+            LocalAgentRuntime::Claude => "claude auth login --claudeai",
+        }
+    }
+
+    fn tool_call(self) -> LocalRunShellCommand {
+        LocalRunShellCommand {
+            command: self.command().to_string(),
+            is_read_only: false,
+            uses_pager: false,
+            is_risky: false,
+            wait_until_complete: false,
+        }
+    }
+}
+
+fn missing_auth_setup_for_runtime(runtime: LocalAgentRuntime) -> Option<LocalAuthSetup> {
+    let is_missing = match runtime {
+        LocalAgentRuntime::Codex => !local_openai_auth::has_access_token(),
+        LocalAgentRuntime::Claude => !local_claude_auth::has_auth_state(),
+    };
+
+    is_missing.then_some(LocalAuthSetup { runtime })
+}
+
 fn configured_local_agent_runtime() -> Option<LocalAgentRuntime> {
     let value = env::var(LOCAL_AGENT_ENV_VAR).ok()?;
     match value.trim().to_ascii_lowercase().as_str() {
@@ -115,12 +159,18 @@ pub(super) async fn generate_output(
         .map(str::to_string);
 
     let direct_tool_call = direct_terminal_tool_call(&params.input, working_directory.as_deref());
+    let auth_setup = direct_tool_call
+        .is_none()
+        .then(|| missing_auth_setup_for_runtime(runtime))
+        .flatten();
     let output_text = if let Some(tool_call) = direct_tool_call.as_ref() {
         if tool_call.command.starts_with("target=$(mdfind ") {
             "I'll find the matching directory and switch Dwarf to it.".to_string()
         } else {
             format!("I'll run `{}` in Dwarf.", tool_call.command)
         }
+    } else if let Some(auth_setup) = auth_setup {
+        auth_setup.message().to_string()
     } else {
         match runtime {
             LocalAgentRuntime::Codex => {
@@ -162,6 +212,8 @@ pub(super) async fn generate_output(
 
     let (mut output_text, mut tool_calls) = if let Some(tool_call) = direct_tool_call {
         (output_text, vec![tool_call])
+    } else if let Some(auth_setup) = auth_setup {
+        (output_text, vec![auth_setup.tool_call()])
     } else {
         extract_dwarf_tool_calls(&output_text)
     };
@@ -259,9 +311,7 @@ async fn generate_local_am_query_suggestions(
 }
 
 fn should_use_local_agent_for_suggestions() -> bool {
-    local_openai_auth::has_access_token()
-        || local_claude_auth::has_auth_state()
-        || env::var("DWARF_ALLOW_OZ_AGENT").as_deref() != Ok("1")
+    local_openai_auth::has_access_token() || local_claude_auth::has_auth_state()
 }
 
 async fn run_local_agent_for_suggestion(
@@ -1330,6 +1380,30 @@ mod tests {
             selected_claude_model(Some("opus".to_string()), "sonnet"),
             Some("opus".to_string())
         );
+    }
+
+    #[test]
+    fn codex_auth_setup_uses_interactive_login_command() {
+        let tool_call = LocalAuthSetup {
+            runtime: LocalAgentRuntime::Codex,
+        }
+        .tool_call();
+
+        assert_eq!(tool_call.command, "codex login");
+        assert!(!tool_call.is_read_only);
+        assert!(!tool_call.wait_until_complete);
+    }
+
+    #[test]
+    fn claude_auth_setup_uses_interactive_login_command() {
+        let tool_call = LocalAuthSetup {
+            runtime: LocalAgentRuntime::Claude,
+        }
+        .tool_call();
+
+        assert_eq!(tool_call.command, "claude auth login --claudeai");
+        assert!(!tool_call.is_read_only);
+        assert!(!tool_call.wait_until_complete);
     }
 
     #[test]

@@ -47,6 +47,64 @@ pub struct AcceptModel {
     pub id: LLMId,
 }
 
+pub const SETUP_CODEX_AUTH_MODEL_ID: &str = "dwarf-setup-codex-auth";
+pub const SETUP_CLAUDE_AUTH_MODEL_ID: &str = "dwarf-setup-claude-auth";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LocalAuthSetupKind {
+    Codex,
+    Claude,
+}
+
+impl LocalAuthSetupKind {
+    fn id(self) -> LLMId {
+        match self {
+            Self::Codex => SETUP_CODEX_AUTH_MODEL_ID.into(),
+            Self::Claude => SETUP_CLAUDE_AUTH_MODEL_ID.into(),
+        }
+    }
+
+    pub fn command(self) -> &'static str {
+        match self {
+            Self::Codex => "codex login",
+            Self::Claude => "claude auth login --claudeai",
+        }
+    }
+
+    fn display_text(self) -> &'static str {
+        match self {
+            Self::Codex => "Set up OpenAI Codex login",
+            Self::Claude => "Set up Claude login",
+        }
+    }
+
+    fn details_text(self) -> &'static str {
+        match self {
+            Self::Codex => {
+                "Runs `codex login` in Dwarf. Codex owns the browser sign-in flow and writes ~/.codex/auth.json."
+            }
+            Self::Claude => {
+                "Runs `claude auth login --claudeai` in Dwarf. Claude Code owns the browser sign-in flow and writes ~/.claude.json."
+            }
+        }
+    }
+
+    fn provider(self) -> LLMProvider {
+        match self {
+            Self::Codex => LLMProvider::OpenAI,
+            Self::Claude => LLMProvider::Anthropic,
+        }
+    }
+}
+
+pub fn local_auth_setup_for_model_id(id: &LLMId) -> Option<LocalAuthSetupKind> {
+    match id.as_str() {
+        SETUP_CODEX_AUTH_MODEL_ID => Some(LocalAuthSetupKind::Codex),
+        SETUP_CLAUDE_AUTH_MODEL_ID => Some(LocalAuthSetupKind::Claude),
+        _ => None,
+    }
+}
+
 impl InlineMenuAction for AcceptModel {
     const MENU_TYPE: InlineMenuType = InlineMenuType::ModelSelector;
 
@@ -170,34 +228,82 @@ impl SyncDataSource for ModelSelectorDataSource {
 
         let query_text = query.text.trim().to_lowercase();
 
+        let setup_items = local_auth_setup_items(&query_text);
+
         if query_text.is_empty() {
-            return Ok(choices
+            return Ok(setup_items
                 .into_iter()
-                .map(|llm| QueryResult::from(ModelSearchItem::new(llm, &active_llm_id, app)))
+                .chain(
+                    choices
+                        .into_iter()
+                        .map(|llm| ModelSearchItem::new(llm, &active_llm_id, app)),
+                )
+                .map(QueryResult::from)
                 .collect());
         }
 
-        Ok(choices
+        Ok(setup_items
             .into_iter()
-            .filter_map(|llm| {
-                let match_result = match_indices_case_insensitive(
-                    llm.display_name.to_lowercase().as_str(),
-                    query_text.as_str(),
-                )?;
-
-                // Avoid spamming results with extremely weak matches.
-                if query_text.len() > 1 && match_result.score < 10 {
-                    return None;
-                }
-
-                Some(QueryResult::from(
-                    ModelSearchItem::new(llm, &active_llm_id, app)
-                        .with_name_match_result(Some(match_result.clone()))
-                        .with_score(OrderedFloat(match_result.score as f64)),
-                ))
-            })
+            .chain(
+                choices.into_iter().filter_map(|llm| {
+                    matched_model_search_item(llm, &active_llm_id, &query_text, app)
+                }),
+            )
+            .map(QueryResult::from)
             .collect())
     }
+}
+
+fn local_auth_setup_items(query_text: &str) -> Vec<ModelSearchItem> {
+    let mut items = Vec::new();
+
+    if !ai::local_openai_auth::has_access_token() {
+        items.push(ModelSearchItem::setup(LocalAuthSetupKind::Codex));
+    }
+
+    if !ai::local_claude_auth::has_auth_state() {
+        items.push(ModelSearchItem::setup(LocalAuthSetupKind::Claude));
+    }
+
+    if query_text.is_empty() {
+        return items;
+    }
+
+    items
+        .into_iter()
+        .filter_map(|item| {
+            let match_result = match_indices_case_insensitive(
+                item.display_text.to_lowercase().as_str(),
+                query_text,
+            )?;
+
+            (query_text.len() <= 1 || match_result.score >= 10).then(|| {
+                item.with_name_match_result(Some(match_result.clone()))
+                    .with_score(OrderedFloat(match_result.score as f64))
+            })
+        })
+        .collect()
+}
+
+fn matched_model_search_item(
+    llm: &LLMInfo,
+    active_llm_id: &LLMId,
+    query_text: &str,
+    app: &AppContext,
+) -> Option<ModelSearchItem> {
+    let match_result =
+        match_indices_case_insensitive(llm.display_name.to_lowercase().as_str(), query_text)?;
+
+    // Avoid spamming results with extremely weak matches.
+    if query_text.len() > 1 && match_result.score < 10 {
+        return None;
+    }
+
+    Some(
+        ModelSearchItem::new(llm, active_llm_id, app)
+            .with_name_match_result(Some(match_result.clone()))
+            .with_score(OrderedFloat(match_result.score as f64)),
+    )
 }
 
 impl Entity for ModelSelectorDataSource {
@@ -213,6 +319,7 @@ struct ModelSearchItem {
     display_text: String,
     is_selected: bool,
     disable_reason: Option<DisableReason>,
+    setup_kind: Option<LocalAuthSetupKind>,
     name_match_result: Option<FuzzyMatchResult>,
     score: OrderedFloat<f64>,
     manage_api_key_mouse_state: MouseStateHandle,
@@ -224,13 +331,15 @@ impl ModelSearchItem {
     fn new(llm: &LLMInfo, active_llm_id: &LLMId, app: &AppContext) -> Self {
         // If the model requires an upgrade but the user already has a BYOK key
         // for this provider, treat it as enabled by clearing the disable reason.
-        let disable_reason = if llm.disable_reason == Some(DisableReason::RequiresUpgrade)
-            && is_using_api_key_for_provider(&llm.provider, app)
-        {
-            None
-        } else {
-            llm.disable_reason.clone()
-        };
+        let disable_reason = local_auth_disable_reason(&llm.provider).or_else(|| {
+            if llm.disable_reason == Some(DisableReason::RequiresUpgrade)
+                && is_using_api_key_for_provider(&llm.provider, app)
+            {
+                None
+            } else {
+                llm.disable_reason.clone()
+            }
+        });
         Self {
             id: llm.id.clone(),
             provider: llm.provider.clone(),
@@ -239,11 +348,31 @@ impl ModelSearchItem {
             display_text: llm.display_name.clone(),
             is_selected: &llm.id == active_llm_id,
             disable_reason,
+            setup_kind: None,
             name_match_result: None,
             score: OrderedFloat(f64::MIN),
             manage_api_key_mouse_state: Default::default(),
             reasoning_level: llm.reasoning_level(),
             discount_percentage: llm.discount_percentage,
+        }
+    }
+
+    fn setup(kind: LocalAuthSetupKind) -> Self {
+        let provider = kind.provider();
+        Self {
+            id: kind.id(),
+            provider: provider.clone(),
+            spec: None,
+            provider_icon: provider.icon(),
+            display_text: kind.display_text().to_string(),
+            is_selected: false,
+            disable_reason: None,
+            setup_kind: Some(kind),
+            name_match_result: None,
+            score: OrderedFloat(f64::MAX),
+            manage_api_key_mouse_state: Default::default(),
+            reasoning_level: None,
+            discount_percentage: None,
         }
     }
 
@@ -256,6 +385,16 @@ impl ModelSearchItem {
         self.score = score;
         self
     }
+}
+
+fn local_auth_disable_reason(provider: &LLMProvider) -> Option<DisableReason> {
+    let auth_missing = match provider {
+        LLMProvider::OpenAI => !ai::local_openai_auth::has_access_token(),
+        LLMProvider::Anthropic => !ai::local_claude_auth::has_auth_state(),
+        _ => false,
+    };
+
+    auth_missing.then_some(DisableReason::LocalAuthMissing)
 }
 
 impl SearchItem for ModelSearchItem {
@@ -329,7 +468,25 @@ impl SearchItem for ModelSearchItem {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(text.finish());
 
-        if is_using_api_key_for_provider(&self.provider, app) {
+        if let Some(kind) = self.setup_kind {
+            let setup_text = Text::new_inline(
+                format!("({})", kind.command()),
+                appearance.ui_font_family(),
+                font_size,
+            )
+            .with_color(secondary_text_color.into())
+            .with_single_highlight(
+                Highlight::new().with_properties(Properties {
+                    style: Style::Italic,
+                    ..Default::default()
+                }),
+                (0..kind.command().len() + 2).collect(),
+            )
+            .finish();
+            row = row.with_child(Container::new(setup_text).with_margin_left(6.).finish());
+        }
+
+        if self.setup_kind.is_none() && is_using_api_key_for_provider(&self.provider, app) {
             let key_icon =
                 ConstrainedBox::new(Icon::Key.to_warpui_icon(secondary_text_color).finish())
                     .with_width(font_size)
@@ -376,10 +533,12 @@ impl SearchItem for ModelSearchItem {
             row = row.with_child(Container::new(disabled_text).with_margin_left(6.).finish());
         }
 
-        if should_show_discount_chip(
-            self.discount_percentage,
-            is_using_api_key_for_provider(&self.provider, app),
-        ) {
+        if self.setup_kind.is_none()
+            && should_show_discount_chip(
+                self.discount_percentage,
+                is_using_api_key_for_provider(&self.provider, app),
+            )
+        {
             let discount_percentage = self.discount_percentage.unwrap_or(0.);
             let chip = Container::new(
                 Text::new_inline(
@@ -412,6 +571,27 @@ impl SearchItem for ModelSearchItem {
 
     fn render_details(&self, app: &AppContext) -> Option<Box<dyn Element>> {
         use warpui::elements::{Flex, ParentElement as _};
+
+        if let Some(kind) = self.setup_kind {
+            let appearance = crate::appearance::Appearance::as_ref(app);
+            let theme = appearance.theme();
+            let background_color = inline_styles::menu_background_color(app);
+            let secondary_text_color =
+                inline_styles::secondary_text_color(theme, background_color.into());
+            let details = Text::new(
+                kind.details_text().to_string(),
+                appearance.ui_font_family(),
+                inline_styles::font_size(appearance),
+            )
+            .with_color(secondary_text_color.into())
+            .finish();
+
+            return Some(
+                ConstrainedBox::new(Container::new(details).finish())
+                    .with_width(model_specs_width(app))
+                    .finish(),
+            );
+        }
 
         let spec = self.spec.as_ref()?;
 
@@ -566,6 +746,10 @@ impl SearchItem for ModelSearchItem {
     }
 
     fn tooltip(&self) -> Option<String> {
+        if let Some(kind) = self.setup_kind {
+            return Some(format!("Run `{}`", kind.command()));
+        }
+
         self.disable_reason
             .as_ref()
             .map(|reason| reason.tooltip_text().to_string())
