@@ -1784,6 +1784,10 @@ impl PaneGroup {
                 Ok((PaneData::new(pane_id), focus))
             }
             LeafContents::AmbientAgent(snapshot) => {
+                if !FeatureFlag::CloudMode.is_enabled() {
+                    return Err(anyhow::anyhow!("Ambient agent panes are disabled"));
+                }
+
                 let task_data = snapshot.task_id.map(|task_id| {
                     let task = AgentConversationsModel::handle(ctx).update(ctx, |model, ctx| {
                         model.get_or_async_fetch_task_data(&task_id, ctx)

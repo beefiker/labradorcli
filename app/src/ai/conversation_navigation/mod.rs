@@ -1,3 +1,4 @@
+use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::AIConversation;
 use crate::ai::agent::conversation::AIConversationId;
@@ -212,7 +213,11 @@ impl ConversationNavigationData {
                             let is_selected =
                                 !is_closed && Some(conversation.id()) == selected_conversation_id;
 
+                            let is_open_agent_view = ActiveAgentViewsModel::as_ref(app)
+                                .is_conversation_open(conversation.id(), app);
+
                             if !is_selected
+                                && !is_open_agent_view
                                 && !blocklist_filter::conversation_would_render_in_blocklist(
                                     conversation,
                                 )
@@ -256,9 +261,12 @@ impl ConversationNavigationData {
             .all_live_conversations()
             .iter()
             .for_each(|(terminal_id, conversation)| {
+                let is_open_agent_view =
+                    ActiveAgentViewsModel::as_ref(app).is_conversation_open(conversation.id(), app);
                 if conversation.should_exclude_from_navigation()
                     || history_model.is_terminal_view_conversation_transcript_viewer(*terminal_id)
-                    || !blocklist_filter::conversation_would_render_in_blocklist(conversation)
+                    || (!is_open_agent_view
+                        && !blocklist_filter::conversation_would_render_in_blocklist(conversation))
                 {
                     // Track the ID so the historical loop below doesn't re-add it.
                     all_conversation_ids.insert(conversation.id());

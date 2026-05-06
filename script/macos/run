@@ -92,6 +92,98 @@ while (( "$#" )); do
   esac
 done
 
+ensure_metal_toolchain() {
+  if xcrun -f metal >/dev/null 2>&1 &&
+     xcrun -f metallib >/dev/null 2>&1 &&
+     xcrun --sdk macosx metal --help >/dev/null 2>&1; then
+    return
+  fi
+
+  local selected_developer_dir
+  selected_developer_dir="$(xcode-select -p 2>/dev/null || true)"
+  local xcode_developer_dir="/Applications/Xcode.app/Contents/Developer"
+  local xcode_probe=""
+  local xcode_metal_probe=""
+  local xcode_metallib_probe=""
+
+  if [[ -d "$xcode_developer_dir" ]]; then
+    xcode_probe="$(DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metal 2>&1 || true)"
+    xcode_metal_probe="$(DEVELOPER_DIR="$xcode_developer_dir" xcrun --sdk macosx metal --help 2>&1 >/dev/null || true)"
+    xcode_metallib_probe="$(DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metallib 2>&1 || true)"
+    if DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metal >/dev/null 2>&1 &&
+       DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metallib >/dev/null 2>&1 &&
+       DEVELOPER_DIR="$xcode_developer_dir" xcrun --sdk macosx metal --help >/dev/null 2>&1; then
+      export DEVELOPER_DIR="$xcode_developer_dir"
+      echo "Using full Xcode developer tools for Metal shader compilation: $DEVELOPER_DIR"
+      return
+    fi
+  fi
+
+  cat >&2 <<EOF
+Dwarf needs Apple's Metal shader compiler to build the macOS app.
+
+Current developer tools:
+  ${selected_developer_dir:-unknown}
+EOF
+
+  if [[ "$xcode_probe" == *"license"* || "$xcode_metal_probe" == *"license"* ]]; then
+    cat >&2 <<EOF
+
+Full Xcode is installed, but its license has not been accepted. Run:
+
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+  sudo xcodebuild -license
+
+Then rerun:
+
+  ./script/run
+EOF
+  elif [[ "$xcode_metal_probe" == *"missing Metal Toolchain"* || "$xcode_metallib_probe" == *"metallib"* ]]; then
+    cat >&2 <<EOF
+
+Full Xcode is selected, but Apple's optional Metal Toolchain component is not installed. Run:
+
+  xcodebuild -downloadComponent MetalToolchain
+
+Then rerun:
+
+  ./script/run
+EOF
+  elif [[ -d "$xcode_developer_dir" ]]; then
+    cat >&2 <<EOF
+
+Full Xcode was found at:
+  $xcode_developer_dir
+
+But its Metal tools are not usable yet:
+  ${xcode_metal_probe:-$xcode_probe}
+
+After installing Xcode's Metal toolchain, either select full Xcode:
+
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+or rerun with:
+
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/run
+EOF
+  else
+    cat >&2 <<EOF
+
+Install full Xcode from the App Store or Apple Developer, then either select it:
+
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+or rerun with:
+
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/run
+EOF
+  fi
+
+  exit 1
+}
+
+ensure_metal_toolchain
+
 rm -rf "$WARP_APP_PATH"
 
 pushd app > /dev/null

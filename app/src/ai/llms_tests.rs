@@ -83,12 +83,15 @@ fn llm_info_round_trip_serializes_and_deserializes() {
 }
 
 #[test]
-fn default_agent_models_are_local_codex_models() {
+fn default_agent_models_are_local_models() {
     let models = ModelsByFeature::default();
     let choices = &models.agent_mode.choices;
 
     assert_eq!(models.agent_mode.default_llm_info().display_name, "gpt-5.5");
-    assert_eq!(choices.len(), LOCAL_CODEX_MODEL_IDS.len() + 1);
+    assert_eq!(
+        choices.len(),
+        LOCAL_CODEX_MODEL_IDS.len() + LOCAL_CLAUDE_MODEL_IDS.len() + 1
+    );
 
     for model_id in LOCAL_CODEX_MODEL_IDS {
         let info = models
@@ -98,10 +101,18 @@ fn default_agent_models_are_local_codex_models() {
         assert_eq!(info.display_name, *model_id);
         assert_eq!(info.provider, LLMProvider::OpenAI);
     }
+
+    for model_id in LOCAL_CLAUDE_MODEL_IDS {
+        let info = models
+            .agent_mode
+            .info_for_id(&LLMId::from(*model_id))
+            .expect("local Claude Code model should be available");
+        assert_eq!(info.provider, LLMProvider::Anthropic);
+    }
 }
 
 #[test]
-fn local_codex_agent_models_replace_server_agent_models() {
+fn local_agent_models_replace_server_agent_models() {
     let mut models = ModelsByFeature {
         agent_mode: AvailableLLMs {
             default_id: "server-model".to_owned().into(),
@@ -128,7 +139,7 @@ fn local_codex_agent_models_replace_server_agent_models() {
         ..Default::default()
     };
 
-    use_local_codex_agent_models(&mut models);
+    use_local_agent_models(&mut models);
 
     assert!(models
         .agent_mode
@@ -137,5 +148,9 @@ fn local_codex_agent_models_replace_server_agent_models() {
     assert!(models
         .agent_mode
         .info_for_id(&LLMId::from("gpt-5.5"))
+        .is_some());
+    assert!(models
+        .agent_mode
+        .info_for_id(&LLMId::from("claude-code"))
         .is_some());
 }

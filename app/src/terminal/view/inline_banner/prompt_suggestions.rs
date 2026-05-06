@@ -15,7 +15,7 @@ use crate::util::bindings::keybinding_name_to_keystroke;
 use pathfinder_geometry::vector::vec2f;
 use warpui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
-    Fill, Flex, HighlightedHyperlink, Hoverable, Icon, MainAxisAlignment, MainAxisSize,
+    Fill, Flex, HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
     Text,
 };
@@ -30,11 +30,10 @@ use warpui::{SingletonEntity, View};
 
 use crate::terminal::view::{ContextMenuAction, InputType, PromptSuggestion};
 use crate::ui_components::blended_colors;
+use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::{appearance::Appearance, terminal::view::TerminalAction};
 use warp_core::channel::ChannelState;
 use warp_core::ui::theme::color::internal_colors::{neutral_2, neutral_3};
-
-use crate::ui_components::icons::Icon as WarpUIIcon;
 
 use crate::ai::agent::{PassiveSuggestionTrigger, StaticQueryType};
 use crate::server::ids::ServerId;
@@ -123,7 +122,6 @@ pub struct PromptSuggestionBannerState {
 #[allow(clippy::too_many_arguments)]
 fn render_button(
     text: String,
-    icon: WarpUIIcon,
     button_index: usize,
     keystroke: Option<Keystroke>,
     mouse_state: MouseStateHandle,
@@ -167,9 +165,6 @@ fn render_button(
         ) + 14.;
         // Need this to have reasonable keyboard shortcut heights.
         // let keyboard_shortcut_icon_height = button_height - 6.;
-        let mut icon_color = blended_colors::text_main(theme, theme.surface_1());
-        icon_color.a = opacity_u8;
-
         let text = {
             let base = Text::new_inline(
                 text,
@@ -189,15 +184,10 @@ fn render_button(
         let mut flex = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
-                Container::new(
-                    ConstrainedBox::new(Icon::new(icon.into(), icon_color).finish())
-                        .with_width(icon_size)
-                        .with_height(icon_size)
-                        .finish(),
-                )
-                .with_padding_left(INLINE_BANNER_BUTTON_PADDING)
-                .with_padding_right(INLINE_BANNER_BUTTON_PADDING)
-                .finish(),
+                Container::new(render_dwarf_icon(icon_size, 3.))
+                    .with_padding_left(INLINE_BANNER_BUTTON_PADDING)
+                    .with_padding_right(INLINE_BANNER_BUTTON_PADDING)
+                    .finish(),
             )
             .with_child(text);
 
@@ -408,7 +398,6 @@ impl View for PromptSuggestionsView {
                 1.0,
                 render_button(
                     prompt_suggestion.label().clone(),
-                    WarpUIIcon::Oz,
                     0,
                     keybinding_name_to_keystroke(ACCEPT_PROMPT_SUGGESTION_KEYBINDING, app),
                     banner_state.accept_button_mouse_state.clone(),

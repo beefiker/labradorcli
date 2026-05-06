@@ -11,6 +11,7 @@ use warpui::elements::{
 use crate::ai::agent::conversation::ConversationStatus;
 use crate::terminal::CLIAgent;
 use crate::themes::theme::Fill as ThemeFill;
+use crate::ui_components::dwarf_icon::render_dwarf_icon;
 
 /// Sizing configuration for the icon circle and its status badge.
 pub(crate) struct IconWithStatusSizing {
@@ -36,10 +37,7 @@ pub(crate) enum IconWithStatusVariant {
     /// A pre-built icon element on an overlay background.
     NeutralElement { icon_element: Box<dyn Element> },
     /// An Oz agent icon on the theme background.
-    OzAgent {
-        status: Option<ConversationStatus>,
-        is_ambient: bool,
-    },
+    OzAgent { status: Option<ConversationStatus> },
     /// A CLI agent icon on the agent's brand color background.
     CLIAgent {
         agent: CLIAgent,
@@ -83,19 +81,8 @@ pub(crate) fn render_icon_with_status(
                 )))
                 .finish()
         }
-        IconWithStatusVariant::OzAgent { status, is_ambient } => {
-            let icon = if is_ambient {
-                WarpIcon::OzCloud
-            } else {
-                WarpIcon::Oz
-            };
-            let inner = ConstrainedBox::new(
-                icon.to_warpui_icon(theme.main_text_color(theme.background()))
-                    .finish(),
-            )
-            .with_width(sizing.icon_size)
-            .with_height(sizing.icon_size)
-            .finish();
+        IconWithStatusVariant::OzAgent { status } => {
+            let inner = render_dwarf_icon(sizing.icon_size, 2.);
             let circle = Container::new(inner)
                 .with_uniform_padding(sizing.padding)
                 .with_background(theme.background())

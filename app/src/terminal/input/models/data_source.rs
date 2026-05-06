@@ -413,6 +413,8 @@ impl SearchItem for ModelSearchItem {
     fn render_details(&self, app: &AppContext) -> Option<Box<dyn Element>> {
         use warpui::elements::{Flex, ParentElement as _};
 
+        let spec = self.spec.as_ref()?;
+
         let appearance = crate::appearance::Appearance::as_ref(app);
         let theme = appearance.theme();
 
@@ -457,12 +459,12 @@ impl SearchItem for ModelSearchItem {
             }
         } else {
             CostRow::Bar {
-                value: self.spec.as_ref().map(|spec| spec.cost),
+                value: Some(spec.cost),
             }
         };
 
         let scores = render_model_spec_scores(
-            self.spec.as_ref(),
+            Some(spec),
             cost_row,
             ModelSpecScoresLayout {
                 bg_bar_color: internal_colors::neutral_3(theme),

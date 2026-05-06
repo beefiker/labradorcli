@@ -78,8 +78,8 @@ use crate::terminal::grid_renderer::URL_COLOR;
 use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::terminal::view::TerminalAction;
-use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
+use crate::ui_components::{blended_colors, dwarf_icon::render_dwarf_icon};
 use crate::util::link_detection::DetectedLinkType;
 use crate::workspace::WorkspaceAction;
 use itertools::Itertools;
@@ -693,7 +693,7 @@ pub fn render_citation(
             )
         }
         AIAgentCitation::WarpDocumentation { .. } => {
-            let icon = Icon::Warp.to_warpui_icon(theme.foreground()).finish();
+            let icon = render_dwarf_icon(font_size, 2.);
             let name = String::from("Dwarf Docs");
             (Some(icon), name)
         }

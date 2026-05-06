@@ -53,6 +53,7 @@ use crate::settings::ai::{AISettings, AISettingsChangedEvent};
 use crate::ui_components::avatar::{Avatar, AvatarContent};
 use crate::ui_components::blended_colors;
 use crate::ui_components::buttons::icon_button;
+use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::ui_components::icons::Icon;
 use crate::util::bindings::CustomAction;
 use crate::util::time_format::{format_approx_duration_from_now, human_readable_precise_duration};
@@ -1040,10 +1041,7 @@ impl ConversationDetailsPanel {
         let ui_font_size = appearance.ui_font_size();
         let sub_color = blended_colors::text_sub(theme, theme.surface_1());
 
-        let icon = ConstrainedBox::new(Icon::Warp.to_warpui_icon(theme.foreground()).finish())
-            .with_width(20.)
-            .with_height(20.)
-            .finish();
+        let icon = render_dwarf_icon(20., 3.);
 
         let skill_name_text = Text::new(
             format!("/{skill_name}"),

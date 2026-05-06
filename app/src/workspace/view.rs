@@ -37,7 +37,6 @@ use crate::ai::agent_management::notifications::NotificationFilter;
 use crate::ai::agent_management::telemetry::AgentManagementTelemetryEvent;
 use crate::ai::agent_management::view::{AgentManagementView, AgentManagementViewEvent};
 use crate::ai::agent_management::AgentManagementEvent;
-use crate::ai::ambient_agents::telemetry::{CloudAgentTelemetryEvent, CloudModeEntryPoint};
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::AgentToolbarEditorMode;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
@@ -161,8 +160,8 @@ use crate::drive::export::ExportManager;
 use crate::drive::settings::WarpDriveSettings;
 use crate::launch_configs::launch_config::WindowTemplate;
 use crate::pane_group::{
-    AIFactPane, CodeReviewPanelArg, Direction as PaneGroupDirection, EnvironmentManagementPane,
-    ExecutionProfileEditorPane, NetworkLogPane, PaneGroup, PaneId, TerminalPaneId,
+    AIFactPane, CodeReviewPanelArg, Direction as PaneGroupDirection, ExecutionProfileEditorPane,
+    NetworkLogPane, PaneGroup, PaneId, TerminalPaneId,
 };
 use crate::quit_warning::UnsavedStateSummary;
 use crate::search::command_palette::view::NavigationMode;
@@ -174,7 +173,6 @@ use crate::settings::{
     AISettings, AISettingsChangedEvent, CodeSettings, CodeSettingsChangedEvent, CtrlTabBehavior,
     DefaultSessionMode, InputModeSettings,
 };
-use crate::settings_view::environments_page::EnvironmentsPage;
 use crate::settings_view::pane_manager::SettingsPaneManager;
 use crate::settings_view::{SettingsSection, SettingsView, SettingsViewEvent};
 #[cfg(all(target_os = "windows", feature = "local_tty"))]
@@ -265,7 +263,9 @@ use crate::resource_center::{
     ResourceCenterEvent, ResourceCenterPage, ResourceCenterView, Tip, TipAction, TipsCompleted,
 };
 use crate::reward_view::{RewardEvent, RewardKind, RewardView};
-use crate::root_view::{quake_mode_window_id, NewWorkspaceSource, OpenLaunchConfigArg};
+use crate::root_view::{
+    quake_mode_window_id, NewWorkspaceSource, OpenLaunchConfigArg, RootViewAction,
+};
 use crate::search::command_search::searcher::{
     AcceptedHistoryItem, AcceptedWorkflow, CommandSearchItemAction,
 };
@@ -462,6 +462,8 @@ use crate::tab::{
     TabComponent, TabData, TabTelemetryAction, TAB_BAR_BORDER_HEIGHT,
 };
 use crate::terminal::view::ssh_file_upload::FileUploadId;
+#[cfg(target_family = "wasm")]
+use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::ui_components::icons;
 use crate::TelemetryEvent;
 use autoupdate::AutoupdateStage;
@@ -6038,7 +6040,7 @@ impl Workspace {
     /// Builds the unified new-session menu items
     /// tab bar chevron and the vertical tab bar `+` button.
     ///
-    /// Order: Agent → Terminal (sidecar) → Cloud Oz → [tab configs] → separator → New worktree config (sidecar) → New tab config → separator → Reopen closed session.
+    /// Order: Agent → Terminal (sidecar) → [tab configs] → separator → New worktree config (sidecar) → New tab config → separator → Reopen closed session.
     fn unified_new_session_menu_items(
         &self,
         ctx: &mut ViewContext<Self>,
@@ -6120,21 +6122,7 @@ impl Workspace {
             }
         }
 
-        // 3. Dwarf agent (if flags enabled)
-        if is_any_ai_enabled
-            && FeatureFlag::AgentView.is_enabled()
-            && FeatureFlag::CloudMode.is_enabled()
-        {
-            let mut cloud_item = MenuItemFields::new("Dwarf Agent")
-                .with_on_select_action(WorkspaceAction::AddAmbientAgentTab)
-                .with_icon(icons::Icon::LayoutAlt01);
-            if effective_default == DefaultSessionMode::CloudAgent {
-                cloud_item = cloud_item.with_key_shortcut_label(shortcut_label.clone());
-            }
-            menu_items.push(cloud_item.into_item());
-        }
-
-        // 3b. Local Docker Sandbox
+        // 3. Local Docker Sandbox
         if FeatureFlag::LocalDockerSandbox.is_enabled() {
             let mut docker_item = MenuItemFields::new("Local Docker Sandbox")
                 .with_on_select_action(WorkspaceAction::AddDockerSandboxTab)
@@ -7531,27 +7519,6 @@ impl Workspace {
         });
     }
 
-    /// Open the Environment Management pane in a split pane (default direction is right).
-    pub fn open_environment_management_pane(
-        &mut self,
-        direction: Option<Direction>,
-        mode: EnvironmentsPage,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let direction = direction.unwrap_or(Direction::Right);
-        let environments_page_view = self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
-            let pane = EnvironmentManagementPane::new(ctx);
-            let view = pane.environments_page_view(ctx);
-            pane_group
-                .add_pane_with_direction(direction, pane, true /* focus_new_pane */, ctx);
-            view
-        });
-        // Update page after the pane is added so focus works correctly
-        environments_page_view.update(ctx, |view, ctx| {
-            view.update_page(mode, ctx);
-        });
-    }
-
     pub(super) fn active_session_view(
         &self,
         ctx: &mut ViewContext<Self>,
@@ -8344,6 +8311,9 @@ impl Workspace {
                 .into_item(),
             MenuItemFields::new("Keyboard shortcuts")
                 .with_on_select_action(WorkspaceAction::ToggleKeybindingsPage)
+                .into_item(),
+            MenuItemFields::new("Confetti")
+                .with_on_select_action(WorkspaceAction::ShowConfetti)
                 .into_item(),
             MenuItem::Separator,
             MenuItemFields::new("Documentation")
@@ -10577,27 +10547,6 @@ impl Workspace {
             let _ = ctx;
             log::warn!("Docker sandbox requires the `local_tty` feature; ignoring request");
         }
-    }
-
-    fn add_ambient_agent_tab(&mut self, ctx: &mut ViewContext<Self>) {
-        if !FeatureFlag::AgentView.is_enabled() || !FeatureFlag::CloudMode.is_enabled() {
-            return;
-        }
-
-        send_telemetry_from_ctx!(
-            CloudAgentTelemetryEvent::EnteredCloudMode {
-                entry_point: CloudModeEntryPoint::NewTab,
-            },
-            ctx
-        );
-
-        self.add_tab_with_pane_layout(
-            PanesLayout::AmbientAgent,
-            Arc::new(HashMap::new()),
-            None,
-            ctx,
-        );
-        ctx.notify();
     }
 
     // Adds a tab with a specific shell, only meant to be dispatched directly by actions.
@@ -13979,11 +13928,7 @@ impl Workspace {
                 self.open_execution_profile_editor_pane(None, *profile_id, ctx);
             }
             pane_group::Event::OpenEnvironmentManagementPane => {
-                self.open_environment_management_pane(
-                    None,
-                    crate::settings_view::environments_page::EnvironmentsPage::Create,
-                    ctx,
-                );
+                self.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
             }
             pane_group::Event::OpenLspLogs { log_path } => {
                 self.open_lsp_logs(log_path, ctx);
@@ -16940,23 +16885,12 @@ impl Workspace {
                 .with_main_axis_size(MainAxisSize::Max);
             let bg_color = blended_colors::neutral_1(appearance.theme());
 
-            // Left: Warp logo - clickable to link to warp.dev
-            let warp_logo = Hoverable::new(self.mouse_states.warp_logo.clone(), |_state| {
-                ConstrainedBox::new(
-                    warp_core::ui::Icon::Warp
-                        .to_warpui_icon(appearance.theme().foreground())
-                        .finish(),
-                )
-                .with_height(24.)
-                .with_width(24.)
-                .finish()
+            // Left: Dwarf logo.
+            let dwarf_logo = Hoverable::new(self.mouse_states.warp_logo.clone(), |_state| {
+                render_dwarf_icon(24., 4.)
             })
-            .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(WorkspaceAction::OpenLink("https://warp.dev".to_owned()));
-            })
-            .with_cursor(Cursor::PointingHand)
             .finish();
-            tab_bar.add_child(warp_logo);
+            tab_bar.add_child(dwarf_logo);
 
             // Right: Info button + "View all cloud runs" button (for ambient agent sessions) + "Open in Dwarf" button
             let mut right_row = Flex::row()
@@ -19702,7 +19636,12 @@ impl TypedActionView for Workspace {
                         }
                     }
                     DefaultSessionMode::CloudAgent => {
-                        self.add_ambient_agent_tab(ctx);
+                        AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                            report_if_error!(settings
+                                .default_session_mode_internal
+                                .set_value(DefaultSessionMode::Agent, ctx));
+                        });
+                        self.add_terminal_tab_with_new_agent_view(ctx);
                     }
                     DefaultSessionMode::DockerSandbox => {
                         self.add_docker_sandbox_tab(ctx);
@@ -19734,7 +19673,7 @@ impl TypedActionView for Workspace {
                 self.add_tab_with_shell(shell.clone(), *source, ctx)
             }
             AddGetStartedTab => self.add_get_started_tab(ctx),
-            AddAmbientAgentTab => self.add_ambient_agent_tab(ctx),
+            AddAmbientAgentTab => self.add_terminal_tab_with_new_agent_view(ctx),
             AddAgentTab => self.add_terminal_tab_with_new_agent_view(ctx),
             AddDockerSandboxTab => self.add_docker_sandbox_tab(ctx),
             StartAgentOnboardingTutorial(tutorial) => {
@@ -19977,6 +19916,7 @@ impl TypedActionView for Workspace {
             JoinSlack => self.join_slack(ctx),
             ViewUserDocs => self.view_user_docs(ctx),
             ViewLatestChangelog => self.view_latest_changelog(ctx),
+            ShowConfetti => ctx.dispatch_typed_action(&RootViewAction::ShowConfetti),
             ViewPrivacyPolicy => self.view_privacy_policy(ctx),
             SendFeedback => self.send_feedback(ctx),
             #[cfg(not(target_family = "wasm"))]
@@ -20492,16 +20432,7 @@ impl TypedActionView for Workspace {
                 self.add_terminal_pane_in_ai_mode(*zero_state_prompt_suggestion_type, ctx);
             }
             OpenCloudAgentSetupGuide => {
-                if AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
-                    && FeatureFlag::AgentManagementView.is_enabled()
-                {
-                    self.set_is_agent_management_view_open(true, ctx);
-                    ctx.focus(&self.agent_management_view);
-                    self.agent_management_view.update(ctx, |view, ctx| {
-                        view.show_setup_guide_from_link(ctx);
-                    });
-                    ctx.notify();
-                }
+                self.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
             }
             ToggleAIAssistant => {
                 self.toggle_ai_assistant_panel(ctx);
@@ -20831,7 +20762,7 @@ impl TypedActionView for Workspace {
                 );
             }
             OpenEnvironmentManagementPane => {
-                self.open_environment_management_pane(None, EnvironmentsPage::Create, ctx);
+                self.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
             }
             ToggleAIDocumentPane {
                 document_id,

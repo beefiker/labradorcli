@@ -932,6 +932,12 @@ impl ServerApi {
         request: &GenerateAIInputSuggestionsRequest,
     ) -> Result<generate_ai_input_suggestions::GenerateAIInputSuggestionsResponseV2, AIApiError>
     {
+        if let Some(response) =
+            crate::ai::agent::api::maybe_generate_local_ai_input_suggestions(request).await
+        {
+            return response.map_err(|error| AIApiError::Other(anyhow!(error)));
+        }
+
         let auth_token = self.get_or_refresh_access_token().await?;
 
         let request_builder = self.client.post(format!(
@@ -982,6 +988,12 @@ impl ServerApi {
         &self,
         request: &GenerateAMQuerySuggestionsRequest,
     ) -> Result<generate_am_query_suggestions::GenerateAMQuerySuggestionsResponse, AIApiError> {
+        if let Some(response) =
+            crate::ai::agent::api::maybe_generate_local_am_query_suggestions(request).await
+        {
+            return response.map_err(|error| AIApiError::Other(anyhow!(error)));
+        }
+
         let auth_token = self.get_or_refresh_access_token().await?;
 
         cfg_if::cfg_if! {

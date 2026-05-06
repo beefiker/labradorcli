@@ -1,3 +1,4 @@
+use crate::dwarf_icon::render_dwarf_icon;
 use crate::model::OnboardingStateModel;
 use crate::OnboardingEvent;
 
@@ -5,7 +6,7 @@ use super::OnboardingSlide;
 use pathfinder_color::ColorU;
 use ui_components::{button, Component as _, Options as _};
 use warp_core::send_telemetry_from_ctx;
-use warp_core::ui::{appearance::Appearance, theme::color::internal_colors, Icon};
+use warp_core::ui::{appearance::Appearance, theme::color::internal_colors};
 use warpui::{
     elements::{
         shimmering_text::{ShimmerConfig, ShimmeringTextElement, ShimmeringTextStateHandle},
@@ -82,12 +83,6 @@ impl IntroSlide {
     fn render_centered_content(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
 
-        let logo_fill = internal_colors::fg_overlay_4(theme);
-        let logo = ConstrainedBox::new(Icon::WarpLogoLight.to_warpui_icon(logo_fill).finish())
-            .with_width(64.)
-            .with_height(64.)
-            .finish();
-
         let base_color: ColorU = internal_colors::fg_overlay_4(theme).into();
         let shimmer_color: ColorU = theme.foreground().into();
         let title = ShimmeringTextElement::new(
@@ -132,7 +127,7 @@ impl IntroSlide {
             .with_main_axis_size(MainAxisSize::Min)
             .with_main_axis_alignment(MainAxisAlignment::Center)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(logo)
+            .with_child(render_dwarf_icon(64., 10.))
             .with_child(title)
             .with_child(Container::new(subtitle).with_margin_top(12.).finish())
             .with_child(

@@ -206,13 +206,6 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::Mcp,
         },
         AgentTip {
-            description: "`/create-environment` to turn a repo into a remote docker environment an agent can run in.".to_string(),
-            link: Some("https://docs.warp.dev/reference/cli/integration-setup".to_string()),
-            binding_name: None,
-            action: None,
-            kind: AgentTipKind::General,
-        },
-        AgentTip {
             description: "`/add-prompt` to create a reusable prompt for repeatable workflows.".to_string(),
             link: None,
             binding_name: None,

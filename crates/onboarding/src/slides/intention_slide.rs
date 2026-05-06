@@ -1,4 +1,5 @@
 use super::OnboardingSlide;
+use crate::dwarf_icon::render_dwarf_icon;
 use crate::model::OnboardingStateModel;
 use crate::slides::{bottom_nav, layout, slide_content};
 use crate::visuals::{intention_terminal_visual, intention_visual};
@@ -72,12 +73,6 @@ impl IntentionSlide {
     fn render_header(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
 
-        let logo_fill = internal_colors::fg_overlay_4(theme);
-        let logo = ConstrainedBox::new(Icon::WarpLogoLight.to_warpui_icon(logo_fill).finish())
-            .with_width(64.)
-            .with_height(64.)
-            .finish();
-
         let title = appearance
             .ui_builder()
             .paragraph("Welcome to Dwarf")
@@ -106,8 +101,11 @@ impl IntentionSlide {
         Flex::column()
             .with_main_axis_size(MainAxisSize::Min)
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            // Offset icon built in padding to left align icon with title.
-            .with_child(Container::new(logo).with_margin_left(-7.).finish())
+            .with_child(
+                Container::new(render_dwarf_icon(64., 10.))
+                    .with_margin_left(-7.)
+                    .finish(),
+            )
             .with_child(Container::new(title).with_margin_top(11.).finish())
             .with_child(Container::new(subtitle).with_margin_top(16.).finish())
             .finish()

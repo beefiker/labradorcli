@@ -94,13 +94,13 @@ impl Slide for OzLaunchSlide {
                 "Use Dwarf agents to run commands, inspect projects, and keep coding tasks inside your local terminal."
             }
             OzLaunchSlide::AgentAutomations => {
-                "Dwarf agents can use the standard Skills format and your local Codex authentication."
+                "Dwarf agents can use the standard Skills format and your local Codex or Claude Code authentication."
             }
             OzLaunchSlide::AgentManagement => {
                 "View and continue local agent sessions in the Dwarf app without a Dwarf account."
             }
             OzLaunchSlide::LaunchCredits => {
-                "Dwarf local agent mode is free to use with your own local Codex credentials."
+                "Dwarf local agent mode is free to use with your own local Codex or Claude Code credentials."
             }
         }
     }

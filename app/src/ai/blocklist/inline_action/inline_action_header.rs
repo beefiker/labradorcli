@@ -3,11 +3,12 @@ use std::borrow::Cow;
 use std::rc::Rc;
 use warp_core::ui::{appearance::Appearance, theme::color::internal_colors};
 use warpui::{
+    assets::asset_cache::AssetSource,
     elements::{
-        Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
-        EventHandler, Expanded, Flex, FormattedTextElement, Hoverable, MainAxisAlignment,
-        MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, SizeConstraintCondition,
-        SizeConstraintSwitch, Text,
+        Border, CacheOption, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+        DispatchEventResult, EventHandler, Expanded, Flex, FormattedTextElement, Hoverable, Image,
+        MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable,
+        SizeConstraintCondition, SizeConstraintSwitch, Text,
     },
     fonts::FamilyId,
     platform::Cursor,
@@ -116,6 +117,7 @@ pub struct HeaderConfig {
     /// Whether to parse the title as markdown when rendering.
     pub use_markdown: bool,
     pub icon: Option<warpui::elements::Icon>,
+    pub image_icon: Option<AssetSource>,
     pub badge: Option<String>,
     pub interaction_mode: Option<InteractionMode>,
     pub is_text_selectable: bool,
@@ -131,6 +133,7 @@ impl HeaderConfig {
             font_family: Appearance::as_ref(app).ui_font_family(),
             use_markdown: false,
             icon: None,
+            image_icon: None,
             badge: None,
             interaction_mode: None,
             is_text_selectable: false,
@@ -152,6 +155,13 @@ impl HeaderConfig {
 
     pub fn with_icon(mut self, icon: warpui::elements::Icon) -> Self {
         self.icon = Some(icon);
+        self.image_icon = None;
+        self
+    }
+
+    pub fn with_image_icon(mut self, image_icon: AssetSource) -> Self {
+        self.icon = None;
+        self.image_icon = Some(image_icon);
         self
     }
 
@@ -204,7 +214,22 @@ impl HeaderConfig {
             .with_main_axis_alignment(MainAxisAlignment::Start)
             .with_cross_axis_alignment(CrossAxisAlignment::Center);
 
-        if let Some(icon) = self.icon {
+        if let Some(image_icon) = self.image_icon {
+            left_content_container.add_child(
+                Container::new(
+                    ConstrainedBox::new(
+                        Image::new(image_icon, CacheOption::BySize)
+                            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(2.)))
+                            .finish(),
+                    )
+                    .with_width(icon_size(app))
+                    .with_height(icon_size(app))
+                    .finish(),
+                )
+                .with_margin_right(ICON_MARGIN)
+                .finish(),
+            )
+        } else if let Some(icon) = self.icon {
             left_content_container.add_child(
                 Container::new(
                     ConstrainedBox::new(icon.finish())

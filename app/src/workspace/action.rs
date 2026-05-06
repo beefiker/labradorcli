@@ -200,6 +200,7 @@ pub enum WorkspaceAction {
     JoinSlack,
     ViewUserDocs,
     ViewLatestChangelog,
+    ShowConfetti,
     ViewPrivacyPolicy,
     SendFeedback,
     /// Open the log directory in the system file explorer with the current log file selected.
@@ -785,6 +786,7 @@ impl WorkspaceAction {
             | JoinSlack
             | ViewUserDocs
             | ViewLatestChangelog
+            | ShowConfetti
             | ViewPrivacyPolicy
             | SendFeedback
             | ChangeCursor(_)

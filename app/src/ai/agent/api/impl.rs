@@ -14,7 +14,7 @@ pub async fn generate_multi_agent_output(
     mut params: RequestParams,
     cancellation_rx: futures::channel::oneshot::Receiver<()>,
 ) -> Result<ResponseStream, ConvertToAPITypeError> {
-    if should_use_local_codex_agent() {
+    if should_use_local_agent() {
         return super::local_codex::generate_output(params, cancellation_rx).await;
     }
 
@@ -154,8 +154,9 @@ pub async fn generate_multi_agent_output(
     }
 }
 
-fn should_use_local_codex_agent() -> bool {
+fn should_use_local_agent() -> bool {
     ai::local_openai_auth::has_access_token()
+        || ai::local_claude_auth::has_auth_state()
         || std::env::var("DWARF_ALLOW_OZ_AGENT").as_deref() != Ok("1")
 }
 

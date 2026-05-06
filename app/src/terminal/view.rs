@@ -153,7 +153,7 @@ use crate::terminal::view::init_environment::{
     mode_selector::{
         EnvironmentSetupMode, EnvironmentSetupModeSelector, EnvironmentSetupModeSelectorEvent,
     },
-    InitEnvironmentBlock, InitEnvironmentBlockEvent,
+    InitEnvironmentBlock,
 };
 use crate::terminal::view::ssh_remote_server_choice_view::{
     SshRemoteServerChoiceView, SshRemoteServerChoiceViewEvent,
@@ -251,6 +251,7 @@ use crate::env_vars::{
 };
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::persistence::{self, FinishedCommandMetadata};
+use crate::root_view::RootViewAction;
 use crate::safe_warn;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ObjectUid, SyncId};
@@ -686,6 +687,73 @@ const P10K_UPDATE_INSTRUCTIONS_URL: &str =
     "https://github.com/romkatv/powerlevel10k#how-do-i-update-powerlevel10k";
 
 const CONTEXT_MENU_WIDTH: f32 = 280.;
+
+const COMPLETION_CONFETTI_COMMAND_PATTERNS: &[&str] = &[
+    "bun run build",
+    "bun run check",
+    "bun run lint",
+    "bun run test",
+    "bun run typecheck",
+    "bun test",
+    "cargo build",
+    "cargo check",
+    "cargo clippy",
+    "cargo fmt",
+    "cargo test",
+    "cmake --build",
+    "go build",
+    "go test",
+    "go vet",
+    "gradle build",
+    "gradle check",
+    "gradle test",
+    "make build",
+    "make check",
+    "make lint",
+    "make test",
+    "mvn test",
+    "mvn verify",
+    "ninja",
+    "npm run build",
+    "npm run check",
+    "npm run lint",
+    "npm run test",
+    "npm run type-check",
+    "npm run typecheck",
+    "npm test",
+    "pnpm build",
+    "pnpm check",
+    "pnpm lint",
+    "pnpm test",
+    "pnpm type-check",
+    "pnpm typecheck",
+    "pytest",
+    "python -m pytest",
+    "python3 -m pytest",
+    "ruff check",
+    "swift build",
+    "swift test",
+    "tox",
+    "xcodebuild",
+    "yarn build",
+    "yarn check",
+    "yarn lint",
+    "yarn test",
+    "yarn type-check",
+    "yarn typecheck",
+    "zig build",
+    "zig test",
+    "./gradlew build",
+    "./gradlew check",
+    "./gradlew test",
+];
+
+fn is_build_test_or_check_command(command: &str) -> bool {
+    let command = command.to_ascii_lowercase();
+    COMPLETION_CONFETTI_COMMAND_PATTERNS
+        .iter()
+        .any(|pattern| command.contains(pattern))
+}
 
 /// The minimum amount of mouse-drag to consider a selection to
 /// be a text-selection as opposed to mouse-drag noise.
@@ -10649,6 +10717,7 @@ impl TerminalView {
                     if let Some(block_duration) =
                         self.block_duration(&block_completed.serialized_block)
                     {
+                        self.maybe_show_completion_confetti(block_completed, block_duration, ctx);
                         self.maybe_send_block_completed_notification(
                             block_completed,
                             block_duration,
@@ -12665,7 +12734,14 @@ impl TerminalView {
 
     /// Open the Environment Management pane.
     fn open_environment_management_pane(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.emit(Event::OpenEnvironmentManagementPane);
+        self.show_cloud_environments_disabled_toast(ctx);
+    }
+
+    fn show_cloud_environments_disabled_toast(&self, ctx: &mut ViewContext<Self>) {
+        ctx.emit(Event::ShowToast {
+            message: "Cloud environments are not available in local-only Dwarf.".to_string(),
+            flavor: ToastFlavor::Default,
+        });
     }
 
     /// Check if completed command was `warp environment create` and emit event if successful
@@ -12691,113 +12767,13 @@ impl TerminalView {
     }
 
     fn enter_environment_setup_selector(&mut self, args: Vec<String>, ctx: &mut ViewContext<Self>) {
-        // If arguments are provided (repo paths/URLs), skip the mode selector and go directly
-        // to the local agent flow
-        if !args.is_empty() {
-            self.setup_cloud_environment_and_start(args, ctx);
-            return;
-        }
-
-        // If already in ambient agent mode, skip the mode selector and go
-        // directly to the environment management pane
-        if FeatureFlag::AgentView.is_enabled()
-            && self.agent_view_controller.as_ref(ctx).is_active()
-            && self.is_ambient_agent_session(ctx)
-        {
-            self.open_environment_management_pane(ctx);
-            return;
-        }
-
-        // No arguments provided and not in agent view - show the mode selector modal
-        // Note: We don't call close_overlays here because this action may be dispatched
-        // from within the input view (e.g., slash command execution), and calling
-        // close_overlays would attempt to update the input view while it's already
-        // being updated, causing a circular view update panic.
-        self.is_environment_setup_mode_selector_open = true;
-        ctx.emit(Event::EnvironmentSetupModeSelectorToggled { is_open: true });
-        ctx.notify();
-        // Focus the mode selector so it can receive keyboard events (ESC to dismiss)
-        ctx.focus(&self.environment_setup_mode_selector);
+        let _ = args;
+        self.show_cloud_environments_disabled_toast(ctx);
     }
 
     fn setup_cloud_environment(&mut self, args: Vec<String>, ctx: &mut ViewContext<Self>) {
-        if FeatureFlag::AgentView.is_enabled()
-            && !self.agent_view_controller.as_ref(ctx).is_active()
-        {
-            self.enter_agent_view_for_new_conversation(
-                None,
-                AgentViewEntryOrigin::CreateEnvironment,
-                ctx,
-            );
-        }
-
-        let repos = args;
-        let (button_label, use_current_dir) = if !repos.is_empty() {
-            (
-                format!(
-                    "Create environment using the supplied repos: {}",
-                    repos.join(", ")
-                ),
-                false,
-            )
-        } else {
-            #[cfg(feature = "local_fs")]
-            let is_repo = {
-                if let Some(pwd_path) = self
-                    .pwd()
-                    .and_then(|pwd| Path::new(&pwd).canonicalize().ok())
-                {
-                    DetectedRepositories::as_ref(ctx)
-                        .get_root_for_path(&pwd_path)
-                        .is_some()
-                } else {
-                    false
-                }
-            };
-
-            #[cfg(not(feature = "local_fs"))]
-            let is_repo = false;
-
-            if is_repo {
-                (
-                    "Create environment using the current working dir as repo".to_string(),
-                    true,
-                )
-            } else {
-                ("Create environment without any repos".to_string(), false)
-            }
-        };
-
-        let init_env_block = ctx.add_typed_action_view(move |ctx| {
-            InitEnvironmentBlock::new(button_label, repos, use_current_dir, ctx)
-        });
-        ctx.subscribe_to_view(&init_env_block, move |me, block, event, ctx| match event {
-            InitEnvironmentBlockEvent::StartSetup(repos, use_current_dir) => {
-                log::info!("TerminalView: received StartSetup event from InitEnvironmentBlock");
-
-                // Remove the block from the UI now that setup is starting
-                me.model
-                    .lock()
-                    .block_list_mut()
-                    .remove_rich_content(block.id());
-
-                me.start_cloud_environment_setup(repos.to_vec(), *use_current_dir, ctx);
-            }
-        });
-
-        self.insert_rich_content(
-            None,
-            init_env_block.clone(),
-            Some(RichContentMetadata::InitEnvironment {
-                block_handle: init_env_block,
-            }),
-            RichContentInsertionPosition::Append {
-                insert_below_long_running_block: true,
-            },
-            ctx,
-        );
-
-        self.redetermine_global_focus(ctx);
+        let _ = args;
+        self.show_cloud_environments_disabled_toast(ctx);
     }
 
     fn handle_environment_setup_mode_selector_event(
@@ -12838,61 +12814,8 @@ impl TerminalView {
         args: Vec<String>,
         ctx: &mut ViewContext<Self>,
     ) {
-        if FeatureFlag::AgentView.is_enabled()
-            && !self.agent_view_controller.as_ref(ctx).is_active()
-        {
-            self.enter_agent_view_for_new_conversation(
-                None,
-                AgentViewEntryOrigin::CreateEnvironment,
-                ctx,
-            );
-        }
-
-        let repos = args;
-
-        #[cfg(feature = "local_fs")]
-        let use_current_dir = repos.is_empty()
-            && self
-                .pwd()
-                .and_then(|pwd| Path::new(&pwd).canonicalize().ok())
-                .is_some_and(|pwd_path| {
-                    DetectedRepositories::as_ref(ctx)
-                        .get_root_for_path(&pwd_path)
-                        .is_some()
-                });
-
-        #[cfg(not(feature = "local_fs"))]
-        let use_current_dir = false;
-
-        self.start_cloud_environment_setup(repos, use_current_dir, ctx);
-    }
-
-    fn start_cloud_environment_setup(
-        &mut self,
-        repos: Vec<String>,
-        use_current_dir: bool,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // Clear input and switch to Agent Mode
-        self.input.update(ctx, |input, ctx| {
-            input
-                .editor()
-                .update(ctx, |editor, ctx| editor.clear_buffer(ctx));
-            input.set_input_mode_agent(false, ctx);
-        });
-
-        // Send the CreateEnvironment request (shows "/create-environment" instead of full prompt)
-        self.ai_controller.update(ctx, |controller, ctx| {
-            controller.send_slash_command_request(
-                SlashCommandRequest::CreateEnvironment {
-                    repos,
-                    use_current_dir,
-                },
-                ctx,
-            );
-        });
-
-        ctx.notify();
+        let _ = args;
+        self.show_cloud_environments_disabled_toast(ctx);
     }
 
     #[cfg(feature = "local_fs")]
@@ -14805,6 +14728,38 @@ impl TerminalView {
                 self.insert_notifications_error_banner(ctx);
             }
         }
+    }
+
+    fn maybe_show_completion_confetti(
+        &mut self,
+        block: &UserBlockCompleted,
+        block_duration: Duration,
+        ctx: &mut ViewContext<TerminalView>,
+    ) {
+        if block.serialized_block.has_failed() {
+            return;
+        }
+
+        let long_running_threshold = SessionSettings::as_ref(ctx)
+            .notifications
+            .value()
+            .long_running_threshold;
+        let completed_long_running_command = block_duration >= long_running_threshold;
+        let fixed_previous_failure = self.previous_visible_block_failed(block)
+            && is_build_test_or_check_command(&block.command);
+
+        if completed_long_running_command || fixed_previous_failure {
+            ctx.dispatch_typed_action(&RootViewAction::ShowConfetti);
+        }
+    }
+
+    fn previous_visible_block_failed(&self, block: &UserBlockCompleted) -> bool {
+        let model = self.model.lock();
+        let block_list = model.block_list();
+        block_list
+            .prev_non_hidden_block_from_index(block.index)
+            .and_then(|previous_index| block_list.block_at(previous_index))
+            .is_some_and(|previous_block| previous_block.has_failed())
     }
 
     pub fn scroll_position(&self) -> ScrollPosition {

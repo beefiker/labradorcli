@@ -10,6 +10,7 @@ use crate::terminal::cli_agent_sessions::listener::agent_supports_rich_status;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::view::TerminalViewState;
 use crate::terminal::CLIAgent;
+use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::ui_components::icon_with_status::{
     render_icon_with_status, IconWithStatusSizing, IconWithStatusVariant,
 };
@@ -252,10 +253,6 @@ fn pane_ids_for_detail_target(
 enum TerminalPrimaryLineFont {
     Ui,
     Monospace,
-}
-
-fn oz_icon_fill(theme: &WarpTheme) -> WarpThemeFill {
-    theme.main_text_color(theme.background())
 }
 
 fn render_pane_icon_with_status(
@@ -1231,22 +1228,15 @@ fn render_detail_kind_badge_icon(
                 return icon.to_warpui_icon(color).finish();
             }
 
-            let icon = if terminal_view.is_ambient_agent_session(app) {
-                WarpIcon::OzCloud
-            } else if terminal_view
-                .selected_conversation_display_title(app)
-                .is_some()
+            if terminal_view.is_ambient_agent_session(app)
+                || terminal_view
+                    .selected_conversation_display_title(app)
+                    .is_some()
             {
-                WarpIcon::Oz
-            } else {
-                WarpIcon::Terminal
-            };
-            let color = match icon {
-                WarpIcon::Oz | WarpIcon::OzCloud => oz_icon_fill(theme),
-                WarpIcon::Terminal => disabled_text,
-                _ => sub_text,
-            };
-            icon.to_warpui_icon(color).finish()
+                return render_dwarf_icon(BADGE_ICON_SIZE, 2.);
+            }
+
+            WarpIcon::Terminal.to_warpui_icon(disabled_text).finish()
         }
         TypedPane::Code(_) => icon_from_file_path(&props.title, appearance)
             .unwrap_or_else(|| WarpIcon::Code2.to_warpui_icon(sub_text).finish()),
@@ -2270,7 +2260,6 @@ fn resolve_icon_with_status_variant(
             } else if is_oz_agent {
                 IconWithStatusVariant::OzAgent {
                     status: terminal_view.selected_conversation_status_for_display(app),
-                    is_ambient,
                 }
             } else {
                 // Plain terminal: use foreground color per design spec
@@ -3627,16 +3616,8 @@ fn render_summary_pane_kind_icon_circle(
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
     let (icon_element, background): (Box<dyn Element>, ElementFill) = match kind {
-        SummaryPaneKind::OzAgent { is_ambient } => {
-            let icon = if is_ambient {
-                WarpIcon::OzCloud
-            } else {
-                WarpIcon::Oz
-            };
-            (
-                icon.to_warpui_icon(oz_icon_fill(theme)).finish(),
-                theme.background().into(),
-            )
+        SummaryPaneKind::OzAgent { .. } => {
+            (render_dwarf_icon(icon_size, 2.), theme.background().into())
         }
         SummaryPaneKind::CLIAgent { agent } => {
             let icon_color = agent.brand_icon_color();

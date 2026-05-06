@@ -154,7 +154,7 @@ impl CloudSetupGuideView {
         header_container.add_child(title);
 
         let subtitle = Text::new(
-            "Start Dwarf agents directly from the local terminal with your Codex authentication.",
+            "Start Dwarf agents directly from the local terminal with your local Codex or Claude Code authentication.",
             appearance.ui_font_family(),
             subtitle_font_size,
         )

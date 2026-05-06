@@ -2,6 +2,7 @@
 
 mod agent_onboarding_view;
 pub mod callout;
+mod dwarf_icon;
 mod model;
 pub mod slides;
 pub mod telemetry;
@@ -29,7 +30,7 @@ pub use callout::{OnboardingCalloutView, OnboardingKeybindings};
 /// skip-login confirmation dialog so the two always stay in sync.
 pub const AI_FEATURES: &[&str] = &[
     "Dwarf local agent",
-    "Local Codex auth",
+    "Local Codex or Claude Code auth",
     "Command and script execution",
     "Codebase context",
     "Prompt suggestions",

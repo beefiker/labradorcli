@@ -10,6 +10,7 @@ use warp_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 #[serde(rename_all = "snake_case")]
 pub enum CloudModeEntryPoint {
     /// User clicked "New Cloud Agent Tab" or similar action to create a dedicated Cloud Mode tab.
+    #[allow(dead_code)]
     NewTab,
     /// User entered Cloud Mode from an existing local terminal session (e.g., via keyboard shortcut or command).
     LocalSession,

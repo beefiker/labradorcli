@@ -276,7 +276,9 @@ impl SettingsSection {
 
     /// Returns true if this section is a subpage under the "Cloud platform" umbrella.
     pub fn is_cloud_platform_subpage(&self) -> bool {
-        matches!(self, Self::CloudEnvironments | Self::OzCloudAPIKeys)
+        matches!(self, Self::OzCloudAPIKeys)
+            || (matches!(self, Self::CloudEnvironments)
+                && FeatureFlag::CloudEnvironments.is_enabled())
     }
 
     /// Maps subpage sections back to their parent page section for page lookup.
@@ -313,7 +315,11 @@ impl SettingsSection {
 
     /// The ordered list of Cloud platform subpage sections.
     pub fn cloud_platform_subpages() -> &'static [Self] {
-        &[Self::CloudEnvironments, Self::OzCloudAPIKeys]
+        if FeatureFlag::CloudEnvironments.is_enabled() {
+            &[Self::CloudEnvironments, Self::OzCloudAPIKeys]
+        } else {
+            &[Self::OzCloudAPIKeys]
+        }
     }
 }
 
@@ -344,7 +350,13 @@ impl FromStr for SettingsSection {
             "Third party CLI agents" | "ThirdPartyCLIAgents" => Ok(Self::ThirdPartyCLIAgents),
             "Indexing and projects" | "CodeIndexing" => Ok(Self::CodeIndexing),
             "Editor and Code Review" | "EditorAndCodeReview" => Ok(Self::EditorAndCodeReview),
-            "CloudEnvironments" => Ok(Self::CloudEnvironments),
+            "CloudEnvironments" | "Environments" => {
+                if FeatureFlag::CloudEnvironments.is_enabled() {
+                    Ok(Self::CloudEnvironments)
+                } else {
+                    Ok(Self::WarpAgent)
+                }
+            }
             "Dwarf API Keys" => Ok(Self::OzCloudAPIKeys),
             _ => Err(()),
         }
@@ -982,7 +994,7 @@ pub struct SettingsView {
     clipped_scroll_state: ClippedScrollStateHandle,
     context_menu: ViewHandle<Menu<SettingsAction>>,
     context_menu_state: Option<Vector2F>,
-    environments_page_handle: ViewHandle<EnvironmentsPageView>,
+    environments_page_handle: Option<ViewHandle<EnvironmentsPageView>>,
     /// Sidebar navigation items (pages + umbrellas).
     nav_items: Vec<SettingsNavItem>,
     /// Handle to the AI settings page, used to switch subpage modes.
@@ -1049,10 +1061,14 @@ impl SettingsView {
             me.handle_ai_page_event(event, ctx);
         });
 
-        // Environments page
-        let environments_page_handle = ctx.add_typed_action_view(EnvironmentsPageView::new);
-        ctx.subscribe_to_view(&environments_page_handle, |me, _, event, ctx| {
-            me.handle_environments_page_event(event, ctx);
+        // Environments are a hosted cloud feature. Dwarf is local-only, so do
+        // not construct the page unless the feature is explicitly enabled.
+        let environments_page_handle = FeatureFlag::CloudEnvironments.is_enabled().then(|| {
+            let handle = ctx.add_typed_action_view(EnvironmentsPageView::new);
+            ctx.subscribe_to_view(&handle, |me, _, event, ctx| {
+                me.handle_environments_page_event(event, ctx);
+            });
+            handle
         });
 
         // Billing and usage page
@@ -1163,10 +1179,12 @@ impl SettingsView {
 
         settings_pages.extend(vec![
             SettingsPage::new(mcp_servers_page_handle),
-            SettingsPage::new(environments_page_handle.clone()),
             SettingsPage::new(privacy_page_handle),
             SettingsPage::new(about_page_handle),
         ]);
+        if let Some(environments_page_handle) = environments_page_handle.as_ref() {
+            settings_pages.push(SettingsPage::new(environments_page_handle.clone()));
+        }
 
         // Build sidebar nav items. AI page is presented as an "Agents" umbrella
         // with subpages; the actual AI SettingsPage is hidden from direct sidebar listing.
@@ -1197,6 +1215,11 @@ impl SettingsView {
             Some(SettingsSection::Account) => SettingsSection::WarpAgent,
             Some(SettingsSection::AI) => SettingsSection::WarpAgent,
             Some(SettingsSection::Code) => SettingsSection::CodeIndexing,
+            Some(SettingsSection::CloudEnvironments)
+                if !FeatureFlag::CloudEnvironments.is_enabled() =>
+            {
+                SettingsSection::WarpAgent
+            }
             Some(section) if section.is_subpage() => section,
             other => other.unwrap_or_default(),
         };
@@ -1815,6 +1838,9 @@ impl SettingsView {
         let section = match section {
             SettingsSection::AI => SettingsSection::WarpAgent,
             SettingsSection::Code => SettingsSection::CodeIndexing,
+            SettingsSection::CloudEnvironments if !FeatureFlag::CloudEnvironments.is_enabled() => {
+                SettingsSection::WarpAgent
+            }
             other => other,
         };
 
@@ -2444,18 +2470,18 @@ impl View for SettingsView {
         // Render environment setup mode selector overlay when open.
         if let Some(selector_handle) = self
             .environments_page_handle
-            .as_ref(app)
-            .environment_setup_mode_selector_handle()
+            .as_ref()
+            .and_then(|handle| handle.as_ref(app).environment_setup_mode_selector_handle())
         {
             stack.add_child(ChildView::new(selector_handle).finish());
         }
 
         // Render agent-assisted environment modal overlay when open.
-        if let Some(modal_handle) = self
-            .environments_page_handle
-            .as_ref(app)
-            .agent_assisted_environment_modal_handle(app)
-        {
+        if let Some(modal_handle) = self.environments_page_handle.as_ref().and_then(|handle| {
+            handle
+                .as_ref(app)
+                .agent_assisted_environment_modal_handle(app)
+        }) {
             stack.add_child(ChildView::new(modal_handle).finish());
         }
 

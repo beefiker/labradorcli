@@ -1,5 +1,5 @@
 use settings::Setting;
-use warp_core::{report_if_error, ui::Icon};
+use warp_core::report_if_error;
 use warpui::{
     elements::{
         ChildAnchor, Container, CrossAxisAlignment, Flex, MainAxisSize, OffsetPositioning,
@@ -7,7 +7,7 @@ use warpui::{
     },
     fonts::{Properties, Weight},
     keymap::Keystroke,
-    prelude::{vec2f, ConstrainedBox, Cursor, Empty, Hoverable, MouseStateHandle},
+    prelude::{vec2f, Cursor, Empty, Hoverable, MouseStateHandle},
     scene::{Border, CornerRadius, Radius},
     ui_components::{
         checkbox::Checkbox,
@@ -30,7 +30,7 @@ use crate::{
         settings::{TerminalSettings, TerminalSettingsChangedEvent},
         view::TerminalAction,
     },
-    ui_components::blended_colors,
+    ui_components::{blended_colors, dwarf_icon::render_dwarf_icon},
     util::bindings::keybinding_name_to_keystroke,
     workspace::tab_settings::TabSettings,
     workspace::tab_settings::TabSettingsChangedEvent,
@@ -149,18 +149,9 @@ impl View for TerminalViewZeroStateBlock {
         let title = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
-                Container::new(
-                    ConstrainedBox::new(
-                        Icon::Warp
-                            .to_warpui_icon(theme.main_text_color(theme.background()))
-                            .finish(),
-                    )
-                    .with_height(title_font_size)
-                    .with_width(title_font_size)
+                Container::new(render_dwarf_icon(title_font_size, 3.))
+                    .with_margin_right(8.)
                     .finish(),
-                )
-                .with_margin_right(8.)
-                .finish(),
             )
             .with_child(
                 Text::new(

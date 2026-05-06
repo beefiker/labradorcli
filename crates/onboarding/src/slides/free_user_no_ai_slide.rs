@@ -25,7 +25,7 @@ use warpui::{
 };
 
 const LOCAL_AGENT_ITEMS: &[&str] = &[
-    "Uses your local Codex auth.json",
+    "Uses local Codex or Claude Code auth",
     "No Dwarf account or API key required",
     "Local agent conversations in the terminal",
     "Command and script execution",
@@ -111,7 +111,7 @@ impl FreeUserNoAiSlide {
             0,
             Icon::Code2,
             "Agent driven development with Dwarf's built-in agent",
-            "Iterate, plan, and build with Dwarf's local agent, backed by your Codex authentication.",
+            "Iterate, plan, and build with Dwarf's local agent, backed by your Codex or Claude Code authentication.",
             "Free".to_string(),
             true, // badge is green
             self.agent_mouse_state.clone(),

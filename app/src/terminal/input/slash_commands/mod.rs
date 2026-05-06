@@ -496,17 +496,10 @@ impl Input {
                 ctx.dispatch_typed_action(&WorkspaceAction::SetActiveTabColor(color));
             }
             create_env if command.name == commands::CREATE_ENVIRONMENT.name => {
-                // If the user included args after the slash command, treat them as repo paths/URLs.
-                let repos = argument
-                    .map(|arg| {
-                        arg.split_whitespace()
-                            .filter(|s| !s.is_empty())
-                            .map(|s| s.to_string())
-                            .collect()
-                    })
-                    .unwrap_or_default();
-
-                ctx.emit(Event::TriggerEnvironmentSetup { repos });
+                show_error_toast(
+                    "Cloud environments are not available in local-only Dwarf.".to_owned(),
+                    ctx,
+                );
             }
             create_project if command.name == commands::CREATE_NEW_PROJECT.name => {
                 if argument.is_none_or(|args| args.is_empty()) {

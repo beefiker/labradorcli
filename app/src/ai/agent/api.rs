@@ -10,6 +10,9 @@ pub use convert_from::{
     user_inputs_from_messages, ConversionParams, ConvertAPIMessageToClientOutputMessage,
     MaybeAIAgentOutputMessage, MessageToAIAgentOutputMessageError,
 };
+pub(crate) use local_codex::{
+    maybe_generate_local_ai_input_suggestions, maybe_generate_local_am_query_suggestions,
+};
 
 pub use r#impl::generate_multi_agent_output;
 
@@ -242,7 +245,8 @@ impl RequestParams {
         );
         let allow_use_of_warp_credits_with_byok = *AISettings::as_ref(app)
             .can_use_warp_credits_with_byok
-            && !ai::local_openai_auth::has_access_token();
+            && !ai::local_openai_auth::has_access_token()
+            && !ai::local_claude_auth::has_auth_state();
 
         let app_execution_mode = AppExecutionMode::as_ref(app);
         let autonomy_level = if app_execution_mode.is_autonomous() {

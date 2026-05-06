@@ -4,35 +4,110 @@ use std::{
     process::Command as StdCommand,
 };
 
+use ai::{local_claude_auth, local_openai_auth};
 use command::r#async::Command;
 use futures_lite::stream;
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;
 use warp_multi_agent_api as api;
 
 use crate::ai::agent::AIAgentInput;
+use crate::ai::predict::generate_ai_input_suggestions::{
+    GenerateAIInputSuggestionsRequest, GenerateAIInputSuggestionsResponseV2,
+};
+use crate::ai::predict::generate_am_query_suggestions::{
+    GenerateAMQuerySuggestionsRequest, GenerateAMQuerySuggestionsResponse,
+    SimpleQuery as AMQuerySimpleQuery, Suggestion as AMQuerySuggestion,
+};
 
 use super::{ConvertToAPITypeError, RequestParams, ResponseStream};
 
 const CODEX_BIN_ENV_VAR: &str = "DWARF_CODEX_BIN";
 const CODEX_MODEL_ENV_VAR: &str = "DWARF_CODEX_MODEL";
+const CLAUDE_BIN_ENV_VAR: &str = "DWARF_CLAUDE_BIN";
+const CLAUDE_MODEL_ENV_VAR: &str = "DWARF_CLAUDE_MODEL";
+const LOCAL_AGENT_ENV_VAR: &str = "DWARF_LOCAL_AGENT";
+const LOCAL_AGENT_DISPLAY_NAME: &str = "Local Agent";
 const TOOL_CALL_PREFIX: &str = "DWARF_TOOL_CALL";
+const CLAUDE_DEFAULT_MODEL_ID: &str = "claude-code";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LocalAgentRuntime {
+    Codex,
+    Claude,
+}
+
+impl LocalAgentRuntime {
+    fn for_request(params: &RequestParams) -> Self {
+        if let Some(runtime) = configured_local_agent_runtime() {
+            return runtime;
+        }
+
+        local_agent_runtime_for_model(params.model.as_str())
+    }
+
+    fn for_standalone_request() -> Self {
+        if let Some(runtime) = configured_local_agent_runtime() {
+            return runtime;
+        }
+
+        if local_claude_auth::has_auth_state() && !local_openai_auth::has_access_token() {
+            LocalAgentRuntime::Claude
+        } else {
+            LocalAgentRuntime::Codex
+        }
+    }
+
+    fn slug(self) -> &'static str {
+        match self {
+            LocalAgentRuntime::Codex => "codex",
+            LocalAgentRuntime::Claude => "claude",
+        }
+    }
+
+    fn cli_name(self) -> &'static str {
+        match self {
+            LocalAgentRuntime::Codex => "Codex CLI",
+            LocalAgentRuntime::Claude => "Claude Code CLI",
+        }
+    }
+}
+
+fn configured_local_agent_runtime() -> Option<LocalAgentRuntime> {
+    let value = env::var(LOCAL_AGENT_ENV_VAR).ok()?;
+    match value.trim().to_ascii_lowercase().as_str() {
+        "codex" | "openai" => Some(LocalAgentRuntime::Codex),
+        "claude" | "claude-code" | "claude_code" => Some(LocalAgentRuntime::Claude),
+        _ => None,
+    }
+}
+
+fn local_agent_runtime_for_model(model: &str) -> LocalAgentRuntime {
+    if is_claude_request_model(model) {
+        LocalAgentRuntime::Claude
+    } else {
+        LocalAgentRuntime::Codex
+    }
+}
 
 pub(super) async fn generate_output(
     params: RequestParams,
     _cancellation_rx: futures::channel::oneshot::Receiver<()>,
 ) -> Result<ResponseStream, ConvertToAPITypeError> {
-    let request_id = format!("local-codex-request-{}", Uuid::new_v4());
+    let runtime = LocalAgentRuntime::for_request(&params);
+    let request_id = format!("local-{}-request-{}", runtime.slug(), Uuid::new_v4());
     let conversation_id = params
         .conversation_token
         .as_ref()
         .map(|token| token.as_str().to_string())
-        .unwrap_or_else(|| format!("local-codex-conversation-{}", Uuid::new_v4()));
+        .unwrap_or_else(|| format!("local-{}-conversation-{}", runtime.slug(), Uuid::new_v4()));
 
     let root_task_id = root_task_id(&params.tasks);
     let needs_create_task = root_task_id.is_none();
-    let task_id = root_task_id.unwrap_or_else(|| format!("local-codex-task-{}", Uuid::new_v4()));
+    let task_id =
+        root_task_id.unwrap_or_else(|| format!("local-{}-task-{}", runtime.slug(), Uuid::new_v4()));
     let working_directory = params
         .session_context
         .current_working_directory()
@@ -47,12 +122,23 @@ pub(super) async fn generate_output(
             format!("I'll run `{}` in Dwarf.", tool_call.command)
         }
     } else {
-        let model = model_for_codex(&params);
-        let prompt = prompt_for_codex(&params, model.as_deref());
-        let codex_output = run_codex(prompt, working_directory.as_deref(), model.as_deref()).await;
-        match codex_output {
-            Ok(text) => text,
-            Err(error) => error,
+        match runtime {
+            LocalAgentRuntime::Codex => {
+                let model = model_for_codex(&params);
+                let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
+                match run_codex(prompt, working_directory.as_deref(), model.as_deref()).await {
+                    Ok(text) => text,
+                    Err(error) => error,
+                }
+            }
+            LocalAgentRuntime::Claude => {
+                let model = model_for_claude(&params);
+                let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
+                match run_claude(prompt, working_directory.as_deref(), model.as_deref()).await {
+                    Ok(text) => text,
+                    Err(error) => error,
+                }
+            }
         }
     };
 
@@ -63,7 +149,7 @@ pub(super) async fn generate_output(
                 api::client_action::CreateTask {
                     task: Some(api::Task {
                         id: task_id.clone(),
-                        description: "Local Codex".to_string(),
+                        description: LOCAL_AGENT_DISPLAY_NAME.to_string(),
                         dependencies: None,
                         messages: vec![],
                         summary: String::new(),
@@ -93,7 +179,7 @@ pub(super) async fn generate_output(
 
     let mut messages = user_query_messages(&params.input, &task_id, &request_id);
     messages.push(api::Message {
-        id: format!("local-codex-message-{}", Uuid::new_v4()),
+        id: format!("local-{}-message-{}", runtime.slug(), Uuid::new_v4()),
         task_id: task_id.clone(),
         request_id: request_id.clone(),
         timestamp: None,
@@ -114,6 +200,200 @@ pub(super) async fn generate_output(
     events.push(Ok(finished_event()));
 
     Ok(Box::pin(stream::iter(events)))
+}
+
+pub(crate) async fn maybe_generate_local_ai_input_suggestions(
+    request: &GenerateAIInputSuggestionsRequest,
+) -> Option<Result<GenerateAIInputSuggestionsResponseV2, String>> {
+    if !should_use_local_agent_for_suggestions() {
+        return None;
+    }
+
+    Some(generate_local_ai_input_suggestions(request).await)
+}
+
+pub(crate) async fn maybe_generate_local_am_query_suggestions(
+    request: &GenerateAMQuerySuggestionsRequest,
+) -> Option<Result<GenerateAMQuerySuggestionsResponse, String>> {
+    if !should_use_local_agent_for_suggestions() {
+        return None;
+    }
+
+    Some(generate_local_am_query_suggestions(request).await)
+}
+
+async fn generate_local_ai_input_suggestions(
+    request: &GenerateAIInputSuggestionsRequest,
+) -> Result<GenerateAIInputSuggestionsResponseV2, String> {
+    let prompt = prompt_for_local_ai_input_suggestion(request);
+    let working_directory = working_directory_from_context_messages(&request.context_messages);
+    let output = run_local_agent_for_suggestion(prompt, working_directory.as_deref()).await?;
+    let command = extract_local_next_command(&output).unwrap_or_default();
+
+    if command.is_empty() {
+        return Ok(GenerateAIInputSuggestionsResponseV2::default());
+    }
+
+    Ok(GenerateAIInputSuggestionsResponseV2 {
+        commands: vec![command.clone()],
+        ai_queries: vec![],
+        most_likely_action: command,
+    })
+}
+
+async fn generate_local_am_query_suggestions(
+    request: &GenerateAMQuerySuggestionsRequest,
+) -> Result<GenerateAMQuerySuggestionsResponse, String> {
+    let prompt = prompt_for_local_am_query_suggestion(request);
+    let working_directory = working_directory_from_context_messages(&request.context_messages);
+    let output = run_local_agent_for_suggestion(prompt, working_directory.as_deref()).await?;
+    let query = extract_local_prompt_suggestion_query(&output).unwrap_or_default();
+
+    Ok(GenerateAMQuerySuggestionsResponse {
+        id: format!("local-suggestion-{}", Uuid::new_v4()),
+        suggestion: (!query.is_empty()).then_some(AMQuerySuggestion::Simple(AMQuerySimpleQuery {
+            query,
+            should_plan_task: false,
+        })),
+    })
+}
+
+fn should_use_local_agent_for_suggestions() -> bool {
+    local_openai_auth::has_access_token()
+        || local_claude_auth::has_auth_state()
+        || env::var("DWARF_ALLOW_OZ_AGENT").as_deref() != Ok("1")
+}
+
+async fn run_local_agent_for_suggestion(
+    prompt: String,
+    working_directory: Option<&str>,
+) -> Result<String, String> {
+    match LocalAgentRuntime::for_standalone_request() {
+        LocalAgentRuntime::Codex => {
+            let model = standalone_codex_model();
+            run_codex(prompt, working_directory, model.as_deref()).await
+        }
+        LocalAgentRuntime::Claude => {
+            let model = standalone_claude_model();
+            run_claude(prompt, working_directory, model.as_deref()).await
+        }
+    }
+}
+
+fn standalone_codex_model() -> Option<String> {
+    selected_codex_model(env::var(CODEX_MODEL_ENV_VAR).ok(), "")
+}
+
+fn standalone_claude_model() -> Option<String> {
+    selected_claude_model(env::var(CLAUDE_MODEL_ENV_VAR).ok(), CLAUDE_DEFAULT_MODEL_ID)
+}
+
+fn prompt_for_local_ai_input_suggestion(request: &GenerateAIInputSuggestionsRequest) -> String {
+    let request_json = serde_json::to_string_pretty(request)
+        .unwrap_or_else(|_| "Could not serialize suggestion context.".to_string());
+    format!(
+        "You are generating a local Dwarf terminal autosuggestion.\n\
+         Return exactly one JSON object and no prose: {{\"command\":\"...\"}}.\n\
+         Suggest one safe shell command the user is likely to run next from the given terminal context.\n\
+         Do not run anything. Do not include markdown. Do not include explanations.\n\
+         If there is no useful next command, return {{\"command\":\"\"}}.\n\
+         If a prefix exists, the command must start with that prefix.\n\n\
+         Terminal suggestion context:\n{request_json}"
+    )
+}
+
+fn prompt_for_local_am_query_suggestion(request: &GenerateAMQuerySuggestionsRequest) -> String {
+    let request_json = serde_json::to_string_pretty(request)
+        .unwrap_or_else(|_| "Could not serialize suggestion context.".to_string());
+    format!(
+        "You are generating a local Dwarf agent follow-up chip.\n\
+         Return exactly one JSON object and no prose: {{\"query\":\"...\"}}.\n\
+         Suggest one concise natural-language instruction for the local Dwarf agent based on the terminal context.\n\
+         Prefer instructions that ask Dwarf to inspect, run, test, debug, or summarize with local commands when useful.\n\
+         Do not mention Warp, Oz, credits, cloud agents, accounts, or premium features.\n\
+         Do not run anything. Do not include markdown. Do not include explanations.\n\
+         If there is no useful follow-up, return {{\"query\":\"\"}}.\n\n\
+         Agent suggestion context:\n{request_json}"
+    )
+}
+
+#[derive(Debug, Deserialize)]
+struct LocalNextCommandJson {
+    #[serde(default)]
+    command: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LocalPromptSuggestionJson {
+    #[serde(default)]
+    query: Option<String>,
+    #[serde(default)]
+    prompt: Option<String>,
+}
+
+fn extract_local_next_command(output: &str) -> Option<String> {
+    let response = parse_local_json_response::<LocalNextCommandJson>(output)?;
+    response
+        .command
+        .map(normalize_one_line)
+        .filter(|s| !s.is_empty())
+}
+
+fn extract_local_prompt_suggestion_query(output: &str) -> Option<String> {
+    let response = parse_local_json_response::<LocalPromptSuggestionJson>(output)?;
+    response
+        .query
+        .or(response.prompt)
+        .map(normalize_one_line)
+        .filter(|s| !s.is_empty())
+}
+
+fn parse_local_json_response<T: DeserializeOwned>(output: &str) -> Option<T> {
+    let candidate = local_json_object_candidate(output)?;
+    serde_json::from_str(candidate).ok()
+}
+
+fn local_json_object_candidate(output: &str) -> Option<&str> {
+    let output = output.trim();
+    if let Some(fenced) = fenced_json_body(output) {
+        return Some(fenced);
+    }
+
+    let start = output.find('{')?;
+    let end = output.rfind('}')?;
+    (start <= end).then_some(&output[start..=end])
+}
+
+fn fenced_json_body(output: &str) -> Option<&str> {
+    let body = output.strip_prefix("```")?;
+    let body = body
+        .strip_prefix("json")
+        .or_else(|| body.strip_prefix("JSON"))
+        .unwrap_or(body)
+        .trim_start();
+    let end = body.rfind("```")?;
+    Some(body[..end].trim())
+}
+
+fn normalize_one_line(value: String) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn working_directory_from_context_messages(context_messages: &[String]) -> Option<String> {
+    context_messages
+        .iter()
+        .rev()
+        .filter_map(|message| serde_json::from_str::<Value>(message).ok())
+        .filter_map(|value| {
+            value
+                .get("pwd")
+                .or_else(|| value.pointer("/context/pwd"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|pwd| !pwd.is_empty())
+                .map(str::to_string)
+        })
+        .find(|pwd| Path::new(pwd).is_dir())
 }
 
 async fn run_codex(
@@ -139,7 +419,7 @@ async fn run_codex(
 
     let output = command.output().await.map_err(|error| {
         format!(
-            "Local Codex failed to start. Tried `{codex_bin}`. Set {CODEX_BIN_ENV_VAR} to your Codex CLI path if it is not on PATH.\n\n```text\n{error}\n```"
+            "{LOCAL_AGENT_DISPLAY_NAME} failed to start. Tried `{codex_bin}`. Set {CODEX_BIN_ENV_VAR} to your Codex CLI path if it is not on PATH.\n\n```text\n{error}\n```"
         )
     })?;
 
@@ -148,15 +428,66 @@ async fn run_codex(
     if output.status.success() {
         extract_codex_agent_text(&stdout).ok_or_else(|| {
             format!(
-                "Local Codex finished without an agent message.\n\n```text\n{}\n```",
+                "{LOCAL_AGENT_DISPLAY_NAME} finished without an agent message.\n\n```text\n{}\n```",
                 truncate(&stdout, 4_000)
             )
         })
     } else {
         Err(format!(
-            "Local Codex exited with status {}.\n\n```text\n{}\n```",
+            "{LOCAL_AGENT_DISPLAY_NAME} exited with status {}.\n\n```text\n{}\n```",
             output.status,
             truncate(&stderr, 4_000)
+        ))
+    }
+}
+
+async fn run_claude(
+    prompt: String,
+    working_directory: Option<&str>,
+    model: Option<&str>,
+) -> Result<String, String> {
+    let claude_bin = claude_bin();
+    let mut command = Command::new(claude_bin.clone());
+    command
+        .arg("-p")
+        .arg("--output-format")
+        .arg("json")
+        .arg("--tools")
+        .arg("")
+        .arg("--no-session-persistence");
+    if let Some(model) = model {
+        command.arg("--model").arg(model);
+    }
+    if let Some(working_directory) = working_directory {
+        command.current_dir(working_directory);
+    }
+    command.arg(prompt);
+
+    let output = command.output().await.map_err(|error| {
+        format!(
+            "{LOCAL_AGENT_DISPLAY_NAME} failed to start Claude Code. Tried `{claude_bin}`. Set {CLAUDE_BIN_ENV_VAR} to your Claude Code CLI path if it is not on PATH.\n\n```text\n{error}\n```"
+        )
+    })?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if output.status.success() {
+        extract_claude_agent_text(&stdout).ok_or_else(|| {
+            format!(
+                "{LOCAL_AGENT_DISPLAY_NAME} finished without a Claude Code message.\n\n```text\n{}\n```",
+                truncate(&stdout, 4_000)
+            )
+        })
+    } else {
+        let details = if stderr.trim().is_empty() {
+            stdout.as_ref()
+        } else {
+            stderr.as_ref()
+        };
+        Err(format!(
+            "{LOCAL_AGENT_DISPLAY_NAME} Claude Code exited with status {}.\n\n```text\n{}\n```",
+            output.status,
+            truncate(details, 4_000)
         ))
     }
 }
@@ -167,8 +498,21 @@ fn codex_bin() -> String {
         .unwrap_or_else(|| "codex".to_string())
 }
 
+fn claude_bin() -> String {
+    configured_claude_bin()
+        .or_else(find_claude_bin)
+        .unwrap_or_else(|| "claude".to_string())
+}
+
 fn configured_codex_bin() -> Option<String> {
     env::var(CODEX_BIN_ENV_VAR)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn configured_claude_bin() -> Option<String> {
+    env::var(CLAUDE_BIN_ENV_VAR)
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -178,6 +522,12 @@ fn find_codex_bin() -> Option<String> {
     find_executable_in_path("codex")
         .or_else(find_common_codex_bin)
         .or_else(find_codex_with_user_shell)
+}
+
+fn find_claude_bin() -> Option<String> {
+    find_executable_in_path("claude")
+        .or_else(find_common_claude_bin)
+        .or_else(find_claude_with_user_shell)
 }
 
 fn find_executable_in_path(name: &str) -> Option<String> {
@@ -190,6 +540,13 @@ fn find_executable_in_path(name: &str) -> Option<String> {
 
 fn find_common_codex_bin() -> Option<String> {
     common_codex_candidates()
+        .into_iter()
+        .find(|path| is_executable(path))
+        .map(path_to_string)
+}
+
+fn find_common_claude_bin() -> Option<String> {
+    common_claude_candidates()
         .into_iter()
         .find(|path| is_executable(path))
         .map(path_to_string)
@@ -209,13 +566,33 @@ fn common_codex_candidates() -> Vec<PathBuf> {
             home.join(".npm-global/bin/codex"),
             home.join(".bun/bin/codex"),
         ]);
-        candidates.extend(nvm_codex_candidates(&home));
+        candidates.extend(nvm_binary_candidates(&home, "codex"));
     }
 
     candidates
 }
 
-fn nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
+fn common_claude_candidates() -> Vec<PathBuf> {
+    let mut candidates = vec![
+        PathBuf::from("/opt/homebrew/bin/claude"),
+        PathBuf::from("/usr/local/bin/claude"),
+    ];
+
+    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
+        candidates.extend([
+            home.join(".local/bin/claude"),
+            home.join(".volta/bin/claude"),
+            home.join(".asdf/shims/claude"),
+            home.join(".npm-global/bin/claude"),
+            home.join(".bun/bin/claude"),
+        ]);
+        candidates.extend(nvm_binary_candidates(&home, "claude"));
+    }
+
+    candidates
+}
+
+fn nvm_binary_candidates(home: &Path, binary_name: &str) -> Vec<PathBuf> {
     let node_versions_dir = home.join(".nvm/versions/node");
     let Ok(entries) = std::fs::read_dir(node_versions_dir) else {
         return Vec::new();
@@ -223,17 +600,29 @@ fn nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
 
     let mut candidates = entries
         .filter_map(Result::ok)
-        .map(|entry| entry.path().join("bin/codex"))
+        .map(|entry| entry.path().join("bin").join(binary_name))
         .collect::<Vec<_>>();
     candidates.sort_by(|a, b| b.cmp(a));
     candidates
 }
 
 fn find_codex_with_user_shell() -> Option<String> {
+    find_binary_with_user_shell("codex")
+}
+
+fn find_claude_with_user_shell() -> Option<String> {
+    find_binary_with_user_shell("claude")
+}
+
+fn path_to_string(path: PathBuf) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+fn find_binary_with_user_shell(binary_name: &str) -> Option<String> {
     let shell = env::var_os("SHELL").unwrap_or_else(|| "/bin/zsh".into());
     let output = StdCommand::new(shell)
         .arg("-lc")
-        .arg("command -v codex")
+        .arg(format!("command -v {binary_name}"))
         .output()
         .ok()?;
 
@@ -248,10 +637,6 @@ fn find_codex_with_user_shell() -> Option<String> {
         .map(PathBuf::from)
         .find(|path| is_executable(path))
         .map(path_to_string)
-}
-
-fn path_to_string(path: PathBuf) -> String {
-    path.to_string_lossy().into_owned()
 }
 
 fn is_executable(path: &Path) -> bool {
@@ -289,19 +674,61 @@ fn selected_codex_model(env_model: Option<String>, request_model: &str) -> Optio
         })
 }
 
-fn prompt_for_codex(params: &RequestParams, model: Option<&str>) -> String {
+fn model_for_claude(params: &RequestParams) -> Option<String> {
+    selected_claude_model(
+        std::env::var(CLAUDE_MODEL_ENV_VAR).ok(),
+        params.model.as_str(),
+    )
+}
+
+fn selected_claude_model(env_model: Option<String>, request_model: &str) -> Option<String> {
+    env_model
+        .map(|model| model.trim().to_string())
+        .filter(|model| !model.is_empty())
+        .filter(|model| !is_claude_default_model(model))
+        .or_else(|| {
+            let model = request_model.trim();
+            (is_claude_request_model(model) && !is_claude_default_model(model))
+                .then(|| model.to_string())
+        })
+}
+
+fn is_claude_default_model(model: &str) -> bool {
+    matches!(
+        model.trim().to_ascii_lowercase().as_str(),
+        CLAUDE_DEFAULT_MODEL_ID | "claude-default" | "claude" | "default"
+    )
+}
+
+fn is_claude_request_model(model: &str) -> bool {
+    let model = model.trim().to_ascii_lowercase();
+    is_claude_default_model(&model)
+        || matches!(model.as_str(), "sonnet" | "opus" | "haiku")
+        || matches!(model.as_str(), "sonnet[1m]" | "opusplan")
+        || model.starts_with("claude-")
+}
+
+fn prompt_for_local_agent(
+    params: &RequestParams,
+    runtime: LocalAgentRuntime,
+    model: Option<&str>,
+) -> String {
     let mut prompt = String::new();
-    prompt.push_str("Dwarf local Codex session context:\n");
+    prompt.push_str("Dwarf local agent session context:\n");
     match model {
         Some(model) => {
-            prompt.push_str("The Codex CLI was invoked with configured model label `");
+            prompt.push_str("The ");
+            prompt.push_str(runtime.cli_name());
+            prompt.push_str(" was invoked with configured model label `");
             prompt.push_str(model);
             prompt.push_str("`.\n");
         }
         None => {
+            prompt.push_str("The ");
+            prompt.push_str(runtime.cli_name());
             prompt.push_str(
-                "The Codex CLI was invoked without an explicit `--model` flag, so it is using the Codex CLI default model.\n",
-            );
+                " was invoked without an explicit `--model` flag, so it is using that CLI's default model.\n",
+            )
         }
     }
     prompt.push_str(
@@ -310,14 +737,14 @@ fn prompt_for_codex(params: &RequestParams, model: Option<&str>) -> String {
     prompt.push_str(
         "Dwarf terminal tool-call contract:\n\
          - Dwarf is a terminal. Prefer making progress with shell commands, scripts, repository inspection, tests, and concise analysis over conversational-only answers.\n\
-         - You cannot change Dwarf's live terminal by changing your own Codex subprocess working directory.\n\
+         - You cannot change Dwarf's live terminal by changing your own local agent subprocess working directory.\n\
          - When the user asks to run, inspect, analyze, search, test, build, install, execute a script, or change directories, emit one tool-call marker per required shell command on its own line:\n\
          DWARF_TOOL_CALL {\"type\":\"run_shell_command\",\"command\":\"pwd\",\"is_read_only\":true,\"uses_pager\":false,\"is_risky\":false,\"wait_until_complete\":true}\n\
          - Emit one self-contained command when a later step depends on an earlier command's output. Do not emit dependent multi-step plans because Dwarf will not feed command results back to you automatically in this local bridge.\n\
          - For directory changes, emit `cd <path>` as a Dwarf tool call. Do not say the cwd changed until Dwarf returns the command result.\n\
          - For read-only inspection commands such as pwd, ls, find, rg, git status, cargo test --no-run, use `is_read_only:true`.\n\
          - For scripts, builds, tests that execute project code, or commands that may modify files, set `is_read_only:false`. Set `is_risky:true` only for destructive, credential, network, sudo, or external side-effect commands.\n\
-         - Do not wrap DWARF_TOOL_CALL lines in markdown fences. Keep prose short and do not claim validation from commands that only ran in your Codex subprocess.\n\n",
+         - Do not wrap DWARF_TOOL_CALL lines in markdown fences. Keep prose short and do not claim validation from commands that only ran in your local agent subprocess.\n\n",
     );
 
     let history = conversation_history(&params.tasks);
@@ -781,6 +1208,41 @@ fn extract_codex_agent_text(stdout: &str) -> Option<String> {
     (!messages.is_empty()).then(|| messages.join("\n\n"))
 }
 
+fn extract_claude_agent_text(stdout: &str) -> Option<String> {
+    let stdout = stdout.trim();
+    if stdout.is_empty() {
+        return None;
+    }
+
+    let Ok(value) = serde_json::from_str::<Value>(stdout) else {
+        return Some(stdout.to_string());
+    };
+
+    for key in ["result", "response", "text", "message"] {
+        if let Some(text) = value
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+        {
+            return Some(text.to_string());
+        }
+    }
+
+    value
+        .get("content")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("text").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        })
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+}
+
 fn truncate(value: &str, max_chars: usize) -> String {
     let mut chars = value.chars();
     let truncated = chars.by_ref().take(max_chars).collect::<String>();
@@ -839,6 +1301,45 @@ mod tests {
     fn ignores_non_codex_request_model() {
         assert_eq!(selected_codex_model(None, "auto"), None);
         assert_eq!(selected_codex_model(None, "claude-sonnet"), None);
+    }
+
+    #[test]
+    fn selects_claude_runtime_from_model() {
+        assert_eq!(
+            local_agent_runtime_for_model("claude-code"),
+            LocalAgentRuntime::Claude
+        );
+        assert_eq!(
+            local_agent_runtime_for_model("sonnet"),
+            LocalAgentRuntime::Claude
+        );
+        assert_eq!(
+            local_agent_runtime_for_model("gpt-5.5"),
+            LocalAgentRuntime::Codex
+        );
+    }
+
+    #[test]
+    fn selects_claude_model_from_request_model() {
+        assert_eq!(selected_claude_model(None, "claude-code"), None);
+        assert_eq!(
+            selected_claude_model(None, "sonnet"),
+            Some("sonnet".to_string())
+        );
+        assert_eq!(
+            selected_claude_model(Some("opus".to_string()), "sonnet"),
+            Some("opus".to_string())
+        );
+    }
+
+    #[test]
+    fn extracts_claude_agent_text_from_json() {
+        let stdout = r#"{"type":"result","result":"hello from claude"}"#;
+
+        assert_eq!(
+            extract_claude_agent_text(stdout).as_deref(),
+            Some("hello from claude")
+        );
     }
 
     #[test]
@@ -1000,6 +1501,40 @@ mod tests {
     }
 
     #[test]
+    fn extracts_local_next_command_json() {
+        let output = "```json\n{\"command\":\"cargo test -p warp local_codex\"}\n```";
+
+        assert_eq!(
+            extract_local_next_command(output).as_deref(),
+            Some("cargo test -p warp local_codex")
+        );
+    }
+
+    #[test]
+    fn extracts_local_prompt_suggestion_json() {
+        let output = "Sure.\n{\"query\":\"Check the failing test output and run the smallest relevant test.\"}";
+
+        assert_eq!(
+            extract_local_prompt_suggestion_query(output).as_deref(),
+            Some("Check the failing test output and run the smallest relevant test.")
+        );
+    }
+
+    #[test]
+    fn extracts_working_directory_from_context_messages() {
+        let temp_dir = std::env::temp_dir();
+        let message = format!(
+            "{{\"input\":\"pwd\",\"context\":{{\"pwd\":\"{}\"}}}}",
+            temp_dir.display()
+        );
+
+        assert_eq!(
+            working_directory_from_context_messages(&[message]).as_deref(),
+            Some(temp_dir.to_string_lossy().as_ref())
+        );
+    }
+
+    #[test]
     fn quotes_shell_paths() {
         assert_eq!(
             shell_quote_path(Path::new("/tmp/path with spaces")),
@@ -1012,7 +1547,7 @@ mod tests {
     }
 
     #[test]
-    fn nvm_codex_candidates_are_newest_first() {
+    fn nvm_binary_candidates_are_newest_first() {
         let home = Path::new("/Users/example");
         let candidates = [
             home.join(".nvm/versions/node/v18.0.0/bin/codex"),

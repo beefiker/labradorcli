@@ -32,11 +32,11 @@ use crate::terminal::TerminalManager;
 use crate::terminal::TerminalView;
 use crate::ui_components::blended_colors;
 use crate::ui_components::buttons::icon_button_with_color;
+use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::ui_components::icons;
 use crate::workspace::tab_settings::TabSettings;
 use settings::Setting as _;
 use warp_core::context_flag::ContextFlag;
-use warp_core::ui::Icon as WarpIcon;
 use warpui::elements::{
     ChildAnchor, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Shrinkable, Stack,
@@ -828,11 +828,6 @@ impl TerminalView {
         };
 
         let appearance = Appearance::as_ref(app);
-        let theme = appearance.theme();
-
-        // Check if we're configuring or waiting on an ambient agent
-        let is_ambient_agent = self.is_ambient_agent_session(app);
-
         // When a long-running command is active, show InProgress
         // instead of the conversation's actual status.
         let status = if is_long_running {
@@ -845,18 +840,7 @@ impl TerminalView {
             && conversation.exchange_count() == 0
             && !is_long_running
         {
-            ConstrainedBox::new(
-                if is_ambient_agent {
-                    WarpIcon::OzCloud
-                } else {
-                    WarpIcon::Oz
-                }
-                .to_warpui_icon(blended_colors::text_sub(theme, theme.background()).into())
-                .finish(),
-            )
-            .with_height(appearance.ui_font_size())
-            .with_width(appearance.ui_font_size())
-            .finish()
+            render_dwarf_icon(appearance.ui_font_size(), 2.)
         } else if FeatureFlag::NewTabStyling.is_enabled() {
             let icon_size = appearance.ui_font_size() + 2.0 - STATUS_ELEMENT_PADDING * 2.;
             render_status_element(&status, icon_size, appearance)
@@ -910,9 +894,6 @@ impl TerminalView {
 
     fn render_ambient_agent_indicator(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
-        let icon_color = appearance
-            .theme()
-            .main_text_color(appearance.theme().background());
         let font_size = appearance.ui_font_size();
         let ui_builder = appearance.ui_builder().clone();
 
@@ -921,15 +902,10 @@ impl TerminalView {
                 .ambient_agent_indicator_mouse_handle
                 .clone(),
             move |state| {
-                let mut stack = Stack::new().with_child(
-                    ConstrainedBox::new(icons::Icon::OzCloud.to_warpui_icon(icon_color).finish())
-                        .with_height(font_size * 1.5)
-                        .with_width(font_size * 1.5)
-                        .finish(),
-                );
+                let mut stack = Stack::new().with_child(render_dwarf_icon(font_size * 1.5, 4.));
                 if state.is_hovered() {
                     let tooltip = ui_builder
-                        .tool_tip("Cloud agent run".to_string())
+                        .tool_tip("Dwarf agent run".to_string())
                         .build()
                         .finish();
                     stack.add_positioned_overlay_child(

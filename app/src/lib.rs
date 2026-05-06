@@ -2886,6 +2886,7 @@ pub fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::APIKeyManagement,
         FeatureFlag::CloudConversations,
         FeatureFlag::CloudEnvironments,
+        FeatureFlag::CloudMode,
         FeatureFlag::CloudModeFromLocalSession,
         FeatureFlag::CloudModeHostSelector,
         FeatureFlag::CloudModeImageContext,

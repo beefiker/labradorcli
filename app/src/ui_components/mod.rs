@@ -8,6 +8,7 @@ pub(crate) mod breadcrumb;
 pub mod buttons;
 pub(crate) mod color_dot;
 pub(crate) mod dialog;
+pub(crate) mod dwarf_icon;
 pub(crate) mod icon_with_status;
 pub(crate) mod item_highlight;
 pub(crate) mod menu_button;

@@ -4,6 +4,7 @@ use ai::agent::action::{AIAgentActionType, ShellCommandDelay};
 use parking_lot::FairMutex;
 use warp_core::ui::appearance::Appearance;
 use warpui::{
+    assets::asset_cache::AssetSource,
     elements::{CornerRadius, Radius},
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, View, ViewContext,
 };
@@ -18,7 +19,7 @@ use crate::{
         },
     },
     terminal::{model::session::Sessions, TerminalModel},
-    ui_components::{blended_colors, icons::Icon},
+    ui_components::dwarf_icon::DWARF_ICON_ASSET_PATH,
 };
 
 const AGENT_PROMPT_TO_INTERACT_MESSAGE: &str = "Prompt agent to interact with";
@@ -120,17 +121,15 @@ impl View for InlineAgentViewHeader {
             )
         };
         if is_agent_tagged_in {
-            let header_background = appearance.theme().surface_2();
-            let icon = Icon::Oz.to_warpui_icon(
-                blended_colors::text_main(appearance.theme(), header_background).into(),
-            );
             let message = if let Some(command) = top_level_command.as_deref() {
                 format!("{AGENT_PROMPT_TO_INTERACT_MESSAGE} `{command}`")
             } else {
                 format!("{AGENT_PROMPT_TO_INTERACT_MESSAGE} the running command")
             };
             return HeaderConfig::new(message, app)
-                .with_icon(icon)
+                .with_image_icon(AssetSource::Bundled {
+                    path: DWARF_ICON_ASSET_PATH,
+                })
                 .with_corner_radius_override(CornerRadius::with_top(Radius::Pixels(8.)))
                 .with_markdown()
                 .render(app);

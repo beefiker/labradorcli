@@ -49,7 +49,7 @@ use crate::terminal::available_shells::AvailableShell;
 use crate::terminal::general_settings::GeneralSettings;
 use crate::terminal::keys_settings::KeysSettings;
 use crate::terminal::shell::ShellType;
-use crate::terminal::view::{cell_size_and_padding, TerminalAction};
+use crate::terminal::view::cell_size_and_padding;
 use crate::themes::onboarding_theme_picker_themes;
 use crate::themes::theme::{AnsiColorIdentifier, Blend, Fill, ThemeKind, WarpThemeConfig};
 use crate::uri::OpenMCPSettingsArgs;
@@ -84,6 +84,7 @@ use cfg_if::cfg_if;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
+use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use serde::{Deserialize, Serialize};
@@ -92,12 +93,16 @@ use settings::Setting as _;
 use std::path::Path;
 use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 use url::Url;
 use warp_core::context_flag::ContextFlag;
 use warp_core::user_preferences::GetUserPreferences as _;
+use warpui::assets::asset_cache::AssetSource;
 use warpui::clipboard::ClipboardContent;
-use warpui::keymap::{EditableBinding, FixedBinding};
+use warpui::fonts::Weight;
+use warpui::keymap::{EditableBinding, FixedBinding, Keystroke};
+use warpui::text_layout::TextAlignment;
 use warpui::windowing::WindowManager;
 
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
@@ -107,16 +112,20 @@ use crate::ai::onboarding::{
 use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
 use warp_graphql::billing::StripeSubscriptionPlan;
 
+use ui_components::{button, Component as _, Options as _};
 use warpui::elements::{
-    Border, ChildAnchor, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
+    Align, Border, CacheOption, ChildAnchor, ConstrainedBox, Container, CornerRadius,
+    CrossAxisAlignment, DispatchEventResult, EventHandler, Fill as ElementFill, Flex,
+    FormattedTextElement, Hoverable, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Point, Radius, Stack,
 };
 use warpui::rendering::OnGPUDeviceSelected;
 use warpui::{id, AddWindowOptions, DisplayId, SingletonEntity};
 use warpui::{
-    platform::{WindowBounds, WindowStyle},
+    platform::{Cursor, WindowBounds, WindowStyle},
     presenter::ChildView,
-    AppContext, Element, Entity, EntityId, TypedActionView, View, ViewContext, ViewHandle,
-    WindowId,
+    AfterLayoutContext, AppContext, Element, Entity, EntityId, EventContext, LayoutContext,
+    PaintContext, SizeConstraint, TypedActionView, View, ViewContext, ViewHandle, WindowId,
 };
 use warpui::{FocusContext, NextNewWindowsHasThisWindowsBoundsUponClose};
 
@@ -978,68 +987,14 @@ fn open_conversation_viewer(conversation_id: &ServerConversationToken, ctx: &mut
 
 /// Opens a new window and starts the guided `/create-environment` setup flow.
 fn create_environment(arg: &CreateEnvironmentArg, ctx: &mut AppContext) {
-    let repos = arg.repos.clone();
-    let (window_id, root_handle) = open_new_with_workspace_source(
-        NewWorkspaceSource::Session {
-            options: Box::default(),
-        },
-        ctx,
-    );
-
-    root_handle.update(ctx, |root_view, ctx| {
-        if let AuthOnboardingState::Terminal(workspace_handle) = &root_view.auth_onboarding_state {
-            workspace_handle.update(ctx, |workspace, ctx| {
-                workspace
-                    .active_tab_pane_group()
-                    .update(ctx, |pane_group, ctx| {
-                        pane_group.set_title("Create Environment", ctx);
-
-                        if let Some(terminal_view) = pane_group.active_session_view(ctx) {
-                            terminal_view.update(ctx, |_, ctx| {
-                                ctx.dispatch_typed_action_deferred(
-                                    TerminalAction::SetupCloudEnvironment(repos.clone()),
-                                );
-                            });
-                        }
-                    });
-            });
-        }
-    });
-
-    ctx.windows().show_window_and_focus_app(window_id);
+    let _ = (arg, ctx);
+    log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
 }
 
 /// Opens a new window and starts the guided `/create-environment` setup flow immediately.
 fn create_environment_and_run(arg: &CreateEnvironmentArg, ctx: &mut AppContext) {
-    let repos = arg.repos.clone();
-    let (window_id, root_handle) = open_new_with_workspace_source(
-        NewWorkspaceSource::Session {
-            options: Box::default(),
-        },
-        ctx,
-    );
-
-    root_handle.update(ctx, |root_view, ctx| {
-        if let AuthOnboardingState::Terminal(workspace_handle) = &root_view.auth_onboarding_state {
-            workspace_handle.update(ctx, |workspace, ctx| {
-                workspace
-                    .active_tab_pane_group()
-                    .update(ctx, |pane_group, ctx| {
-                        pane_group.set_title("Create Environment", ctx);
-
-                        if let Some(terminal_view) = pane_group.active_session_view(ctx) {
-                            terminal_view.update(ctx, |_, ctx| {
-                                ctx.dispatch_typed_action_deferred(
-                                    TerminalAction::SetupCloudEnvironmentAndStart(repos.clone()),
-                                );
-                            });
-                        }
-                    });
-            });
-        }
-    });
-
-    ctx.windows().show_window_and_focus_app(window_id);
+    let _ = (arg, ctx);
+    log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
 }
 fn open_team_settings_with_email_invite_in_new_window(
     arg: &OpenTeamsSettingsModalArgs,
@@ -1651,6 +1606,436 @@ enum AuthOnboardingTarget {
     Terminal(ViewHandle<Workspace>),
 }
 
+#[derive(Clone, Debug)]
+enum LocalWelcomeEvent {
+    Completed,
+}
+
+#[derive(Clone, Debug)]
+enum LocalWelcomeAction {
+    StartClicked,
+}
+
+struct LocalWelcomeView {
+    start_button: button::Button,
+    icon_mouse_state: MouseStateHandle,
+}
+
+impl LocalWelcomeView {
+    fn new(_: &mut ViewContext<Self>) -> Self {
+        Self {
+            start_button: button::Button::default(),
+            icon_mouse_state: MouseStateHandle::default(),
+        }
+    }
+
+    fn complete(&mut self, ctx: &mut ViewContext<Self>) {
+        ctx.emit(LocalWelcomeEvent::Completed);
+    }
+
+    fn render_content(&self, app: &AppContext) -> Box<dyn Element> {
+        let appearance = Appearance::as_ref(app);
+        let theme = appearance.theme();
+        let main_text_color = theme.main_text_color(theme.background()).into_solid();
+        let sub_text_color = theme.sub_text_color(theme.background()).into_solid();
+
+        let icon = Hoverable::new(self.icon_mouse_state.clone(), move |state| {
+            let icon = ConstrainedBox::new(
+                Image::new(
+                    AssetSource::Bundled {
+                        path: "bundled/png/local.png",
+                    },
+                    CacheOption::BySize,
+                )
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(12.)))
+                .finish(),
+            )
+            .with_width(112.)
+            .with_height(112.)
+            .finish();
+
+            let mut container = Container::new(icon)
+                .with_uniform_padding(5.)
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(17.)));
+            if state.is_hovered() {
+                container = container.with_background(theme.block_selection_color());
+            }
+            container.finish()
+        })
+        .with_cursor(Cursor::PointingHand)
+        .on_click(|ctx, _, _| {
+            ctx.dispatch_typed_action(RootViewAction::ShowConfetti);
+        })
+        .finish();
+
+        let title =
+            FormattedTextElement::from_str("Welcome to Dwarf", appearance.ui_font_family(), 42.)
+                .with_color(main_text_color)
+                .with_weight(Weight::Bold)
+                .with_alignment(TextAlignment::Center)
+                .with_line_height_ratio(1.0)
+                .finish();
+
+        let subtitle = FormattedTextElement::from_str(
+            "Your local agent terminal is ready. Local auth stays on this machine.",
+            appearance.ui_font_family(),
+            16.,
+        )
+        .with_color(sub_text_color)
+        .with_weight(Weight::Normal)
+        .with_alignment(TextAlignment::Center)
+        .with_line_height_ratio(1.25)
+        .finish();
+
+        let enter = Keystroke::parse("enter").unwrap_or_default();
+        let start_button = self.start_button.render(
+            appearance,
+            button::Params {
+                content: button::Content::Label("Start Dwarf".into()),
+                theme: &button::themes::Primary,
+                options: button::Options {
+                    keystroke: Some(enter),
+                    on_click: Some(Box::new(|ctx, _app, _pos| {
+                        ctx.dispatch_typed_action(LocalWelcomeAction::StartClicked);
+                    })),
+                    ..button::Options::default(appearance)
+                },
+            },
+        );
+        let content = Flex::column()
+            .with_main_axis_size(MainAxisSize::Min)
+            .with_main_axis_alignment(MainAxisAlignment::Center)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(icon)
+            .with_child(Container::new(title).with_margin_top(22.).finish())
+            .with_child(Container::new(subtitle).with_margin_top(14.).finish())
+            .with_child(Container::new(start_button).with_margin_top(28.).finish())
+            .finish();
+
+        Container::new(ConstrainedBox::new(content).with_max_width(560.).finish())
+            .with_uniform_padding(32.)
+            .finish()
+    }
+}
+
+impl Entity for LocalWelcomeView {
+    type Event = LocalWelcomeEvent;
+}
+
+impl View for LocalWelcomeView {
+    fn ui_name() -> &'static str {
+        "LocalWelcomeView"
+    }
+
+    fn render(&self, app: &AppContext) -> Box<dyn Element> {
+        let mut stack = Stack::new();
+        stack.add_child(
+            Container::new(Align::new(self.render_content(app)).finish())
+                .with_background(Appearance::as_ref(app).theme().background())
+                .finish(),
+        );
+        EventHandler::new(stack.finish())
+            .on_keydown(move |ctx, _app, keystroke| {
+                if keystroke.is_unmodified_enter() {
+                    ctx.dispatch_typed_action(LocalWelcomeAction::StartClicked);
+                    DispatchEventResult::StopPropagation
+                } else {
+                    DispatchEventResult::PropagateToParent
+                }
+            })
+            .finish()
+    }
+}
+
+impl TypedActionView for LocalWelcomeView {
+    type Action = LocalWelcomeAction;
+
+    fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
+        match action {
+            LocalWelcomeAction::StartClicked => self.complete(ctx),
+        }
+    }
+}
+
+struct DwarfConfettiElement {
+    started_at: instant::Instant,
+    size: Option<Vector2F>,
+    origin: Option<Point>,
+}
+
+#[derive(Clone, Copy)]
+enum ConfettiShape {
+    Ribbon,
+    Circle,
+}
+
+struct ConfettiParticle {
+    color_slot: usize,
+    shape: ConfettiShape,
+    start_x: f32,
+    start_y: f32,
+    velocity_x: f32,
+    velocity_y: f32,
+    gravity: f32,
+    drift: f32,
+    width: f32,
+    height: f32,
+    delay: f32,
+    life: f32,
+    spin: f32,
+    wobble_speed: f32,
+}
+
+impl DwarfConfettiElement {
+    const DURATION: Duration = Duration::from_millis(4000);
+    const FRAME: Duration = Duration::from_millis(16);
+    const BURST_COUNT: usize = 1;
+    const BURST_INTERVAL_SECONDS: f32 = 0.55;
+    const PARTICLES_PER_BURST: usize = 150;
+    const PARTICLE_COUNT: usize = Self::BURST_COUNT * Self::PARTICLES_PER_BURST;
+    const DECAY_DRAG: f32 = 6.32;
+
+    fn new(started_at: instant::Instant) -> Self {
+        Self {
+            started_at,
+            size: None,
+            origin: None,
+        }
+    }
+
+    fn hash_unit(index: usize, salt: u32) -> f32 {
+        let mut value = index as u32;
+        value = value.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
+        value ^= salt.wrapping_mul(277_803_737);
+        value ^= value >> 16;
+        (value % 10_000) as f32 / 10_000.
+    }
+
+    fn color_pair(slot: usize, alpha: u8) -> (ColorU, ColorU) {
+        match slot % 7 {
+            0 => (
+                ColorU::new(38, 204, 255, alpha),
+                ColorU::new(155, 235, 255, alpha),
+            ),
+            1 => (
+                ColorU::new(162, 90, 253, alpha),
+                ColorU::new(211, 183, 254, alpha),
+            ),
+            2 => (
+                ColorU::new(255, 94, 126, alpha),
+                ColorU::new(255, 174, 191, alpha),
+            ),
+            3 => (
+                ColorU::new(136, 255, 90, alpha),
+                ColorU::new(192, 255, 170, alpha),
+            ),
+            4 => (
+                ColorU::new(252, 255, 66, alpha),
+                ColorU::new(254, 255, 170, alpha),
+            ),
+            5 => (
+                ColorU::new(255, 166, 45, alpha),
+                ColorU::new(255, 210, 128, alpha),
+            ),
+            _ => (
+                ColorU::new(255, 54, 255, alpha),
+                ColorU::new(255, 169, 255, alpha),
+            ),
+        }
+    }
+
+    fn particle(index: usize) -> ConfettiParticle {
+        let burst_index = index / Self::PARTICLES_PER_BURST;
+        let particle_index = index % Self::PARTICLES_PER_BURST;
+        let angle = -std::f32::consts::FRAC_PI_2
+            + (Self::hash_unit(particle_index, 1 + burst_index as u32) - 0.5)
+                * std::f32::consts::PI
+                * 0.25;
+        let speed = (22.5 + Self::hash_unit(particle_index, 2 + burst_index as u32) * 45.) * 60.;
+        let width = 8. + Self::hash_unit(particle_index, 3 + burst_index as u32) * 4.;
+        let height = 5. + Self::hash_unit(particle_index, 4 + burst_index as u32) * 3.;
+        let shape = match particle_index % 2 {
+            0 => ConfettiShape::Circle,
+            _ => ConfettiShape::Ribbon,
+        };
+        let start_x = 0.5 + (Self::hash_unit(particle_index, 5 + burst_index as u32) - 0.5) * 0.22;
+        let start_y = 0.5 + (Self::hash_unit(particle_index, 6 + burst_index as u32) - 0.5) * 0.04;
+
+        ConfettiParticle {
+            color_slot: index,
+            shape,
+            start_x,
+            start_y,
+            velocity_x: angle.cos() * speed,
+            velocity_y: angle.sin() * speed,
+            gravity: 180.,
+            drift: 0.,
+            width,
+            height,
+            delay: burst_index as f32 * Self::BURST_INTERVAL_SECONDS
+                + Self::hash_unit(particle_index, 9 + burst_index as u32) * 0.08,
+            life: 3.25 + Self::hash_unit(particle_index, 10 + burst_index as u32) * 0.2,
+            spin: Self::hash_unit(particle_index, 11 + burst_index as u32) * std::f32::consts::TAU,
+            wobble_speed: 3. + Self::hash_unit(particle_index, 12 + burst_index as u32) * 3.6,
+        }
+    }
+
+    fn draw_particle_rect(
+        ctx: &mut PaintContext,
+        origin: Vector2F,
+        size: Vector2F,
+        color: ColorU,
+        corner_radius: f32,
+    ) {
+        ctx.scene
+            .draw_rect_without_hit_recording(RectF::new(origin, size))
+            .with_background(ElementFill::Solid(color))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(corner_radius)));
+    }
+
+    fn draw_particle(
+        particle: &ConfettiParticle,
+        position: Vector2F,
+        local_time: f32,
+        color: ColorU,
+        highlight: ColorU,
+        ctx: &mut PaintContext,
+    ) {
+        let wobble = (particle.spin + local_time * particle.wobble_speed).sin();
+        match particle.shape {
+            ConfettiShape::Ribbon => {
+                let visible_width = particle.width * (0.32 + wobble.abs() * 0.68);
+                let visible_height = particle.height * (0.72 + (1. - wobble.abs()) * 0.38);
+                let vertical_flip = (particle.spin + local_time * particle.wobble_speed).cos() < 0.;
+                let particle_size = if vertical_flip {
+                    vec2f(visible_height, visible_width)
+                } else {
+                    vec2f(visible_width, visible_height)
+                };
+                let particle_origin = position - particle_size * 0.5;
+                ctx.scene
+                    .draw_rect_without_hit_recording(RectF::new(particle_origin, particle_size))
+                    .with_background(ElementFill::Gradient {
+                        start: vec2f(0., 0.),
+                        end: vec2f(1., 1.),
+                        start_color: highlight,
+                        end_color: color,
+                    })
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(1.8)));
+            }
+            ConfettiShape::Circle => {
+                let diameter = (particle.width * 0.72) * (0.8 + wobble.abs() * 0.2);
+                Self::draw_particle_rect(
+                    ctx,
+                    position - vec2f(diameter, diameter) * 0.5,
+                    vec2f(diameter, diameter),
+                    color,
+                    diameter / 2.,
+                );
+            }
+        }
+    }
+}
+
+impl Element for DwarfConfettiElement {
+    fn layout(
+        &mut self,
+        constraint: SizeConstraint,
+        _ctx: &mut LayoutContext,
+        _app: &AppContext,
+    ) -> Vector2F {
+        let size = vec2f(
+            if constraint.max.x().is_finite() {
+                constraint.max.x().max(1.)
+            } else {
+                constraint.min.x().max(1.)
+            },
+            if constraint.max.y().is_finite() {
+                constraint.max.y().max(1.)
+            } else {
+                constraint.min.y().max(1.)
+            },
+        );
+        self.size = Some(size);
+        size
+    }
+
+    fn after_layout(&mut self, _ctx: &mut AfterLayoutContext, _app: &AppContext) {}
+
+    fn paint(&mut self, origin: Vector2F, ctx: &mut PaintContext, _app: &AppContext) {
+        let Some(size) = self.size else {
+            return;
+        };
+
+        self.origin = Some(Point::from_vec2f(origin, ctx.scene.z_index()));
+
+        let elapsed = self.started_at.elapsed();
+        let progress = (elapsed.as_secs_f32() / Self::DURATION.as_secs_f32()).clamp(0., 1.);
+        if progress >= 1. {
+            return;
+        }
+
+        let time = elapsed.as_secs_f32();
+
+        // Native approximation of canvas-confetti defaults: 200 ticks at
+        // 60fps, startVelocity 45, decay 0.9, and gravity 1.
+        for index in 0..Self::PARTICLE_COUNT {
+            let particle = Self::particle(index);
+            let local_time = time - particle.delay;
+            if local_time <= 0. {
+                continue;
+            }
+
+            let life_progress = (local_time / particle.life).clamp(0., 1.);
+            if life_progress >= 1. {
+                continue;
+            }
+
+            let alpha = ((1. - life_progress) * 255.).round() as u8;
+            let (color, highlight) = Self::color_pair(particle.color_slot, alpha);
+            let drag_time = (1. - (-local_time * Self::DECAY_DRAG).exp()) / Self::DECAY_DRAG;
+            let x = size.x() * particle.start_x
+                + particle.velocity_x * drag_time
+                + particle.drift * local_time;
+            let y = size.y() * particle.start_y
+                + particle.velocity_y * drag_time
+                + particle.gravity * local_time;
+
+            if x < -20. || x > size.x() + 20. || y < -20. || y > size.y() + 20. {
+                continue;
+            }
+
+            Self::draw_particle(
+                &particle,
+                origin + vec2f(x, y),
+                local_time,
+                color,
+                highlight,
+                ctx,
+            );
+        }
+
+        ctx.repaint_after(Self::FRAME);
+    }
+
+    fn dispatch_event(
+        &mut self,
+        _event: &warpui::event::DispatchedEvent,
+        _ctx: &mut EventContext,
+        _app: &AppContext,
+    ) -> bool {
+        false
+    }
+
+    fn size(&self) -> Option<Vector2F> {
+        self.size
+    }
+
+    fn origin(&self) -> Option<Point> {
+        self.origin
+    }
+}
+
 /// User preferences key to track whether the user has completed the onboarding slides locally
 /// (before login). This is needed because the server-side `is_onboarded` flag requires
 /// authentication.
@@ -1689,6 +2074,10 @@ enum AuthOnboardingState {
         onboarding_view: ViewHandle<AgentOnboardingView>,
         target: AuthOnboardingTarget,
     },
+    LocalWelcome {
+        welcome_view: ViewHandle<LocalWelcomeView>,
+        target: AuthOnboardingTarget,
+    },
     /// Post-onboarding login slide (full-screen, onboarding-style).
     LoginSlide {
         login_slide_view: ViewHandle<LoginSlideView>,
@@ -1720,6 +2109,7 @@ pub struct RootView {
     /// settings to apply after a new user login / initial cloud load completes
     pending_post_auth_onboarding_settings: Option<SelectedSettings>,
     paste_auth_token_modal: Option<ViewHandle<PasteAuthTokenModalView>>,
+    confetti_started_at: Option<instant::Instant>,
 }
 
 impl RootView {
@@ -1761,9 +2151,16 @@ impl RootView {
         let auth_onboarding_state = if auth_state.is_logged_in() {
             AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
         } else if local_agent_terminal_only() {
-            mark_local_onboarding_completed(ctx);
-            mark_hoa_onboarding_completed(ctx);
-            AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
+            if has_completed_local_onboarding(ctx) {
+                mark_hoa_onboarding_completed(ctx);
+                AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
+            } else {
+                let welcome_view = Self::create_local_welcome_view(ctx);
+                AuthOnboardingState::LocalWelcome {
+                    welcome_view,
+                    target: AuthOnboardingTarget::Workspace(workspace_args.into()),
+                }
+            }
         } else {
             cfg_if! {
                 if #[cfg(target_family = "wasm")] {
@@ -1809,6 +2206,12 @@ impl RootView {
             view
         };
 
+        let confetti_started_at = matches!(
+            auth_onboarding_state,
+            AuthOnboardingState::LocalWelcome { .. }
+        )
+        .then(instant::Instant::now);
+
         let root_view = Self {
             auth_onboarding_state,
             server_time: None,
@@ -1824,6 +2227,7 @@ impl RootView {
             pending_tutorial: None,
             pending_post_auth_onboarding_settings: None,
             paste_auth_token_modal: None,
+            confetti_started_at,
         };
 
         match &root_view.auth_onboarding_state {
@@ -1882,11 +2286,16 @@ impl RootView {
         // Ensure the onboarding view has focus after all views are created.
         // The auth_view's internal editor may have grabbed focus during construction;
         // this overrides that so keyboard input (Enter, arrow keys) routes to onboarding.
-        if let AuthOnboardingState::Onboarding {
-            onboarding_view, ..
-        } = &root_view.auth_onboarding_state
-        {
-            ctx.focus(onboarding_view);
+        match &root_view.auth_onboarding_state {
+            AuthOnboardingState::Onboarding {
+                onboarding_view, ..
+            } => {
+                ctx.focus(onboarding_view);
+            }
+            AuthOnboardingState::LocalWelcome { welcome_view, .. } => {
+                ctx.focus(welcome_view);
+            }
+            _ => {}
         }
 
         root_view
@@ -1995,6 +2404,14 @@ impl RootView {
         PricingInfoModel::as_ref(ctx)
             .plan_pricing(&StripeSubscriptionPlan::Build)
             .map(|p| p.yearly_plan_price_per_month_usd_cents)
+    }
+
+    fn create_local_welcome_view(ctx: &mut ViewContext<Self>) -> ViewHandle<LocalWelcomeView> {
+        let welcome_view = ctx.add_typed_action_view(LocalWelcomeView::new);
+        ctx.subscribe_to_view(&welcome_view, |me, _view, event, ctx| {
+            me.handle_local_welcome_event(event, ctx);
+        });
+        welcome_view
     }
 
     fn create_agent_onboarding_view(
@@ -2165,6 +2582,31 @@ impl RootView {
             .find_map(|(kind, theme)| {
                 (theme.name().as_deref() == Some(theme_name)).then(|| kind.clone())
             })
+    }
+
+    fn handle_local_welcome_event(
+        &mut self,
+        event: &LocalWelcomeEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        match event {
+            LocalWelcomeEvent::Completed => {
+                let AuthOnboardingState::LocalWelcome { target, .. } = &self.auth_onboarding_state
+                else {
+                    return;
+                };
+
+                let target = target.clone();
+                mark_local_onboarding_completed(ctx);
+                mark_hoa_onboarding_completed(ctx);
+
+                let workspace = target.to_workspace(ctx);
+                self.auth_onboarding_state = AuthOnboardingState::Terminal(workspace);
+                ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
+                self.focus(ctx);
+                ctx.notify();
+            }
+        }
     }
 
     fn handle_login_slide_event(&mut self, event: &LoginSlideEvent, ctx: &mut ViewContext<Self>) {
@@ -2745,39 +3187,9 @@ impl RootView {
         arg: &CreateEnvironmentArg,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
-        if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
-            let repos = arg.repos.clone();
-
-            handle.update(ctx, |workspace, ctx| {
-                workspace.add_tab_with_pane_layout(
-                    PanesLayout::SingleTerminal(Box::default()),
-                    Arc::new(HashMap::new()),
-                    None,
-                    ctx,
-                );
-
-                workspace
-                    .active_tab_pane_group()
-                    .update(ctx, |pane_group, ctx| {
-                        pane_group.set_title("Create Environment", ctx);
-
-                        if let Some(terminal_view) = pane_group.active_session_view(ctx) {
-                            terminal_view.update(ctx, |_, ctx| {
-                                ctx.dispatch_typed_action_deferred(
-                                    TerminalAction::SetupCloudEnvironment(repos.clone()),
-                                );
-                            });
-                        }
-                    });
-            });
-            let window_id = ctx.window_id();
-            ctx.windows().show_window_and_focus_app(window_id);
-            ctx.notify();
-            true
-        } else {
-            log::warn!("Auth not complete before trying to create environment");
-            false
-        }
+        let _ = (arg, ctx);
+        log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
+        true
     }
 
     /// Adds a tab and starts the guided `/create-environment` setup flow immediately.
@@ -2786,41 +3198,8 @@ impl RootView {
         arg: &CreateEnvironmentArg,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
-        let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state else {
-            log::warn!("Auth not complete before trying to create environment");
-            return false;
-        };
-
-        let repos = arg.repos.clone();
-
-        handle.update(ctx, |workspace, ctx| {
-            workspace.add_tab_with_pane_layout(
-                PanesLayout::SingleTerminal(Box::default()),
-                Arc::new(HashMap::new()),
-                None,
-                ctx,
-            );
-
-            workspace
-                .active_tab_pane_group()
-                .update(ctx, |pane_group, ctx| {
-                    pane_group.set_title("Create Environment", ctx);
-
-                    if let Some(terminal_view) = pane_group.active_session_view(ctx) {
-                        terminal_view.update(ctx, |_, ctx| {
-                            ctx.dispatch_typed_action_deferred(
-                                crate::terminal::view::TerminalAction::SetupCloudEnvironmentAndStart(
-                                    repos.clone(),
-                                ),
-                            );
-                        });
-                    }
-                });
-        });
-
-        let window_id = ctx.window_id();
-        ctx.windows().show_window_and_focus_app(window_id);
-        ctx.notify();
+        let _ = (arg, ctx);
+        log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
         true
     }
 
@@ -3213,6 +3592,9 @@ impl RootView {
             } => {
                 ctx.focus(onboarding_view);
             }
+            AuthOnboardingState::LocalWelcome { welcome_view, .. } => {
+                ctx.focus(welcome_view);
+            }
             AuthOnboardingState::LoginSlide {
                 login_slide_view, ..
             } => {
@@ -3356,7 +3738,7 @@ impl View for RootView {
             // Modal is open — focus belongs to the editor inside it.
         } else if matches!(
             self.auth_onboarding_state,
-            AuthOnboardingState::Onboarding { .. }
+            AuthOnboardingState::Onboarding { .. } | AuthOnboardingState::LocalWelcome { .. }
         ) {
             // During onboarding, aggressively redirect focus.
             // This ensures keystrokes (Enter) are handled by the correct view rather
@@ -3388,6 +3770,9 @@ impl View for RootView {
             AuthOnboardingState::Onboarding {
                 onboarding_view, ..
             } => ChildView::new(onboarding_view).finish(),
+            AuthOnboardingState::LocalWelcome { welcome_view, .. } => {
+                ChildView::new(welcome_view).finish()
+            }
             AuthOnboardingState::LoginSlide {
                 login_slide_view, ..
             } => ChildView::new(login_slide_view).finish(),
@@ -3399,6 +3784,13 @@ impl View for RootView {
 
         if let Some(modal) = &self.paste_auth_token_modal {
             stack.add_child(ChildView::new(modal).finish());
+        }
+
+        if let Some(started_at) = self
+            .confetti_started_at
+            .filter(|started_at| started_at.elapsed() < DwarfConfettiElement::DURATION)
+        {
+            stack.add_overlay_child(DwarfConfettiElement::new(started_at).finish());
         }
 
         if let Some(traffic_light_data) = self.traffic_light_data(app) {
@@ -3457,6 +3849,7 @@ pub enum RootViewAction {
     ShowOrHideNonQuakeModeWindows,
     ToggleFullscreen,
     DebugEnterOnboardingState,
+    ShowConfetti,
 }
 
 impl TypedActionView for RootView {
@@ -3479,6 +3872,10 @@ impl TypedActionView for RootView {
             }
             RootViewAction::DebugEnterOnboardingState => {
                 self.debug_enter_onboarding_state(&(), ctx);
+            }
+            RootViewAction::ShowConfetti => {
+                self.confetti_started_at = Some(instant::Instant::now());
+                ctx.notify();
             }
         }
     }
@@ -3576,7 +3973,9 @@ impl AuthOnboardingState {
             AuthOnboardingState::NeedsSsoLink(target) => {
                 *self = AuthOnboardingState::WebImport(target.clone())
             }
-            AuthOnboardingState::Onboarding { .. } | AuthOnboardingState::LoginSlide { .. } => {
+            AuthOnboardingState::Onboarding { .. }
+            | AuthOnboardingState::LocalWelcome { .. }
+            | AuthOnboardingState::LoginSlide { .. } => {
                 // For onboarding/login slide, we don't have a workspace yet, so we can't convert to web import
                 // This case shouldn't normally occur
             }
@@ -3609,7 +4008,9 @@ impl AuthOnboardingState {
                 log::error!("SSO link required after web user import");
             }
             AuthOnboardingState::NeedsSsoLink { .. } => (),
-            AuthOnboardingState::Onboarding { .. } | AuthOnboardingState::LoginSlide { .. } => {
+            AuthOnboardingState::Onboarding { .. }
+            | AuthOnboardingState::LocalWelcome { .. }
+            | AuthOnboardingState::LoginSlide { .. } => {
                 // For onboarding/login slide, we don't have a workspace yet, so we can't convert to SSO link
                 // This case shouldn't normally occur
             }
@@ -3640,7 +4041,9 @@ impl AuthOnboardingState {
                 }
                 AuthOnboardingTarget::Terminal(_) => {}
             },
-            AuthOnboardingState::Onboarding { .. } | AuthOnboardingState::LoginSlide { .. } => {
+            AuthOnboardingState::Onboarding { .. }
+            | AuthOnboardingState::LocalWelcome { .. }
+            | AuthOnboardingState::LoginSlide { .. } => {
                 // No workspace to clean up for onboarding/login slide state
             }
             AuthOnboardingState::Terminal(workspace) => {

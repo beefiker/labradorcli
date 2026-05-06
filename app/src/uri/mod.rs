@@ -359,19 +359,13 @@ impl UriHost {
                                 notifier.notify_auth_completed(ctx);
                             });
 
-                            // Open settings page unless auth was initiated from cloud setup
-                            // (cloud setup users should stay on their current page)
-                            let source = query_string.get("source").map(|s| s.as_ref());
-                            let skip_settings = source == Some(CLOUD_SETUP_SOURCE);
-                            if !skip_settings {
-                                dispatch_action_in_new_or_existing_window(
-                                    primary_window_id,
-                                    "root_view:open_settings_page_in_existing_window",
-                                    "root_view:open_settings_page_in_new_window",
-                                    &SettingsSection::CloudEnvironments,
-                                    ctx,
-                                );
-                            }
+                            dispatch_action_in_new_or_existing_window(
+                                primary_window_id,
+                                "root_view:open_settings_page_in_existing_window",
+                                "root_view:open_settings_page_in_new_window",
+                                &SettingsSection::WarpAgent,
+                                ctx,
+                            );
                         }
                         "mcp" => {
                             // warp://settings/mcp?autoinstall=<name> auto-installs a gallery MCP server.
@@ -773,7 +767,10 @@ impl Action {
 
                 if let Some(workspace) = workspaces.pop() {
                     workspace.update(ctx, |workspace, ctx| {
-                        workspace.handle_action(&WorkspaceAction::OpenCloudAgentSetupGuide, ctx);
+                        workspace.handle_action(
+                            &WorkspaceAction::ShowSettingsPage(SettingsSection::WarpAgent),
+                            ctx,
+                        );
                     });
                 } else {
                     log::warn!(
@@ -830,28 +827,10 @@ impl Action {
                 });
             }
             Action::CreateEnvironment { repos } => {
-                use crate::root_view::CreateEnvironmentArg;
-
-                let arg = CreateEnvironmentArg {
-                    repos: repos.clone(),
-                };
-
-                let primary_window_and_view = primary_window_id.and_then(|window_id| {
-                    ctx.root_view_id(window_id)
-                        .map(|view_id| (window_id, view_id))
-                });
-
-                if let Some((primary_window_id, root_view_id)) = primary_window_and_view {
-                    ctx.dispatch_action(
-                        primary_window_id,
-                        &[root_view_id],
-                        "root_view:create_environment_in_existing_window",
-                        &arg,
-                        log::Level::Info,
-                    );
-                } else {
-                    ctx.dispatch_global_action("root_view:create_environment", &arg);
-                }
+                log::info!(
+                    "Ignoring create-environment URI with {} repo(s); Dwarf does not expose cloud environments",
+                    repos.len()
+                );
             }
             Action::FocusCloudMode => {
                 // Notify that GitHub auth completed so views can refresh
@@ -902,7 +881,7 @@ impl Action {
                     primary_window_id,
                     "root_view:open_settings_page_in_existing_window",
                     "root_view:open_settings_page_in_new_window",
-                    &SettingsSection::CloudEnvironments,
+                    &SettingsSection::WarpAgent,
                     ctx,
                 );
             }

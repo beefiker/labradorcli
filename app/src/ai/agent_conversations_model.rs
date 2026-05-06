@@ -885,9 +885,21 @@ impl Entity for AgentConversationsModel {
 impl SingletonEntity for AgentConversationsModel {}
 
 impl AgentConversationsModel {
+    fn tracks_local_conversations() -> bool {
+        FeatureFlag::InteractiveConversationManagementView.is_enabled()
+            || FeatureFlag::AgentViewConversationListView.is_enabled()
+    }
+
+    fn syncs_ambient_tasks() -> bool {
+        FeatureFlag::AgentManagementView.is_enabled()
+    }
+
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        // If FF not enabled, return an empty model and don't sync any tasks.
-        if !FeatureFlag::AgentManagementView.is_enabled() {
+        let tracks_local_conversations = Self::tracks_local_conversations();
+        let syncs_ambient_tasks = Self::syncs_ambient_tasks();
+
+        // If no visible surface consumes this model, return an empty model.
+        if !tracks_local_conversations && !syncs_ambient_tasks {
             return Self {
                 tasks: HashMap::new(),
                 conversations: HashMap::new(),
@@ -899,28 +911,32 @@ impl AgentConversationsModel {
             };
         }
 
-        // Subscribe to network status and window manager to inform whether we should poll for new task data
-        let network_status = NetworkStatus::handle(ctx);
-        ctx.subscribe_to_model(&network_status, Self::handle_network_status_changed);
-        let window_manager = WindowManager::handle(ctx);
-        ctx.subscribe_to_model(&window_manager, Self::handle_window_state_changed);
+        if syncs_ambient_tasks {
+            // Subscribe to network status and window manager to inform whether we should poll for new task data
+            let network_status = NetworkStatus::handle(ctx);
+            ctx.subscribe_to_model(&network_status, Self::handle_network_status_changed);
+            let window_manager = WindowManager::handle(ctx);
+            ctx.subscribe_to_model(&window_manager, Self::handle_window_state_changed);
 
-        // Subscribe to auth events to retry initial sync when user becomes available
-        let auth_manager = AuthManager::handle(ctx);
-        ctx.subscribe_to_model(&auth_manager, Self::handle_auth_manager_event);
+            // Subscribe to auth events to retry initial sync when user becomes available
+            let auth_manager = AuthManager::handle(ctx);
+            ctx.subscribe_to_model(&auth_manager, Self::handle_auth_manager_event);
+        }
 
-        let history_model = BlocklistAIHistoryModel::handle(ctx);
-        ctx.subscribe_to_model(&history_model, move |me, event, ctx| {
-            me.handle_history_event(event, ctx);
-        });
+        if tracks_local_conversations {
+            let history_model = BlocklistAIHistoryModel::handle(ctx);
+            ctx.subscribe_to_model(&history_model, move |me, event, ctx| {
+                me.handle_history_event(event, ctx);
+            });
 
-        let active_views_model = ActiveAgentViewsModel::handle(ctx);
-        ctx.subscribe_to_model(&active_views_model, |me, _event, ctx| {
-            me.sync_conversations(ctx);
-        });
+            let active_views_model = ActiveAgentViewsModel::handle(ctx);
+            ctx.subscribe_to_model(&active_views_model, |me, _event, ctx| {
+                me.sync_conversations(ctx);
+            });
+        }
 
         // Subscribe to UpdateManager for RTC task updates
-        if FeatureFlag::AmbientAgentsRTC.is_enabled() {
+        if syncs_ambient_tasks && FeatureFlag::AmbientAgentsRTC.is_enabled() {
             let update_manager = UpdateManager::handle(ctx);
             ctx.subscribe_to_model(&update_manager, Self::handle_update_manager_event);
         }
@@ -938,9 +954,13 @@ impl AgentConversationsModel {
         // Only sync local conversations if we're not in CLI mode. Server-side data
         // (tasks and cloud conversation metadata) is fetched on AuthComplete instead of
         // here to avoid duplicate requests at startup.
-        if AppExecutionMode::as_ref(ctx).can_fetch_agent_runs_for_management() {
+        if tracks_local_conversations
+            && AppExecutionMode::as_ref(ctx).can_fetch_agent_runs_for_management()
+        {
             model.sync_conversations(ctx);
-        } else {
+        }
+
+        if !syncs_ambient_tasks {
             model.has_finished_initial_load = true;
         }
         model
@@ -1045,7 +1065,7 @@ impl AgentConversationsModel {
     /// This function will loop through all active panes, recently closed panes, and historical
     /// conversations to construct a complete snapshot of conversations.
     pub fn sync_conversations(&mut self, ctx: &mut ModelContext<Self>) {
-        if !FeatureFlag::InteractiveConversationManagementView.is_enabled() {
+        if !Self::tracks_local_conversations() {
             return;
         }
 
@@ -1401,7 +1421,7 @@ impl AgentConversationsModel {
         event: &BlocklistAIHistoryEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        if !FeatureFlag::InteractiveConversationManagementView.is_enabled() {
+        if !Self::tracks_local_conversations() {
             return;
         }
         match event {

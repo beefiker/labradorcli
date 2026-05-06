@@ -417,7 +417,6 @@ fn render_agent_avatar(
     let variant = match agent {
         NotificationSourceAgent::Oz => IconWithStatusVariant::OzAgent {
             status: Some(status),
-            is_ambient: false,
         },
         NotificationSourceAgent::CLI(cli) => IconWithStatusVariant::CLIAgent {
             agent: cli,
