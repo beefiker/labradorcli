@@ -1,10 +1,9 @@
 use std::{
     borrow::Cow,
-    cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ffi::OsString,
     future::Future,
-    io::{self, Write},
+    io,
     path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -15,13 +14,8 @@ use std::{
 };
 
 use crate::ai::blocklist::task_status_sync_model::TaskStatusSyncModel;
-use crate::ai::llms::{LLMId, LLMPreferences};
-use crate::ai::mcp::MCPServerState;
-use crate::ai::{
-    agent::conversation::AIConversationId,
-    agent_sdk::driver::harness::{
-        task_env_vars, HarnessKind, HarnessRunner, ResumePayload, SavePoint, ThirdPartyHarness,
-    },
+use crate::ai::agent_sdk::driver::harness::{
+    task_env_vars, HarnessKind, HarnessRunner, ResumePayload, SavePoint, ThirdPartyHarness,
 };
 use crate::terminal::cli_agent_sessions::plugin_manager::{
     plugin_manager_for, CliAgentPluginManager,
@@ -31,45 +25,26 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::{
     ai::{
-        agent::{
-            AIAgentExchange, AIAgentInput, AIAgentOutput, CancellationReason, RenderableAIError,
-        },
+        agent::{CancellationReason, RenderableAIError},
         ambient_agents::AmbientAgentTaskId,
-        blocklist::BlocklistAIPermissions,
         cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironment},
-        execution_profiles::profiles::AIExecutionProfilesModel,
-        mcp::{
-            file_based_manager::{FileBasedMCPManager, FileBasedMCPManagerEvent},
-            parsing::{normalize_mcp_json, ParsedTemplatableMCPServerResult},
-            templatable_manager::TemplatableMCPServerManagerEvent,
-            TemplatableMCPServerInstallation, TemplatableMCPServerManager,
-        },
     },
     auth::AuthStateProvider,
     cloud_object::CloudObject,
-    server::{
-        ids::{ServerId, SyncId},
-        server_api::{
-            ai::AIClient,
-            harness_support::{
-                HarnessSupportClient, ResolvePromptAttachedSkill, ResolvePromptRequest,
-            },
-            ServerApiProvider,
+    server::server_api::{
+        ai::AIClient,
+        harness_support::{
+            HarnessSupportClient, ResolvePromptAttachedSkill, ResolvePromptRequest,
         },
+        ServerApiProvider,
     },
     terminal::view::ConversationRestorationInNewPaneType,
 };
 use ai::skills::ParsedSkill;
 use anyhow::{anyhow, Context as _};
-use futures::{
-    channel::oneshot,
-    future::{self, Either},
-    FutureExt as _,
-};
-use oneshot::{Canceled, Receiver, Sender};
-use uuid::Uuid;
+use futures::{channel::oneshot, FutureExt as _};
+use oneshot::Canceled;
 use warp_cli::agent::{Harness, OutputFormat};
-use warp_cli::mcp::MCPSpec;
 use warp_cli::share::ShareRequest;
 use warp_core::{
     channel::{Channel, ChannelState},
@@ -95,7 +70,6 @@ pub(crate) mod terminal;
 use environment::PrepareEnvironmentError;
 use terminal::TerminalDriverEvent;
 
-const MCP_SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
 const HARNESS_SAVE_INTERVAL: Duration = Duration::from_secs(30);
 pub(crate) const WARP_DRIVE_SYNC_TIMEOUT: Duration = Duration::from_secs(60);
 const SETUP_FAILED_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
@@ -255,9 +229,6 @@ pub struct AgentDriver {
     // and exit after this period of inactivity.
     idle_on_complete: Option<Duration>,
 
-    // The conversation ID to continue (if provided).
-    restored_conversation_id: Option<AIConversationId>,
-
     /// Cloud providers set up within this driver session.
     cloud_providers: Vec<Box<dyn cloud_provider::CloudProvider>>,
 
@@ -280,11 +251,6 @@ pub struct AgentDriver {
 pub struct Task {
     /// The prompt for the agent.
     pub prompt: AgentRunPrompt,
-    pub model: Option<LLMId>,
-    /// ID of the profile to run as (SyncId string). If None, use the default profile.
-    pub profile: Option<String>,
-    /// MCP server specifications to start prior to execution.
-    pub mcp_specs: Vec<MCPSpec>,
     /// Which harness to use for executing the agent run.
     pub harness: HarnessKind,
 }
@@ -467,18 +433,6 @@ impl AgentDriver {
             return Err(AgentDriverError::NotLoggedIn);
         }
 
-        // Extract the conversation ID if we're restoring a conversation.
-        // This will be used when submitting the initial query to continue the conversation.
-        let restored_conversation_id =
-            conversation_restoration
-                .as_ref()
-                .and_then(|restoration| match restoration {
-                    ConversationRestorationInNewPaneType::Historical { conversation, .. } => {
-                        Some(conversation.id())
-                    }
-                    _ => None,
-                });
-
         // Build environment variables from secrets for the terminal session.
         // Do not override env vars that are already set to a non-empty value in the current
         // process. This ensures that worker-injected credentials (e.g. harness auth secrets)
@@ -590,7 +544,6 @@ impl AgentDriver {
             task_id,
             harness: None,
             idle_on_complete,
-            restored_conversation_id,
             cloud_providers,
             environment,
             snapshot_disabled: snapshot_disabled.unwrap_or(false),
@@ -740,401 +693,6 @@ impl AgentDriver {
         }
     }
 
-    /// Resolve MCP specs into UUIDs for existing servers and ephemeral installations for inline specs.
-    ///
-    /// Returns (existing_server_uuids, ephemeral_installations)
-    fn resolve_mcp_specs(
-        specs: &[MCPSpec],
-    ) -> Result<(Vec<Uuid>, Vec<TemplatableMCPServerInstallation>), AgentDriverError> {
-        let mut existing_uuids = Vec::new();
-        let mut ephemeral_installations = Vec::new();
-
-        for spec in specs {
-            match spec {
-                MCPSpec::Uuid(uuid) => {
-                    existing_uuids.push(*uuid);
-                }
-                MCPSpec::Json(json_str) => {
-                    // Normalize the JSON - if it's a single server definition (has command or url
-                    // at top level), wrap it with a generated name.
-                    let normalized_json = normalize_mcp_json(json_str)
-                        .map_err(|e| AgentDriverError::MCPJsonParseError(e.to_string()))?;
-
-                    // Parse as inline MCP server configuration
-                    let parsed_results =
-                        ParsedTemplatableMCPServerResult::from_user_json(&normalized_json)
-                            .map_err(|e| AgentDriverError::MCPJsonParseError(e.to_string()))?;
-
-                    for result in parsed_results {
-                        let installation = result
-                            .templatable_mcp_server_installation
-                            .ok_or(AgentDriverError::MCPMissingVariables)?;
-                        ephemeral_installations.push(installation);
-                    }
-                }
-            }
-        }
-
-        Ok((existing_uuids, ephemeral_installations))
-    }
-
-    /// Start MCP servers from profile allowlist for the terminal.
-    fn start_profile_mcp_servers(
-        &self,
-        ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
-        let terminal_id = self.terminal_driver.as_ref(ctx).terminal_view().id();
-        let permissions = BlocklistAIPermissions::as_ref(ctx);
-        let profile_allowlist = permissions.get_mcp_allowlist(ctx, Some(terminal_id));
-
-        if !profile_allowlist.is_empty() {
-            log::info!(
-                "Starting {} MCP servers allowlisted in profile",
-                profile_allowlist.len()
-            );
-        }
-        self.start_mcp_servers(&profile_allowlist, ctx)
-    }
-
-    fn get_mcp_servers_to_start(
-        &self,
-        uuids: &[uuid::Uuid],
-        ctx: &mut ModelContext<Self>,
-    ) -> Result<HashSet<Uuid>, AgentDriverError> {
-        let templatable_mcp_manager = TemplatableMCPServerManager::handle(ctx);
-
-        let mut servers_to_start: HashSet<Uuid> = HashSet::new();
-
-        for uuid in uuids.iter() {
-            if templatable_mcp_manager
-                .as_ref(ctx)
-                .is_server_active_or_pending(*uuid)
-            {
-                log::debug!("MCP server {uuid} is already active or pending; skipping");
-                continue;
-            } else if templatable_mcp_manager
-                .as_ref(ctx)
-                .get_installed_server(uuid)
-                .is_some()
-            {
-                servers_to_start.insert(*uuid);
-            } else {
-                return Err(AgentDriverError::MCPServerNotFound(*uuid));
-            }
-        }
-
-        Ok(servers_to_start)
-    }
-
-    fn subscribe_to_mcp_managers(
-        &self,
-        tx: Sender<Result<(), AgentDriverError>>,
-        servers_to_start: HashSet<Uuid>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        use std::rc::Rc;
-
-        let templatable_mcp_manager = TemplatableMCPServerManager::handle(ctx);
-        let mcp_to_start = Rc::new(RefCell::new(servers_to_start));
-        let manager_clone = templatable_mcp_manager.clone();
-        let mut tx = Some(tx);
-        ctx.subscribe_to_model(
-            &templatable_mcp_manager,
-            move |_me, event, ctx| match event {
-                TemplatableMCPServerManagerEvent::StateChanged { uuid, state } => {
-                    let mut pending_ids = mcp_to_start.borrow_mut();
-                    if !pending_ids.contains(uuid) {
-                        return;
-                    }
-                    match state {
-                        MCPServerState::Running => {
-                            pending_ids.remove(uuid);
-                            if pending_ids.is_empty() {
-                                log::info!("All MCP servers started");
-                                if let Some(sender) = tx.take() {
-                                    let _ = sender.send(Ok(()));
-                                }
-                                ctx.unsubscribe_from_model(&manager_clone);
-                            }
-                        }
-                        MCPServerState::FailedToStart => {
-                            log::warn!("Failed to start MCP server {uuid}");
-                            if let Some(sender) = tx.take() {
-                                let _ = sender.send(Err(AgentDriverError::MCPStartupFailed));
-                            }
-                            ctx.unsubscribe_from_model(&manager_clone);
-                        }
-                        _ => {}
-                    }
-                }
-                TemplatableMCPServerManagerEvent::ServerInstallationAdded(_)
-                | TemplatableMCPServerManagerEvent::ServerInstallationDeleted(_)
-                | TemplatableMCPServerManagerEvent::TemplatableMCPServersUpdated
-                | TemplatableMCPServerManagerEvent::LegacyServerConverted => {}
-            },
-        );
-    }
-
-    fn spawn_inactive_servers(
-        &self,
-        servers_to_start: HashSet<Uuid>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let templatable_mcp_manager = TemplatableMCPServerManager::handle(ctx);
-        templatable_mcp_manager.update(ctx, |manager, ctx| {
-            for uuid in servers_to_start {
-                manager.spawn_server(uuid, ctx);
-            }
-        });
-    }
-
-    fn start_mcp_servers(
-        &self,
-        uuids: &[uuid::Uuid],
-        ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
-        let (tx, rx) = oneshot::channel();
-        let servers_to_start = match self.get_mcp_servers_to_start(uuids, ctx) {
-            Ok(val) => val,
-            Err(e) => {
-                return Either::Right(future::ready(Err(e)));
-            }
-        };
-
-        // If we don't need to start any servers, complete immediately.
-        if servers_to_start.is_empty() {
-            return Either::Right(future::ready(Ok(())));
-        }
-
-        log::info!("Starting {} MCP servers...", servers_to_start.len());
-
-        self.subscribe_to_mcp_managers(tx, servers_to_start.clone(), ctx);
-
-        self.spawn_inactive_servers(servers_to_start, ctx);
-
-        Either::Left(async move {
-            match rx.with_timeout(MCP_SERVER_STARTUP_TIMEOUT).await {
-                Ok(Ok(result)) => result,
-                Ok(Err(Canceled)) => {
-                    log::error!("Subscription dropped before MCP servers started");
-                    Err(AgentDriverError::InvalidRuntimeState)
-                }
-                Err(TimeoutError) => {
-                    log::error!("Timed out waiting for MCP servers to start");
-                    Err(AgentDriverError::MCPStartupFailed)
-                }
-            }
-        })
-    }
-
-    /// Start ephemeral MCP servers from inline JSON specifications.
-    /// These servers are not persisted and exist only for the duration of the agent run.
-    fn start_ephemeral_mcp_servers(
-        &self,
-        mut installations: Vec<TemplatableMCPServerInstallation>,
-        ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
-        if installations.is_empty() {
-            return Either::Right(future::ready(Ok(())));
-        }
-
-        // Inject secrets into the ephemeral MCP server installations.
-        for installation in installations.iter_mut() {
-            installation.apply_secrets(&self.secrets);
-        }
-
-        let (tx, rx) = oneshot::channel();
-        let mut tx = Some(tx);
-        let mut uuids_to_start: HashSet<Uuid> = installations.iter().map(|i| i.uuid()).collect();
-
-        log::info!("Starting {} ephemeral MCP servers...", installations.len());
-
-        // Subscribe to state changes for these ephemeral servers.
-        let templatable_mcp_manager = TemplatableMCPServerManager::handle(ctx);
-        let manager_clone = templatable_mcp_manager.clone();
-
-        ctx.subscribe_to_model(&templatable_mcp_manager, move |_me, event, ctx| {
-            if let TemplatableMCPServerManagerEvent::StateChanged { uuid, state } = event {
-                if !uuids_to_start.contains(uuid) {
-                    return;
-                }
-                match state {
-                    MCPServerState::Running => {
-                        uuids_to_start.remove(uuid);
-                        if uuids_to_start.is_empty() {
-                            log::info!("All ephemeral MCP servers started");
-                            if let Some(sender) = tx.take() {
-                                let _ = sender.send(Ok(()));
-                            }
-                            ctx.unsubscribe_from_model(&manager_clone);
-                        }
-                    }
-                    MCPServerState::FailedToStart => {
-                        log::warn!("Failed to start ephemeral MCP server {uuid}");
-                        if let Some(sender) = tx.take() {
-                            let _ = sender.send(Err(AgentDriverError::MCPStartupFailed));
-                        }
-                        ctx.unsubscribe_from_model(&manager_clone);
-                    }
-                    _ => {}
-                }
-            }
-        });
-
-        // Spawn the ephemeral servers.
-        templatable_mcp_manager.update(ctx, move |manager, ctx| {
-            for installation in installations {
-                manager.spawn_cli_ephemeral_server(installation, ctx);
-            }
-        });
-
-        Either::Left(async move {
-            match rx.with_timeout(MCP_SERVER_STARTUP_TIMEOUT).await {
-                Ok(Ok(result)) => result,
-                Ok(Err(Canceled)) => {
-                    log::error!("Subscription dropped before ephemeral MCP servers started");
-                    Err(AgentDriverError::InvalidRuntimeState)
-                }
-                Err(TimeoutError) => {
-                    log::error!("Timed out waiting for ephemeral MCP servers to start");
-                    Err(AgentDriverError::MCPStartupFailed)
-                }
-            }
-        })
-    }
-
-    /// Subscribe to [`FileBasedMCPManagerEvent::CloudEnvMcpScanComplete`]
-    /// paths and return a receiver that fires with all discovered server UUIDs once every repo
-    /// reports in. Must be called **before** `prepare_environment` so no events are missed.
-    fn setup_file_based_mcp_discovery(
-        &self,
-        expected_repos: Vec<PathBuf>,
-        ctx: &mut ModelContext<Self>,
-    ) -> Receiver<Vec<Uuid>> {
-        let (tx, rx) = oneshot::channel::<Vec<Uuid>>();
-
-        if expected_repos.is_empty() {
-            let _ = tx.send(vec![]);
-            return rx;
-        }
-
-        log::info!(
-            "Waiting for {} cloud environment repo(s) to report back file-based MCP server UUIDs...",
-            expected_repos.len()
-        );
-
-        let mut tx = Some(tx);
-        let mut pending_repos: HashSet<PathBuf> = HashSet::from_iter(expected_repos);
-        let mut collected_uuids = Vec::<Uuid>::new();
-
-        let file_based_mcp_manager = FileBasedMCPManager::handle(ctx);
-        let manager_clone = file_based_mcp_manager.clone();
-
-        ctx.subscribe_to_model(&file_based_mcp_manager, move |_me, event, ctx| {
-            if let FileBasedMCPManagerEvent::CloudEnvMcpScanComplete {
-                repo_path,
-                server_uuids,
-            } = event
-            {
-                if pending_repos.remove(repo_path) {
-                    collected_uuids.extend(server_uuids.iter().copied());
-                    log::info!(
-                        "Found file-based MCP server UUIDs in repo {repo_path:?}: {server_uuids:?}"
-                    );
-                    // If we've received all UUIDs from all cloud environment repos, send it back to the caller
-                    // and begin waiting for file-based MCP initialization.
-                    if pending_repos.is_empty() {
-                        let uuids = collected_uuids.clone();
-                        if let Some(sender) = tx.take() {
-                            log::info!("Waiting for file-based MCP servers to reach a terminal state: {uuids:?}");
-                            let _ = sender.send(uuids);
-                        }
-                        ctx.unsubscribe_from_model(&manager_clone);
-                    }
-                }
-            }
-        });
-
-        rx
-    }
-
-    /// Wait for all file-based MCP servers with the given UUIDs to reach a terminal state
-    /// (`Running` or `FailedToStart`). Non-fatal: always completes without returning an error.
-    ///
-    /// **Sequencing note:** `AgentDriver` supports only one active subscription to
-    /// [`TemplatableMCPServerManager`] at a time. This function, [`Self::start_mcp_servers`],
-    /// and [`Self::start_ephemeral_mcp_servers`] must therefore run sequentially, never
-    /// concurrently.
-    fn wait_for_file_based_mcps_running(
-        &self,
-        uuids: Vec<Uuid>,
-        ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = ()> {
-        // Filter out UUIDs that have already reached a terminal state.
-        let mut pending_uuids: HashSet<Uuid> = {
-            let templatable_manager = TemplatableMCPServerManager::as_ref(ctx);
-            uuids
-                .into_iter()
-                .filter(|uuid| {
-                    !matches!(
-                        templatable_manager.get_server_state(*uuid),
-                        Some(MCPServerState::Running) | Some(MCPServerState::FailedToStart)
-                    )
-                })
-                .collect()
-        };
-
-        if pending_uuids.is_empty() {
-            log::info!("All file-based MCP servers are already running; proceeding");
-            return Either::Right(future::ready(()));
-        }
-
-        let (tx, rx) = oneshot::channel::<()>();
-        let mut tx = Some(tx);
-
-        let templatable_manager_handle = TemplatableMCPServerManager::handle(ctx);
-        let manager_clone = templatable_manager_handle.clone();
-
-        ctx.subscribe_to_model(&templatable_manager_handle, move |_me, event, ctx| {
-            if let TemplatableMCPServerManagerEvent::StateChanged { uuid, state } = event {
-                if !pending_uuids.contains(uuid) {
-                    return;
-                }
-                match state {
-                    MCPServerState::Running | MCPServerState::FailedToStart => {
-                        pending_uuids.remove(uuid);
-                    }
-                    _ => {
-                        return;
-                    }
-                }
-                if pending_uuids.is_empty() {
-                    log::info!("All file-based MCP servers reached a terminal state; proceeding");
-                    if let Some(sender) = tx.take() {
-                        let _ = sender.send(());
-                    }
-                    ctx.unsubscribe_from_model(&manager_clone);
-                }
-            }
-        });
-
-        Either::Left(async move {
-            match rx.with_timeout(MCP_SERVER_STARTUP_TIMEOUT).await {
-                Ok(Ok(())) => {}
-                Ok(Err(Canceled)) => {
-                    log::warn!(
-                        "File-based MCP server readiness subscription dropped early; proceeding"
-                    );
-                }
-                Err(TimeoutError) => {
-                    log::warn!(
-                        "Timed out waiting for file-based MCP servers to reach a terminal state; proceeding without"
-                    );
-                }
-            }
-        })
-    }
-
     /// Runs the agent to completion.
     /// Driving the agent mostly requires main-thread UI framework updates, but using `async` and
     /// a `ModelSpawner` lets us express the high-level process linearly rather than in a
@@ -1187,12 +745,6 @@ impl AgentDriver {
 
         if let Some(environment) = environment_opt {
             log::info!("Loading environment...");
-            let environment_github_repos = environment.github_repos.clone();
-
-            // File-based MCP discovery used to be Oz-only and has been removed
-            // along with the Oz harness. Third-party harnesses will need their
-            // own MCP setup (TODO REMOTE-1345).
-            let file_based_discovery_rx: Option<futures::channel::oneshot::Receiver<Vec<uuid::Uuid>>> = None;
 
             let harness = task.harness.harness();
             foreground
@@ -1212,45 +764,6 @@ impl AgentDriver {
                 .await
                 .map_err(AgentDriverError::from)?;
 
-            if let Some(file_based_discovery_rx) = file_based_discovery_rx {
-                // Await discovery: collect UUIDs of file-based MCP servers found in cloned repos.
-                let discovered_uuids = match file_based_discovery_rx
-                    .with_timeout(MCP_SERVER_STARTUP_TIMEOUT)
-                    .await
-                {
-                    Ok(Ok(uuids)) => uuids,
-                    Ok(Err(Canceled)) => {
-                        log::warn!(
-                            "File-based MCP discovery subscription dropped early; proceeding without"
-                        );
-                        vec![]
-                    }
-                    Err(TimeoutError) => {
-                        log::warn!(
-                            "Timed out waiting for file-based MCP servers to be parsed; proceeding without"
-                        );
-                        vec![]
-                    }
-                };
-
-                // Wait for discovered servers to reach Running (non-fatal: always unblocks).
-                if !discovered_uuids.is_empty() {
-                    log::info!(
-                        "Waiting for {} file-based MCP server(s) to reach a terminal state",
-                        discovered_uuids.len()
-                    );
-                    foreground
-                        .spawn(move |me, ctx| {
-                            me.wait_for_file_based_mcps_running(discovered_uuids, ctx)
-                        })
-                        .await?
-                        .await;
-                }
-            }
-
-            // Repo-skill loading from cloud environments was Oz-only and has
-            // been removed. Third-party harnesses use their own skill systems.
-            let _ = environment_github_repos;
         }
 
         // Run the harness with a prompt
@@ -1455,82 +968,6 @@ impl AgentDriver {
             Err(AgentDriverError::HarnessCommandFailed {
                 exit_code: exit_code.value(),
             })
-        }
-    }
-
-    /// Configure the active terminal session with the specified profile.
-    fn configure_terminal(
-        &self,
-        profile: Option<String>,
-        ctx: &mut ModelContext<Self>,
-    ) -> Result<(), AgentDriverError> {
-        let terminal_id = self.terminal_driver.as_ref(ctx).terminal_view().id();
-
-        if let Some(profile) = profile {
-            let server_id = ServerId::try_from(profile.as_str())
-                .map_err(|_| AgentDriverError::ProfileError(profile.clone()))?;
-            let sync_id = SyncId::ServerId(server_id);
-            AIExecutionProfilesModel::handle(ctx).update(ctx, |model, ctx| {
-                if let Some(profile_id) = model.get_profile_id_by_sync_id(&sync_id) {
-                    model.set_active_profile(terminal_id, profile_id, ctx);
-                } else {
-                    return Err(AgentDriverError::ProfileError(profile.clone()));
-                }
-                Ok(())
-            })?;
-        }
-
-        Ok(())
-    }
-
-    fn set_base_model_override(
-        &self,
-        model_id: LLMId,
-        ctx: &mut ModelContext<Self>,
-    ) -> Result<(), AgentDriverError> {
-        let terminal_view_id = self.terminal_driver.as_ref(ctx).terminal_view().id();
-        log::info!("Selecting base agent model {model_id} (from agent driver)");
-
-        LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
-            preferences.update_preferred_agent_mode_llm(&model_id, terminal_view_id, ctx);
-        });
-        Ok(())
-    }
-
-
-    /// Write the inputs to an exchange to stdout.
-    fn write_exchange_inputs(&self, exchange: &AIAgentExchange) -> io::Result<()> {
-        output::with_stdout_buffered(|buf| {
-            for input in &exchange.input {
-                self.write_input(buf, input)?;
-            }
-            Ok(())
-        })
-    }
-
-    /// Write the outputs of an exchange to stdout.
-    fn write_exchange_output(&self, exchange: &AIAgentExchange) -> io::Result<()> {
-        let Some(shared) = exchange.output_status.output() else {
-            return Ok(());
-        };
-        let output = shared.get();
-
-        output::with_stdout_buffered(|buf| self.write_output(buf, &output))
-    }
-
-    /// Format an agent input for display.
-    fn write_input<W: Write>(&self, w: &mut W, input: &AIAgentInput) -> io::Result<()> {
-        match self.output_format {
-            OutputFormat::Json | OutputFormat::Ndjson => output::json::format_input(input, w),
-            OutputFormat::Text | OutputFormat::Pretty => output::text::format_input(input, w),
-        }
-    }
-
-    /// Format an agent output for display.
-    fn write_output<W: Write>(&self, w: &mut W, output: &AIAgentOutput) -> io::Result<()> {
-        match self.output_format {
-            OutputFormat::Json | OutputFormat::Ndjson => output::json::format_output(output, w),
-            OutputFormat::Text | OutputFormat::Pretty => output::text::format_output(output, w),
         }
     }
 

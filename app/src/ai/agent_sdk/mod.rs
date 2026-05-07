@@ -390,11 +390,9 @@ fn build_merged_config_and_task(
         }
     };
 
+    let _ = (model_override, runtime_mcp_specs);
     let task = Task {
         prompt: AgentRunPrompt::Local(resolve_prompt(&local_prompt, ctx)?),
-        model: model_override,
-        profile: args.profile.clone(),
-        mcp_specs: runtime_mcp_specs,
         harness: harness_kind(args.harness)?,
     };
 
@@ -447,14 +445,12 @@ fn build_server_side_task(
 
     let skill = resolved_skill.as_ref().map(|s| s.parsed_skill.clone());
 
+    let _ = (model_override, profile, runtime_mcp_specs);
     let task = Task {
         prompt: AgentRunPrompt::ServerSide {
             skill,
             attachments_dir: None,
         },
-        model: model_override,
-        profile,
-        mcp_specs: runtime_mcp_specs,
         harness: harness_kind(args.harness)?,
     };
 
