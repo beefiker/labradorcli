@@ -272,16 +272,20 @@ fn generate_commit_message(
 ) {
     let repo_path = repo_path.to_path_buf();
     let branch_name = branch_name.to_string();
+    let preference = crate::settings::AISettings::as_ref(ctx).default_local_provider();
 
     ctx.spawn(
         async move {
             let diff = get_diff_for_commit_message(&repo_path, include_unstaged).await?;
-            let generated = generate_locally(GenerateCodeReviewContentRequest {
-                output_type: OutputType::CommitMessage,
-                diff,
-                branch_name,
-                commit_messages: Vec::new(),
-            })
+            let generated = generate_locally(
+                GenerateCodeReviewContentRequest {
+                    output_type: OutputType::CommitMessage,
+                    diff,
+                    branch_name,
+                    commit_messages: Vec::new(),
+                },
+                preference,
+            )
             .await?
             .content;
             if generated.trim().is_empty() {
@@ -371,6 +375,7 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
     let intent = state.intent;
     let include_unstaged = state.include_unstaged;
     let ai_autogen_enabled = should_send_git_ops_ai_request(ctx);
+    let preference = crate::settings::AISettings::as_ref(ctx).default_local_provider();
     let message_editor = state.message_editor.clone();
     let repo_path = me.repo_path().clone();
     let branch_name = me.branch_name().to_string();
@@ -401,7 +406,13 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
                         // Reuse pr.rs's AI-title/body-with-fallback helper so
                         // the standalone PR flow and this chain always produce
                         // PRs the same way.
-                        create_pr_with_ai_content(&repo_path, &branch_name, path_env_ref).await?
+                        create_pr_with_ai_content(
+                            &repo_path,
+                            &branch_name,
+                            preference,
+                            path_env_ref,
+                        )
+                        .await?
                     } else {
                         // AI autogen disabled (global toggle, per-feature
                         // toggle, or enterprise) — skip AI entirely and use

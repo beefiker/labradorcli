@@ -1464,6 +1464,18 @@ define_settings_group!(AISettings, settings: [
         private: false,
         toml_path: "agents.warp_agent.other.agent_attribution_enabled",
         description: "Whether the Dwarf Agent adds an attribution co-author line to commit messages and pull requests it creates.",
+    },
+    // Which local CLI agent dwarf prefers when both `codex` and `claude` are
+    // installed. Stored as a lowercase string ("codex" | "claude"); read via
+    // the `default_local_provider()` getter on `AISettings`.
+    default_local_provider_internal: DefaultLocalProvider {
+        type: String,
+        default: "codex".to_string(),
+        supported_platforms: SupportedPlatforms::ALL,
+        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
+        private: false,
+        toml_path: "agents.warp_agent.local.default_provider",
+        description: "Preferred local CLI agent when multiple are installed (codex | claude).",
     }
 ]);
 
@@ -1483,6 +1495,17 @@ impl AISettings {
                 }
             });
         });
+    }
+
+    /// User's preferred local CLI agent when both `codex` and `claude` are
+    /// installed. Returns the parsed value; defaults to `Provider::Codex` if
+    /// the stored string is empty or unrecognized.
+    pub fn default_local_provider(&self) -> crate::ai::local_llm::Provider {
+        use crate::ai::local_llm::Provider;
+        match self.default_local_provider_internal.trim().to_ascii_lowercase().as_str() {
+            "claude" => Provider::Claude,
+            _ => Provider::Codex,
+        }
     }
 
     pub fn is_ai_disabled_due_to_remote_session_org_policy(&self, app: &AppContext) -> bool {

@@ -168,8 +168,8 @@ impl PassiveSuggestionsModel {
         // the streaming pipeline entirely and emits a one-shot prompt
         // suggestion. Code-diff suggestions are not produced on the local
         // path (punted to a follow-up phase).
-        // TODO(phase-4): read default_preference from AISettings.
-        if let Some(provider) = resolve_local_provider(LocalProvider::Codex) {
+        let preference = AISettings::as_ref(ctx).default_local_provider();
+        if let Some(provider) = resolve_local_provider(preference) {
             self.send_local_request(provider, followup_conversation_id, trigger, ctx);
             return;
         }

@@ -20,12 +20,13 @@ const SYSTEM_PROMPT: &str =
 ///
 /// Replaces the previous hosted-server endpoint
 /// (`POST /ai/generate_code_review_content`) so dwarf can produce this content
-/// without depending on Warp's backend.
+/// without depending on Warp's backend. Callers pass `preference` from
+/// `AISettings::default_local_provider()` (callers run inside a ctx; this
+/// function is a plain async fn without one).
 pub async fn generate_locally(
     req: GenerateCodeReviewContentRequest,
+    preference: Provider,
 ) -> Result<GenerateCodeReviewContentResponse, LocalLLMError> {
-    // TODO(phase-4): read the user's preferred provider from AISettings.
-    let preference = Provider::Codex;
     let one_shot = build_one_shot(preference).ok_or(LocalLLMError::CliNotInstalled {
         binary: preference.binary_name(),
     })?;

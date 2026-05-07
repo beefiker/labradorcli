@@ -129,13 +129,15 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
     me.set_loading(loading_label_for(), ctx);
 
     let use_ai = should_send_git_ops_ai_request(ctx);
+    let preference = crate::settings::AISettings::as_ref(ctx).default_local_provider();
     let path_future = interactive_path_future(ctx);
 
     ctx.spawn(
         async move {
             let path_env = path_future.await;
             if use_ai {
-                create_pr_with_ai_content(&repo_path, &branch_name, path_env.as_deref()).await
+                create_pr_with_ai_content(&repo_path, &branch_name, preference, path_env.as_deref())
+                    .await
             } else {
                 create_pr(&repo_path, None, None, path_env.as_deref()).await
             }
@@ -173,6 +175,7 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
 pub(super) async fn create_pr_with_ai_content(
     repo_path: &Path,
     branch_name: &str,
+    preference: crate::ai::local_llm::Provider,
     path_env: Option<&str>,
 ) -> anyhow::Result<PrInfo> {
     let diff = get_diff_for_pr(repo_path).await?;
@@ -193,7 +196,10 @@ pub(super) async fn create_pr_with_ai_content(
         commit_messages,
     };
 
-    match futures::try_join!(generate_locally(title_req), generate_locally(body_req)) {
+    match futures::try_join!(
+        generate_locally(title_req, preference),
+        generate_locally(body_req, preference),
+    ) {
         Ok((title_resp, body_resp))
             if !title_resp.content.trim().is_empty() && !body_resp.content.trim().is_empty() =>
         {
