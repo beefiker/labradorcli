@@ -50,7 +50,6 @@ use crate::workflows::{WorkflowSelectionSource, WorkflowSource, WorkflowType};
 use crate::workspace::{ForkedConversationDestination, ToastStack, WorkspaceAction};
 use crate::TelemetryEvent;
 #[cfg(not(target_family = "wasm"))]
-use warp_cli::agent::Harness;
 #[cfg(not(target_family = "wasm"))]
 use warpui::AppContext;
 

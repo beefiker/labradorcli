@@ -27,7 +27,6 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::terminal::model::session::SessionType;
 #[cfg(not(target_family = "wasm"))]
-use warp_cli::agent::Harness;
 use warp_core::ui::Icon as WarpIcon;
 
 use super::AcceptSlashCommandOrSavedPrompt;

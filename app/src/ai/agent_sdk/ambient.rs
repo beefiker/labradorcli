@@ -28,7 +28,7 @@ use futures::{future, StreamExt};
 use serde::Serialize;
 
 use warp_cli::{
-    agent::{Harness, OutputFormat, Prompt, RunCloudArgs},
+    agent::{OutputFormat, Prompt, RunCloudArgs},
     json_filter::JsonOutput,
     task::{
         ArtifactTypeArg, ExecutionLocationArg, ListTasksArgs, MessageCommand, MessageDeliveredArgs,

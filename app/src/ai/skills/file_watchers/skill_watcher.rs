@@ -29,7 +29,7 @@ use repo_metadata::{
     repository::{Repository, SubscriberId},
     DirectoryWatcher, RepoMetadataModel, RepositoryUpdate,
 };
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 #[derive(Debug, PartialEq)]
 pub enum SkillWatcherEvent {

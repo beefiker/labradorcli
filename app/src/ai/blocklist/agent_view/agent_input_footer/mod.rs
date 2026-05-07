@@ -56,7 +56,6 @@ use crate::{
     workspaces::user_workspaces::UserWorkspaces,
 };
 use toolbar_item::AgentToolbarItemKind;
-use warp_cli::agent::Harness;
 
 use std::sync::Arc;
 
