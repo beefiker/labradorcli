@@ -15,10 +15,8 @@ use std::{
 };
 
 use crate::ai::blocklist::task_status_sync_model::TaskStatusSyncModel;
-use crate::ai::document::ai_document_model::{AIDocumentModel, AIDocumentModelEvent};
 use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::ai::mcp::MCPServerState;
-use crate::ai::skills::{SkillManager, SkillWatcher};
 use crate::ai::{
     agent::conversation::AIConversationId,
     agent_sdk::driver::harness::{
@@ -36,14 +34,8 @@ use crate::{
         agent::{
             AIAgentExchange, AIAgentInput, AIAgentOutput, CancellationReason, RenderableAIError,
         },
-        ambient_agents::{
-            conversation_output_status_from_conversation, AmbientAgentTaskId,
-            AmbientConversationStatus,
-        },
-        blocklist::{
-            agent_view::AgentViewEntryOrigin, BlocklistAIHistoryEvent, BlocklistAIHistoryModel,
-            BlocklistAIPermissions,
-        },
+        ambient_agents::AmbientAgentTaskId,
+        blocklist::BlocklistAIPermissions,
         cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironment},
         execution_profiles::profiles::AIExecutionProfilesModel,
         mcp::{
@@ -202,11 +194,9 @@ impl<T: Send + 'static> IdleTimeoutSender<T> {
 
 /// How to resume an existing conversation when starting an agent run.
 ///
-/// The Oz harness restores the full conversation transcript into the terminal pane and treats
-/// any new prompt as a follow-up; third-party harnesses round-trip a harness-specific payload
-/// (see [`ResumePayload`]) instead.
+/// Third-party harnesses round-trip a harness-specific payload
+/// (see [`ResumePayload`]) — the previous Oz variant has been removed.
 pub enum ResumeOptions {
-    Oz(Box<ConversationRestorationInNewPaneType>),
     ThirdParty(Box<ResumePayload>),
 }
 
@@ -287,31 +277,6 @@ pub struct AgentDriver {
     /// when building the runner and taken back to `None` after use so subsequent runs start
     /// fresh.
     resume_payload: Option<ResumePayload>,
-}
-
-pub(crate) enum SDKConversationOutputStatus {
-    Success,
-    Error { error: RenderableAIError },
-    Cancelled { reason: CancellationReason },
-    Blocked { blocked_action: String },
-}
-
-impl SDKConversationOutputStatus {
-    pub fn into_result(self) -> Result<(), AgentDriverError> {
-        match self {
-            SDKConversationOutputStatus::Success => Ok(()),
-            SDKConversationOutputStatus::Error { error } => {
-                Err(AgentDriverError::ConversationError { error })
-            }
-            // NOTE: this doesn't happen in the SDK (yet) because CTRL+C kills the whole program.
-            SDKConversationOutputStatus::Cancelled { reason } => {
-                Err(AgentDriverError::ConversationCancelled { reason })
-            }
-            SDKConversationOutputStatus::Blocked { blocked_action } => {
-                Err(AgentDriverError::ConversationBlocked { blocked_action })
-            }
-        }
-    }
 }
 
 /// Task configuration for running an agent.
@@ -482,11 +447,10 @@ impl AgentDriver {
             snapshot_script_timeout,
         } = options;
 
-        // Split the unified resume option into the two internal slots that the rest of
-        // the driver consumes: terminal-driven Oz transcript restoration vs. third-party
-        // harness payload rehydration.
-        let (conversation_restoration, resume_payload) = match resume {
-            Some(ResumeOptions::Oz(restoration)) => (Some(*restoration), None),
+        let (conversation_restoration, resume_payload): (
+            Option<ConversationRestorationInNewPaneType>,
+            Option<ResumePayload>,
+        ) = match resume {
             Some(ResumeOptions::ThirdParty(payload)) => (None, Some(*payload)),
             None => (None, None),
         };
@@ -1537,334 +1501,6 @@ impl AgentDriver {
         Ok(())
     }
 
-    /// Execute an AI run in the terminal session and wait for it to complete.
-    ///
-    /// Conversation output is streamed as it's available.
-    fn execute_run(
-        &self,
-        task_prompt: AgentRunPrompt,
-        ctx: &mut ModelContext<Self>,
-    ) -> Receiver<SDKConversationOutputStatus> {
-        // Create a oneshot channel to signal task completion.
-        let (tx, rx) = oneshot::channel();
-        let run_exit = IdleTimeoutSender::new(tx);
-
-        // Subscribe before the conversation starts.
-        let history_model_handle = BlocklistAIHistoryModel::handle(ctx);
-        let terminal_id = self.terminal_driver.as_ref(ctx).terminal_view().id();
-        let mut written_conversation_id = false;
-
-        // Create shared storage for the conversation ID
-        let conversation_id_cell = Arc::new(Mutex::new(Option::<String>::None));
-        let conversation_id_cell_for_handler = Arc::clone(&conversation_id_cell);
-
-        // Get the server API from context
-        let server_api = ServerApiProvider::as_ref(ctx).get_ai_client();
-        let server_api_for_conversation_update = server_api.clone();
-        let task_id_for_conversation_update = self.task_id;
-
-        ctx.subscribe_to_model(&history_model_handle, move |me, event, ctx| {
-            if event.terminal_view_id().is_some_and(|id| id != terminal_id) {
-                return;
-            }
-
-            match event {
-                BlocklistAIHistoryEvent::UpdatedTodoList { .. } => {
-                    // TODO: Log TODO list updates.
-                }
-                BlocklistAIHistoryEvent::AppendedExchange {
-                    exchange_id,
-                    conversation_id,
-                    ..
-                } => {
-                    let Some(conversation) = BlocklistAIHistoryModel::as_ref(ctx)
-                        .conversation(conversation_id)
-                    else {
-                        log::warn!("Invalid conversation ID: {conversation_id:?}");
-                        return;
-                    };
-
-                    let Some(exchange) = conversation.exchange_with_id(*exchange_id) else {
-                        log::warn!("Invalid exchange ID: {exchange_id:?}");
-                        return;
-                    };
-
-                    // When a new exchange is appended, we should already have its inputs available.
-                    report_if_error!(me
-                        .write_exchange_inputs(exchange)
-                        .context("Failed to write exchange inputs"));
-
-                    // Reset the idle timer only if we've already scheduled one.
-                    // This handles the case where a follow-up query creates new exchanges after
-                    // the conversation has finished and an idle timer was set.
-                    run_exit.cancel_idle_timeout();
-                }
-                BlocklistAIHistoryEvent::UpdatedStreamingExchange {
-                    exchange_id,
-                    conversation_id,
-                    ..
-                } => {
-                    // Get conversation data first to avoid borrowing conflicts
-                    let history_model = BlocklistAIHistoryModel::handle(ctx);
-                    let conversation_data = history_model.as_ref(ctx).conversation(conversation_id)
-                        .and_then(|conv| {
-                            let token = conv.server_conversation_token().map(|t| t.as_str().to_string());
-                            let exchange = conv.exchange_with_id(*exchange_id)?;
-                            Some((token, exchange))
-                        });
-                    let Some((token_opt, exchange)) = conversation_data else {
-                        log::warn!("Invalid conversation or exchange ID: {conversation_id:?}, {exchange_id:?}");
-                        return;
-                    };
-
-                    // Track whether we should spawn an async task to update the server.
-                    let mut pending_conversation_update: Option<String> = None;
-
-                    if !written_conversation_id {
-                        if let Some(token) = token_opt {
-                            report_if_error!(output::with_stdout_buffered(|buf| match me.output_format {
-                                OutputFormat::Json | OutputFormat::Ndjson => output::json::conversation_started(&token, buf),
-                                OutputFormat::Text | OutputFormat::Pretty => output::text::conversation_started(&token, buf),
-                            }).context("Failed to write conversation ID"));
-                            written_conversation_id = true;
-
-                            // Store the server conversation token and record that we should update the task
-                            if let Ok(mut guard) = conversation_id_cell_for_handler.lock() {
-                                *guard = Some(token.clone());
-
-                                if task_id_for_conversation_update.is_some() {
-                                    pending_conversation_update = Some(token);
-                                }
-                            }
-                        }
-                    }
-
-                    // Once the outputs are fully streamed from the server, write them to stdout.
-                    if exchange.output_status.is_finished() {
-                        report_if_error!(me
-                            .write_exchange_output(exchange)
-                            .context("Failed to write exchange output"));
-                    }
-
-                    // Perform task update after all immutable borrows end
-                    if let (Some(task_id), Some(conversation_id_str)) = (
-                        task_id_for_conversation_update,
-                        pending_conversation_update,
-                    ) {
-                        let server_api = server_api_for_conversation_update.clone();
-                        ctx.spawn(
-                            async move {
-                                if let Err(e) = server_api
-                                    .update_agent_task(
-                                        task_id,
-                                        None, // Don't change state, just update conversation ID
-                                        None, // Don't update session_id from CLI context
-                                        Some(conversation_id_str),
-                                        None,
-                                    )
-                                    .await
-                                {
-                                    log::error!("Failed to update agent task with conversation ID: {e}");
-                                }
-                            },
-                            |_, _, _| {},
-                        );
-                    }
-                }
-
-                BlocklistAIHistoryEvent::UpdatedConversationStatus { terminal_view_id: conversation_terminal_id, conversation_id, .. } => {
-                    if *conversation_terminal_id != terminal_id {
-                        return;
-                    }
-                    let history_model = BlocklistAIHistoryModel::as_ref(ctx);
-                    let Some(conversation) = history_model.conversation(conversation_id) else {
-                        log::warn!("No active conversation for terminal view {conversation_terminal_id} with id {conversation_id}");
-                        return;
-                    };
-
-                    if conversation.status().is_in_progress() {
-                        // Conversation resumed or a new one started; cancel any pending idle timeout.
-                        run_exit.cancel_idle_timeout();
-                        return;
-                    }
-
-                    // Conversation is no longer in progress. Handle completion based on the result.
-                    if let Some(conversation_status) =
-                         conversation_output_status_from_conversation(conversation)
-                    {
-                        let output_status = match conversation_status {
-                            AmbientConversationStatus::Success => {
-                                SDKConversationOutputStatus::Success
-                            }
-                            AmbientConversationStatus::Cancelled { reason } => {
-                                SDKConversationOutputStatus::Cancelled { reason }
-                            }
-                            AmbientConversationStatus::Error { error } => {
-                                SDKConversationOutputStatus::Error { error }
-                            }
-                            AmbientConversationStatus::Blocked { blocked_action } => {
-                                SDKConversationOutputStatus::Blocked { blocked_action }
-                            }
-                        };
-
-                        match output_status {
-                            SDKConversationOutputStatus::Success
-                            | SDKConversationOutputStatus::Blocked { .. }
-                            | SDKConversationOutputStatus::Cancelled { .. } => {
-                                // Whether to keep the process alive after completion is controlled by
-                                // the `warp agent run --idle-on-complete[=<DURATION>]` flag.
-                                if let Some(idle_timeout) = me.idle_on_complete {
-                                    run_exit.end_run_after(idle_timeout, output_status);
-                                } else {
-                                    run_exit.end_run_now(output_status);
-                                }
-                            }
-                            // For errors, check if we expect an automatic retry.
-                            SDKConversationOutputStatus::Error { ref error } => {
-                                // If the error indicates that an automatic resume will be attempted,
-                                // don't terminate yet - give the retry a chance to succeed.
-                                // However, bound the wait so the CLI doesn't hang indefinitely
-                                // if the follow-up never arrives.
-                                if error.will_attempt_resume() {
-                                    log::info!("Error occurred but automatic resume will be attempted; waiting up to {AUTO_RESUME_TIMEOUT:?} for retry");
-                                    run_exit.end_run_after(AUTO_RESUME_TIMEOUT, output_status);
-                                    return;
-                                }
-
-                                run_exit.end_run_now(output_status);
-                            }
-                        }
-                    }
-                }
-
-                BlocklistAIHistoryEvent::SetActiveConversation { .. } => {
-                    // Continuing an existing conversation should reset the idle timer.
-                    run_exit.cancel_idle_timeout();
-                }
-                BlocklistAIHistoryEvent::StartedNewConversation { .. }
-                | BlocklistAIHistoryEvent::ReassignedExchange { .. }
-                | BlocklistAIHistoryEvent::ClearedConversationsInTerminalView { .. }
-                | BlocklistAIHistoryEvent::UpdatedAutoexecuteOverride { .. }
-                | BlocklistAIHistoryEvent::SplitConversation { .. }
-                | BlocklistAIHistoryEvent::RemoveConversation { .. }
-                | BlocklistAIHistoryEvent::DeletedConversation { .. }
-                | BlocklistAIHistoryEvent::RestoredConversations { .. }
-                | BlocklistAIHistoryEvent::CreatedSubtask { .. }
-                | BlocklistAIHistoryEvent::UpgradedTask { .. }
-                | BlocklistAIHistoryEvent::UpdatedConversationMetadata { .. }
-                | BlocklistAIHistoryEvent::ClearedActiveConversation { .. }
-                | BlocklistAIHistoryEvent::UpdatedConversationArtifacts { .. }
-                | BlocklistAIHistoryEvent::ConversationServerTokenAssigned { .. } => (),
-            }
-        });
-
-        // Subscribe to document model events to emit artifact_created when plans sync to Dwarf Drive.
-        ctx.subscribe_to_model(&AIDocumentModel::handle(ctx), move |me, event, ctx| {
-            let AIDocumentModelEvent::DocumentSaveStatusUpdated(document_id) = event else {
-                return;
-            };
-
-            let doc_model = AIDocumentModel::as_ref(ctx);
-
-            // Only emit when the document transitions to "Saved" (has a ServerId)
-            if !doc_model.get_document_save_status(document_id).is_saved() {
-                return;
-            }
-
-            // Get the document to extract the notebook link
-            let Some(document) = doc_model.get_current_document(document_id) else {
-                return;
-            };
-
-            // Get the notebook link from the document model
-            let Some(notebook_link) =
-                doc_model.get_document_warp_drive_object_link(document_id, ctx)
-            else {
-                return;
-            };
-
-            let document_id_str = document_id.to_string();
-
-            report_if_error!(output::with_stdout_buffered(|buf| {
-                match me.output_format {
-                    OutputFormat::Json | OutputFormat::Ndjson => {
-                        output::json::plan_artifact_created(
-                            &document_id_str,
-                            &notebook_link,
-                            &document.title,
-                            buf,
-                        )
-                    }
-                    OutputFormat::Text | OutputFormat::Pretty => {
-                        output::text::plan_artifact_created(
-                            &document_id_str,
-                            &notebook_link,
-                            &document.title,
-                            buf,
-                        )
-                    }
-                }
-            })
-            .context("Failed to write artifact_created"));
-        });
-
-        // Submit the AI query.
-        // If we restored a conversation from --conversation, use that conversation ID
-        // so the prompt is sent as a follow-up to the restored conversation.
-        let restored_conversation_id = self.restored_conversation_id;
-        self.terminal_driver.update(ctx, |td, ctx| {
-            td.with_terminal_view(ctx, |terminal, ctx| match task_prompt {
-                AgentRunPrompt::Local(prompt_str) => {
-                    if FeatureFlag::AgentView.is_enabled() {
-                        terminal.enter_agent_view(
-                            Some(prompt_str),
-                            restored_conversation_id,
-                            AgentViewEntryOrigin::Cli,
-                            ctx,
-                        );
-                    } else {
-                        terminal.set_ai_input_mode_with_query(Some(&prompt_str), ctx);
-                        terminal
-                            .input()
-                            .update(ctx, |input, ctx| input.input_enter(ctx));
-                    }
-                }
-                AgentRunPrompt::ServerSide {
-                    skill,
-                    attachments_dir,
-                } => {
-                    let Some(task_id) = self.task_id else {
-                        log::error!("ServerSide prompt without task_id");
-                        return;
-                    };
-                    let ambient_run_id = task_id.to_string();
-
-                    if FeatureFlag::AgentView.is_enabled() {
-                        terminal.enter_agent_view(
-                            None,
-                            restored_conversation_id,
-                            AgentViewEntryOrigin::Cli,
-                            ctx,
-                        );
-                    }
-
-                    terminal.ai_controller().update(ctx, |controller, ctx| {
-                        controller.send_ai_input_with_context(
-                            |context| AIAgentInput::StartFromAmbientRunPrompt {
-                                ambient_run_id: ambient_run_id.clone(),
-                                context,
-                                runtime_skill: skill.clone(),
-                                attachments_dir: attachments_dir.clone(),
-                            },
-                            ctx,
-                        );
-                    });
-                }
-            })
-        });
-
-        rx
-    }
 
     /// Write the inputs to an exchange to stdout.
     fn write_exchange_inputs(&self, exchange: &AIAgentExchange) -> io::Result<()> {
