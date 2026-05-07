@@ -268,15 +268,6 @@ impl TerminalDriver {
         &self.terminal_view
     }
 
-    /// Provide mutable access to the terminal view through a closure.
-    pub fn with_terminal_view(
-        &self,
-        ctx: &mut ModelContext<Self>,
-        f: impl FnOnce(&mut TerminalView, &mut warpui::ViewContext<TerminalView>),
-    ) {
-        self.terminal_view.update(ctx, f);
-    }
-
     /// Request that the terminal session be shared with the given participants.
     ///
     /// This has no effect if the session is not being shared.

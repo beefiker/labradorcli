@@ -5,8 +5,6 @@ pub mod text {
         io::{self, Write},
     };
 
-    const CANCELLED_MESSAGE: &str = "<cancelled>";
-
     use ai::agent::action_result::{FetchConversationResult, ReadSkillResult, UseComputerResult};
     use itertools::Itertools;
 
@@ -1309,75 +1307,3 @@ where
     buf.flush()
 }
 
-fn format_agent_text<W: Write>(text: &AIAgentText, w: &mut W) -> io::Result<()> {
-    let mut wrote_newline = false;
-    for section in &text.sections {
-        match section {
-            AIAgentTextSection::PlainText { text } => {
-                write!(w, "{}", text.text())?;
-                wrote_newline = text.text().ends_with('\n');
-            }
-            AIAgentTextSection::Code {
-                code,
-                language,
-                source,
-            } => {
-                write!(w, "```")?;
-                if let Some(language) = language {
-                    write!(w, "{}", language.display_name())?;
-                }
-
-                match source {
-                    Some(CodeSource::ProjectRules { path }) => {
-                        writeln!(w, " rules_path={}", path.display())?;
-                    }
-                    Some(CodeSource::Link {
-                        path,
-                        range_start,
-                        range_end,
-                    }) => {
-                        write!(w, " path={}", path.display())?;
-
-                        if let Some(start) = range_start {
-                            write!(w, " start={}", start.line_num)?;
-                        }
-
-                        if let Some(end) = range_end {
-                            write!(w, " end={}", end.line_num)?;
-                        }
-
-                        writeln!(w)?;
-                    }
-                    Some(CodeSource::Skill { path, .. }) => {
-                        writeln!(w, " skill_path={}", path.display())?;
-                    }
-                    Some(CodeSource::AIAction { .. })
-                    | Some(CodeSource::New { .. })
-                    | Some(CodeSource::FileTree { .. })
-                    | Some(CodeSource::Finder { .. })
-                    | None => {}
-                }
-
-                writeln!(w, "{code}\n```",)?;
-                wrote_newline = true;
-            }
-            AIAgentTextSection::Table { table } => {
-                write!(w, "{}", table.markdown_source)?;
-                wrote_newline = table.markdown_source.ends_with('\n');
-            }
-            AIAgentTextSection::Image { image } => {
-                write!(w, "{}", image.markdown_source)?;
-                wrote_newline = image.markdown_source.ends_with('\n');
-            }
-            AIAgentTextSection::MermaidDiagram { diagram } => {
-                write!(w, "{}", diagram.markdown_source)?;
-                wrote_newline = diagram.markdown_source.ends_with('\n');
-            }
-        }
-    }
-    if !wrote_newline {
-        writeln!(w)?;
-    }
-
-    Ok(())
-}

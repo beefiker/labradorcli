@@ -114,12 +114,6 @@ impl SkillManager {
         }
     }
 
-    /// Marks this manager as running in a cloud environment, enabling all
-    /// directory skills to be in scope regardless of the current working directory.
-    pub fn set_cloud_environment(&mut self, value: bool) {
-        self.is_cloud_environment = value;
-    }
-
     /// Returns skills available for the given working directory.
     pub fn get_skills_for_working_directory(
         &self,
