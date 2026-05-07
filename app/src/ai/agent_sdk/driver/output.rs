@@ -1,3 +1,14 @@
+// Oz-leftover: many of the formatters in this module (format_input,
+// format_output, conversation_started, plan_artifact_created, format_todos,
+// format_queries, the Json* enum variants, and the JsonMessage::from_* impls)
+// were only called by AgentDriver::execute_run, which was removed when the Oz
+// dispatch path went away. Still-used entry points are run_started,
+// shared_session_established, with_stdout_buffered, standard_table, print_list,
+// write_json, write_json_line, and print_raw_json. The dead surface is left in
+// place under #[allow(dead_code)] so the diff stays surgical; a future sweep
+// can prune it once we confirm nothing third-party reaches in.
+#![allow(dead_code)]
+
 pub mod text {
     use std::{
         collections::HashSet,

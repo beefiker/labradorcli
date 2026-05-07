@@ -645,6 +645,7 @@ impl TemplatableMCPServerManager {
     }
 
     /// Spawns an ephemeral MCP server started via the CLI (`oz agent run --mcp`).
+    #[allow(dead_code)] // only the deleted Oz dispatch path called this
     pub fn spawn_cli_ephemeral_server(
         &mut self,
         installation: TemplatableMCPServerInstallation,

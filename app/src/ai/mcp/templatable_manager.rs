@@ -345,6 +345,7 @@ impl TemplatableMCPServerManager {
 pub enum TemplatableMCPServerManagerEvent {
     StateChanged {
         uuid: Uuid,
+        #[allow(dead_code)] // emitted but no live consumer post-Oz
         state: MCPServerState,
     },
     // TODO(aeybel) Right now most of the app doesn't use these events to communicate

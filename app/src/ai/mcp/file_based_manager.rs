@@ -450,7 +450,12 @@ pub enum FileBasedMCPManagerEvent {
         installation_hashes: Vec<u64>,
     },
     CloudEnvMcpScanComplete {
+        // Cloud-env file-based MCP discovery was Oz-only; the Oz dispatch
+        // path that consumed these fields has been removed. Variant retained
+        // because the event is still constructed by the watcher.
+        #[allow(dead_code)]
         repo_path: PathBuf,
+        #[allow(dead_code)]
         server_uuids: Vec<Uuid>,
     },
 }

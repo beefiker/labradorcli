@@ -272,6 +272,7 @@ pub enum AgentRunPrompt {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[allow(dead_code)] // some MCP* / cloud-env-related variants are only constructed by deleted Oz paths
 pub enum AgentDriverError {
     #[error("Terminal session is not available.")]
     TerminalUnavailable,

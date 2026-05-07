@@ -59,6 +59,7 @@ pub trait LocalLLMOneShot: Send + Sync {
     ) -> Result<String, LocalLLMError>;
 
     /// Provider this implementation talks to. For telemetry/debugging.
+    #[allow(dead_code)]
     fn provider(&self) -> Provider;
 }
 
