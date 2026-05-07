@@ -18,7 +18,10 @@ use warpui::{
 };
 
 use crate::{
-    ai::generate_code_review_content::api::{GenerateCodeReviewContentRequest, OutputType},
+    ai::generate_code_review_content::{
+        api::{GenerateCodeReviewContentRequest, OutputType},
+        generate_locally,
+    },
     code_review::{
         git_dialog::{
             interactive_path_future,
@@ -33,7 +36,6 @@ use crate::{
         EditorOptions, EditorView, Event as EditorEvent, InteractionState,
         PropagateAndNoOpNavigationKeys, TextOptions,
     },
-    server::server_api::ServerApiProvider,
     ui_components::icons::Icon,
     util::git::{
         create_pr, get_diff_for_commit_message, get_file_change_entries, run_commit, run_push,
@@ -270,20 +272,18 @@ fn generate_commit_message(
 ) {
     let repo_path = repo_path.to_path_buf();
     let branch_name = branch_name.to_string();
-    let code_review_ai = ServerApiProvider::handle(ctx).read(ctx, |p, _| p.get_ai_client());
 
     ctx.spawn(
         async move {
             let diff = get_diff_for_commit_message(&repo_path, include_unstaged).await?;
-            let generated = code_review_ai
-                .generate_code_review_content(GenerateCodeReviewContentRequest {
-                    output_type: OutputType::CommitMessage,
-                    diff,
-                    branch_name,
-                    commit_messages: Vec::new(),
-                })
-                .await?
-                .content;
+            let generated = generate_locally(GenerateCodeReviewContentRequest {
+                output_type: OutputType::CommitMessage,
+                diff,
+                branch_name,
+                commit_messages: Vec::new(),
+            })
+            .await?
+            .content;
             if generated.trim().is_empty() {
                 anyhow::bail!("AI returned an empty commit message");
             }
@@ -382,11 +382,6 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
         editor.set_interaction_state(InteractionState::Disabled, ctx);
     });
 
-    let code_review_ai = if ai_autogen_enabled {
-        Some(ServerApiProvider::handle(ctx).read(ctx, |p, _| p.get_ai_client()))
-    } else {
-        None
-    };
     let path_future = interactive_path_future(ctx);
 
     ctx.spawn(
@@ -402,25 +397,16 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
                 }
                 CommitIntent::CommitAndCreatePr => {
                     run_push(&repo_path, &branch_name, path_env_ref).await?;
-                    let pr = match code_review_ai {
-                        Some(ai) => {
-                            // Reuse pr.rs's AI-title/body-with-fallback helper so
-                            // the standalone PR flow and this chain always produce
-                            // PRs the same way.
-                            create_pr_with_ai_content(
-                                &repo_path,
-                                &branch_name,
-                                ai.as_ref(),
-                                path_env_ref,
-                            )
-                            .await?
-                        }
-                        None => {
-                            // AI autogen disabled (global toggle, per-feature
-                            // toggle, or enterprise) — skip AI entirely and use
-                            // `gh pr create --fill`
-                            create_pr(&repo_path, None, None, path_env_ref).await?
-                        }
+                    let pr = if ai_autogen_enabled {
+                        // Reuse pr.rs's AI-title/body-with-fallback helper so
+                        // the standalone PR flow and this chain always produce
+                        // PRs the same way.
+                        create_pr_with_ai_content(&repo_path, &branch_name, path_env_ref).await?
+                    } else {
+                        // AI autogen disabled (global toggle, per-feature
+                        // toggle, or enterprise) — skip AI entirely and use
+                        // `gh pr create --fill`
+                        create_pr(&repo_path, None, None, path_env_ref).await?
                     };
                     CommitOutcome::PrCreated(pr)
                 }

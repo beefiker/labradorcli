@@ -15,7 +15,10 @@ use warpui::{
 };
 
 use crate::{
-    ai::generate_code_review_content::api::{GenerateCodeReviewContentRequest, OutputType},
+    ai::generate_code_review_content::{
+        api::{GenerateCodeReviewContentRequest, OutputType},
+        generate_locally,
+    },
     code_review::{
         git_dialog::{
             interactive_path_future, render_branch_section, render_file_changes_box,
@@ -24,7 +27,6 @@ use crate::{
         },
         telemetry_event::{CodeReviewTelemetryEvent, GitDialogStatus, GitOperationKind},
     },
-    server::server_api::{ai::AIClient, ServerApiProvider},
     ui_components::icons::Icon,
     util::git::{
         create_pr, get_branch_commit_messages, get_branch_diff_entries, get_diff_for_pr,
@@ -126,24 +128,14 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
 
     me.set_loading(loading_label_for(), ctx);
 
-    let code_review_ai = if should_send_git_ops_ai_request(ctx) {
-        Some(ServerApiProvider::handle(ctx).read(ctx, |p, _| p.get_ai_client()))
-    } else {
-        None
-    };
+    let use_ai = should_send_git_ops_ai_request(ctx);
     let path_future = interactive_path_future(ctx);
 
     ctx.spawn(
         async move {
             let path_env = path_future.await;
-            if let Some(code_review_ai) = code_review_ai.as_ref() {
-                create_pr_with_ai_content(
-                    &repo_path,
-                    &branch_name,
-                    code_review_ai.as_ref(),
-                    path_env.as_deref(),
-                )
-                .await
+            if use_ai {
+                create_pr_with_ai_content(&repo_path, &branch_name, path_env.as_deref()).await
             } else {
                 create_pr(&repo_path, None, None, path_env.as_deref()).await
             }
@@ -181,7 +173,6 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
 pub(super) async fn create_pr_with_ai_content(
     repo_path: &Path,
     branch_name: &str,
-    code_review_ai: &dyn AIClient,
     path_env: Option<&str>,
 ) -> anyhow::Result<PrInfo> {
     let diff = get_diff_for_pr(repo_path).await?;
@@ -202,10 +193,7 @@ pub(super) async fn create_pr_with_ai_content(
         commit_messages,
     };
 
-    match futures::try_join!(
-        code_review_ai.generate_code_review_content(title_req),
-        code_review_ai.generate_code_review_content(body_req),
-    ) {
+    match futures::try_join!(generate_locally(title_req), generate_locally(body_req)) {
         Ok((title_resp, body_resp))
             if !title_resp.content.trim().is_empty() && !body_resp.content.trim().is_empty() =>
         {
