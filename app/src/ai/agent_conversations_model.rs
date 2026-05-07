@@ -593,14 +593,10 @@ impl ConversationOrTask<'_> {
         match self {
             ConversationOrTask::Task(task) => {
                 task.agent_config_snapshot.as_ref().and_then(|config| {
-                    config
-                        .harness
-                        .as_ref()
-                        .map(|h| h.harness_type)
-                        .or(Some(Harness::Oz))
+                    config.harness.as_ref().map(|h| h.harness_type)
                 })
             }
-            ConversationOrTask::Conversation(_) => Some(Harness::Oz),
+            ConversationOrTask::Conversation(_) => None,
         }
     }
 

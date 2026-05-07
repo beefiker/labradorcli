@@ -101,7 +101,7 @@ pub struct AmbientAgentViewModel {
     conversation_id: Option<AIConversationId>,
 
     /// Selected execution harness for the cloud agent run.
-    /// Defaults to `Harness::Oz`. Used to populate `AgentConfigSnapshot.harness` on spawn.
+    /// Used to populate `AgentConfigSnapshot.harness` on spawn.
     harness: Harness,
     /// Whether the optimistic InitialUserQuery block has been inserted for the current run.
     has_inserted_cloud_mode_user_query_block: bool,
@@ -240,13 +240,13 @@ impl AmbientAgentViewModel {
         ctx.emit(AmbientAgentViewModelEvent::HarnessSelected);
     }
 
-    /// True when the run is configured to use a non-Oz execution harness and the
-    /// required feature flags are enabled.
+    /// True when the run uses a third-party execution harness (Claude / Codex) and the
+    /// required feature flags are enabled. Always true post-Oz-removal.
     pub(super) fn is_third_party_harness(&self) -> bool {
-        FeatureFlag::AgentHarness.is_enabled() && self.harness != Harness::Oz
+        FeatureFlag::AgentHarness.is_enabled()
     }
 
-    /// Whether the harness CLI has started running. Only meaningful for non-oz runs.
+    /// Whether the harness CLI has started running.
     pub(super) fn harness_command_started(&self) -> bool {
         self.harness_command_started
     }
@@ -254,10 +254,6 @@ impl AmbientAgentViewModel {
     /// Marks the harness CLI as started and emits `HarnessCommandStarted`.
     /// Idempotent: subsequent calls after the first are no-ops and do not re-emit.
     pub(super) fn mark_harness_command_started(&mut self, ctx: &mut ModelContext<Self>) {
-        debug_assert!(
-            self.harness != Harness::Oz,
-            "harness_command_started is only meaningful for non-oz runs"
-        );
         if self.harness_command_started {
             return;
         }
@@ -413,7 +409,7 @@ impl AmbientAgentViewModel {
                     let harness = snapshot
                         .and_then(|s| s.harness.as_ref())
                         .map(|h| h.harness_type)
-                        .unwrap_or(Harness::Oz);
+                        .unwrap_or_default();
 
                     me.set_environment_id(environment_id, ctx);
                     me.set_harness(harness, ctx);
@@ -476,8 +472,7 @@ impl AmbientAgentViewModel {
             .ok()
             .filter(|s| !s.is_empty());
 
-        let harness_override =
-            (self.harness != Harness::Oz).then(|| HarnessConfig::from_harness_type(self.harness));
+        let harness_override = Some(HarnessConfig::from_harness_type(self.harness));
 
         let config = Some(AgentConfigSnapshot {
             environment_id: self.environment_id.as_ref().map(|id| id.to_string()),

@@ -64,9 +64,10 @@ pub fn prepare_environment(
             ..
         } = environment;
 
-        // Only index the codebase for the Oz harness; third-party harnesses (e.g. Claude)
-        // have their own methods for navigating a codebase.
-        let should_index_codebase = harness == Harness::Oz;
+        // Codebase indexing was Oz-only; third-party harnesses navigate the
+        // codebase through their own tooling.
+        let _ = harness;
+        let should_index_codebase = false;
         let should_subscribe_to_index_updates = should_index_codebase && !github_repos.is_empty();
         let repo_channels = Arc::new(Mutex::new(HashMap::<PathBuf, oneshot::Sender<()>>::new()));
 

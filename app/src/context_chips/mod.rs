@@ -18,23 +18,22 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use context_chip::PromptGenerator;
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 use smol_str::SmolStr;
-use warpui::{
-    color::ColorU,
-    elements::Text,
-    fonts::{Properties, Weight},
-};
+use warpui::{ color::ColorU, elements::Text, fonts::{ Properties, Weight } };
 
-use crate::ui_components::{blended_colors, icons::Icon};
-use crate::{appearance::Appearance, features::FeatureFlag, themes::theme::PromptColors};
+use crate::ui_components::{ blended_colors, icons::Icon };
+use crate::{ appearance::Appearance, features::FeatureFlag, themes::theme::PromptColors };
 
 #[allow(unused_imports)]
 pub use self::context_chip::{
-    ChipAvailability, ChipDisabledReason, ChipRuntimeCapabilities, ExternalCommandsAvailability,
+    ChipAvailability,
+    ChipDisabledReason,
+    ChipRuntimeCapabilities,
+    ExternalCommandsAvailability,
 };
 use self::{
-    context_chip::{ChipFingerprintInput, ChipRuntimePolicy, ContextChip, RefreshConfig},
+    context_chip::{ ChipFingerprintInput, ChipRuntimePolicy, ContextChip, RefreshConfig },
     renderer::RendererStyles,
 };
 
@@ -76,11 +75,7 @@ impl std::fmt::Display for ChipValue {
         match self {
             ChipValue::Text(s) => f.write_str(s),
             ChipValue::GitDiffStats(g) => {
-                write!(
-                    f,
-                    "{} • +{} -{}",
-                    g.files_changed, g.lines_added, g.lines_removed
-                )
+                write!(f, "{} • +{} -{}", g.files_changed, g.lines_added, g.lines_removed)
             }
         }
     }
@@ -150,12 +145,9 @@ impl ChipResult {
     PartialEq,
     Hash,
     schemars::JsonSchema,
-    settings_value::SettingsValue,
+    settings_value::SettingsValue
 )]
-#[schemars(
-    description = "Type of prompt context chip.",
-    rename_all = "snake_case"
-)]
+#[schemars(description = "Type of prompt context chip.", rename_all = "snake_case")]
 pub enum ContextChipKind {
     WorkingDirectory,
     Username,
@@ -166,8 +158,7 @@ pub enum ContextChipKind {
     VirtualEnvironment,
     CondaEnvironment,
     NodeVersion,
-    #[schemars(description = "A user-defined custom chip.")]
-    Custom {
+    #[schemars(description = "A user-defined custom chip.")] Custom {
         title: String,
     },
     ShellGitBranch,
@@ -188,118 +179,115 @@ pub enum ContextChipKind {
 impl ContextChipKind {
     pub fn to_chip(&self) -> Option<ContextChip> {
         match self {
-            Self::WorkingDirectory => Some(ContextChip::builtin_with_runtime_policy(
-                "Working Directory",
-                builtins::working_directory,
-                RefreshConfig::OnDemandOnly,
-                ChipRuntimePolicy::new(
-                    std::iter::empty::<&str>(),
-                    false,
-                    None,
-                    [
-                        ChipFingerprintInput::SessionId,
-                        ChipFingerprintInput::WorkingDirectory,
-                    ],
+            Self::WorkingDirectory =>
+                Some(
+                    ContextChip::builtin_with_runtime_policy(
+                        "Working Directory",
+                        builtins::working_directory,
+                        RefreshConfig::OnDemandOnly,
+                        ChipRuntimePolicy::new(std::iter::empty::<&str>(), false, None, [
+                            ChipFingerprintInput::SessionId,
+                            ChipFingerprintInput::WorkingDirectory,
+                        ])
+                    )
                 ),
-            )),
-            Self::Username => Some(ContextChip::builtin_with_runtime_policy(
-                "User",
-                builtins::username,
-                RefreshConfig::OnDemandOnly,
-                ChipRuntimePolicy::new(
-                    std::iter::empty::<&str>(),
-                    false,
-                    None,
-                    [ChipFingerprintInput::SessionId],
+            Self::Username =>
+                Some(
+                    ContextChip::builtin_with_runtime_policy(
+                        "User",
+                        builtins::username,
+                        RefreshConfig::OnDemandOnly,
+                        ChipRuntimePolicy::new(std::iter::empty::<&str>(), false, None, [
+                            ChipFingerprintInput::SessionId,
+                        ])
+                    )
                 ),
-            )),
-            Self::Hostname => Some(ContextChip::builtin_with_runtime_policy(
-                "Host",
-                builtins::hostname,
-                RefreshConfig::OnDemandOnly,
-                ChipRuntimePolicy::new(
-                    std::iter::empty::<&str>(),
-                    false,
-                    None,
-                    [ChipFingerprintInput::SessionId],
+            Self::Hostname =>
+                Some(
+                    ContextChip::builtin_with_runtime_policy(
+                        "Host",
+                        builtins::hostname,
+                        RefreshConfig::OnDemandOnly,
+                        ChipRuntimePolicy::new(std::iter::empty::<&str>(), false, None, [
+                            ChipFingerprintInput::SessionId,
+                        ])
+                    )
                 ),
-            )),
-            Self::VirtualEnvironment => Some(ContextChip::builtin_with_runtime_policy(
-                "Python Virtualenv",
-                builtins::virtual_environment,
-                RefreshConfig::OnDemandOnly,
-                ChipRuntimePolicy::new(
-                    std::iter::empty::<&str>(),
-                    false,
-                    None,
-                    [
-                        ChipFingerprintInput::SessionId,
-                        ChipFingerprintInput::PythonVirtualenv,
-                    ],
+            Self::VirtualEnvironment =>
+                Some(
+                    ContextChip::builtin_with_runtime_policy(
+                        "Python Virtualenv",
+                        builtins::virtual_environment,
+                        RefreshConfig::OnDemandOnly,
+                        ChipRuntimePolicy::new(std::iter::empty::<&str>(), false, None, [
+                            ChipFingerprintInput::SessionId,
+                            ChipFingerprintInput::PythonVirtualenv,
+                        ])
+                    )
                 ),
-            )),
-            Self::CondaEnvironment => Some(ContextChip::builtin_with_runtime_policy(
-                "Conda Environment",
-                builtins::conda_environment,
-                RefreshConfig::OnDemandOnly,
-                ChipRuntimePolicy::new(
-                    std::iter::empty::<&str>(),
-                    false,
-                    None,
-                    [
-                        ChipFingerprintInput::SessionId,
-                        ChipFingerprintInput::CondaEnvironment,
-                    ],
+            Self::CondaEnvironment =>
+                Some(
+                    ContextChip::builtin_with_runtime_policy(
+                        "Conda Environment",
+                        builtins::conda_environment,
+                        RefreshConfig::OnDemandOnly,
+                        ChipRuntimePolicy::new(std::iter::empty::<&str>(), false, None, [
+                            ChipFingerprintInput::SessionId,
+                            ChipFingerprintInput::CondaEnvironment,
+                        ])
+                    )
                 ),
-            )),
-            Self::NodeVersion => Some(ContextChip::builtin_with_runtime_policy(
-                "Node.js Version",
-                builtins::node_version,
-                RefreshConfig::OnDemandOnly,
-                ChipRuntimePolicy::new(
-                    std::iter::empty::<&str>(),
-                    false,
-                    None,
-                    [
-                        ChipFingerprintInput::SessionId,
-                        ChipFingerprintInput::NodeVersion,
-                    ],
+            Self::NodeVersion =>
+                Some(
+                    ContextChip::builtin_with_runtime_policy(
+                        "Node.js Version",
+                        builtins::node_version,
+                        RefreshConfig::OnDemandOnly,
+                        ChipRuntimePolicy::new(std::iter::empty::<&str>(), false, None, [
+                            ChipFingerprintInput::SessionId,
+                            ChipFingerprintInput::NodeVersion,
+                        ])
+                    )
                 ),
-            )),
-            Self::Date => Some(ContextChip::builtin(
-                "Date",
-                builtins::date,
-                DATE_REFRESH_CONFIG,
-            )),
-            Self::Time12 => Some(ContextChip::builtin(
-                "Time (12-hour format)",
-                builtins::time12,
-                TIME_REFRESH_CONFIG,
-            )),
-            Self::Time24 => Some(ContextChip::builtin(
-                "Time (24-hour format)",
-                builtins::time24,
-                TIME_REFRESH_CONFIG,
-            )),
+            Self::Date => Some(ContextChip::builtin("Date", builtins::date, DATE_REFRESH_CONFIG)),
+            Self::Time12 =>
+                Some(
+                    ContextChip::builtin(
+                        "Time (12-hour format)",
+                        builtins::time12,
+                        TIME_REFRESH_CONFIG
+                    )
+                ),
+            Self::Time24 =>
+                Some(
+                    ContextChip::builtin(
+                        "Time (24-hour format)",
+                        builtins::time24,
+                        TIME_REFRESH_CONFIG
+                    )
+                ),
             Self::Custom { title } => {
                 log::warn!("Tried to use custom chip {title}");
                 None
             }
-            Self::ShellGitBranch => Some(ContextChip::shell_builtin(
-                "Git Branch",
-                builtins::shell_git_branch(),
-                Some(builtins::shell_other_git_branches()),
-                GIT_REFRESH_CONFIG,
-            )),
-            Self::GitDiffStats => Some(
-                ContextChip::shell_builtin(
-                    "Git Diff Stats",
-                    builtins::shell_git_line_changes(),
-                    None,
-                    GIT_REFRESH_CONFIG,
-                )
-                .with_allow_empty_value(),
-            ),
+            Self::ShellGitBranch =>
+                Some(
+                    ContextChip::shell_builtin(
+                        "Git Branch",
+                        builtins::shell_git_branch(),
+                        Some(builtins::shell_other_git_branches()),
+                        GIT_REFRESH_CONFIG
+                    )
+                ),
+            Self::GitDiffStats =>
+                Some(
+                    ContextChip::shell_builtin(
+                        "Git Diff Stats",
+                        builtins::shell_git_line_changes(),
+                        None,
+                        GIT_REFRESH_CONFIG
+                    ).with_allow_empty_value()
+                ),
             Self::GithubPullRequest if !FeatureFlag::GithubPrPromptChip.is_enabled() => None,
             Self::GithubPullRequest => {
                 let generator = builtins::github_pull_request_url();
@@ -313,51 +301,71 @@ impl ContextChipKind {
                         ChipFingerprintInput::GitBranch,
                         ChipFingerprintInput::RequiredExecutablesPresence,
                         ChipFingerprintInput::InvalidatingCommandCount,
-                    ],
+                    ]
                 )
-                .with_suppress_on_failure()
-                .with_invalidate_on_commands(["git", "gh", "gt"]);
-                Some(ContextChip::shell_builtin_with_runtime_policy(
-                    "GitHub Pull Request",
-                    generator,
-                    None,
-                    GIT_REFRESH_CONFIG,
-                    policy,
-                ))
+                    .with_suppress_on_failure()
+                    .with_invalidate_on_commands(["git", "gh", "gt"]);
+                Some(
+                    ContextChip::shell_builtin_with_runtime_policy(
+                        "GitHub Pull Request",
+                        generator,
+                        None,
+                        GIT_REFRESH_CONFIG,
+                        policy
+                    )
+                )
             }
-            Self::KubernetesContext => Some(ContextChip::shell_builtin(
-                "Kubernetes Context",
-                builtins::kubernetes_current_context(),
-                None,
-                RefreshConfig::OnDemandOnly,
-            )),
-            Self::SvnBranch => Some(ContextChip::shell_builtin(
-                "Svn Branch",
-                builtins::svn_branch_context(),
-                None,
-                RefreshConfig::OnDemandOnly,
-            )),
-            Self::SvnDirtyItems => Some(ContextChip::shell_builtin(
-                "Svn Uncommited File Count",
-                builtins::svn_dirty_items(),
-                None,
-                RefreshConfig::OnDemandOnly,
-            )),
-            Self::Ssh => Some(ContextChip::builtin(
-                "Remote Login",
-                builtins::ssh_session,
-                RefreshConfig::OnDemandOnly,
-            )),
-            Self::Subshell => Some(ContextChip::builtin(
-                "subshell",
-                builtins::subshell,
-                RefreshConfig::OnDemandOnly,
-            )),
-            Self::AgentPlanAndTodoList => Some(ContextChip::builtin(
-                "Agent Plan and Todo List",
-                |_| Some(ChipValue::Text(String::new())),
-                RefreshConfig::OnDemandOnly,
-            )),
+            Self::KubernetesContext =>
+                Some(
+                    ContextChip::shell_builtin(
+                        "Kubernetes Context",
+                        builtins::kubernetes_current_context(),
+                        None,
+                        RefreshConfig::OnDemandOnly
+                    )
+                ),
+            Self::SvnBranch =>
+                Some(
+                    ContextChip::shell_builtin(
+                        "Svn Branch",
+                        builtins::svn_branch_context(),
+                        None,
+                        RefreshConfig::OnDemandOnly
+                    )
+                ),
+            Self::SvnDirtyItems =>
+                Some(
+                    ContextChip::shell_builtin(
+                        "Svn Uncommited File Count",
+                        builtins::svn_dirty_items(),
+                        None,
+                        RefreshConfig::OnDemandOnly
+                    )
+                ),
+            Self::Ssh =>
+                Some(
+                    ContextChip::builtin(
+                        "Remote Login",
+                        builtins::ssh_session,
+                        RefreshConfig::OnDemandOnly
+                    )
+                ),
+            Self::Subshell =>
+                Some(
+                    ContextChip::builtin(
+                        "subshell",
+                        builtins::subshell,
+                        RefreshConfig::OnDemandOnly
+                    )
+                ),
+            Self::AgentPlanAndTodoList =>
+                Some(
+                    ContextChip::builtin(
+                        "Agent Plan and Todo List",
+                        |_| Some(ChipValue::Text(String::new())),
+                        RefreshConfig::OnDemandOnly
+                    )
+                ),
         }
     }
 
@@ -372,14 +380,14 @@ impl ContextChipKind {
     /// for the periodic updates.
     pub fn initial_value_generator(&self) -> Option<PromptGenerator> {
         match self {
-            Self::ShellGitBranch => Some(PromptGenerator::Contextual {
-                from_context_fn: |context| {
-                    context
-                        .current_environment
-                        .git_branch()
-                        .map(|s| ChipValue::Text(s.to_string()))
-                },
-            }),
+            Self::ShellGitBranch =>
+                Some(PromptGenerator::Contextual {
+                    from_context_fn: |context| {
+                        context.current_environment
+                            .git_branch()
+                            .map(|s| ChipValue::Text(s.to_string()))
+                    },
+                }),
             _ => None,
         }
     }
@@ -388,7 +396,7 @@ impl ContextChipKind {
     pub fn placeholder_value(&self) -> ChipValue {
         match self {
             Self::WorkingDirectory => ChipValue::Text("~/Desktop".to_string()),
-            Self::Username => ChipValue::Text("alice".to_string()),
+            Self::Username => ChipValue::Text("bee".to_string()),
             Self::Hostname => ChipValue::Text("ubuntu-04".to_string()),
             Self::ShellGitBranch => ChipValue::Text("git-feature-branch".to_string()),
             Self::GitDiffStats => ChipValue::Text("3 • +10 -2".to_string()),
@@ -403,7 +411,7 @@ impl ContextChipKind {
             Self::KubernetesContext => ChipValue::Text("kube-context".to_string()),
             Self::SvnBranch => ChipValue::Text("svn-feature-branch".to_string()),
             Self::SvnDirtyItems => ChipValue::Text("3".to_string()),
-            Self::Ssh => ChipValue::Text("alice@127.0.0.1".to_string()),
+            Self::Ssh => ChipValue::Text("bee@127.0.0.1".to_string()),
             Self::Subshell => ChipValue::Text("bash".to_string()),
             Self::AgentPlanAndTodoList => ChipValue::Text("Plan and Todo List".to_string()),
         }
@@ -412,7 +420,7 @@ impl ContextChipKind {
     pub fn default_styles(
         &self,
         appearance: &Appearance,
-        is_in_agent_view: bool,
+        is_in_agent_view: bool
     ) -> RendererStyles {
         if is_in_agent_view {
             return RendererStyles::new(agent_view_chip_color(appearance), Properties::default());
@@ -502,12 +510,17 @@ impl ContextChipKind {
                     "fubectl",
                 ];
 
-                command.split_whitespace().next().is_some_and(|first_word| {
-                    KUBERNETES_COMMANDS.contains(&first_word)
-                        || aliases.get(first_word).is_some_and(|expanded| {
-                            KUBERNETES_COMMANDS.contains(&expanded.as_str())
-                        })
-                })
+                command
+                    .split_whitespace()
+                    .next()
+                    .is_some_and(|first_word| {
+                        KUBERNETES_COMMANDS.contains(&first_word) ||
+                            aliases
+                                .get(first_word)
+                                .is_some_and(|expanded| {
+                                    KUBERNETES_COMMANDS.contains(&expanded.as_str())
+                                })
+                    })
             }
 
             // All other chips unconditionally render
@@ -551,7 +564,7 @@ pub fn available_chips() -> Vec<ContextChipKind> {
         ContextChipKind::Hostname,
         ContextChipKind::Ssh,
         ContextChipKind::ShellGitBranch,
-        ContextChipKind::GitDiffStats,
+        ContextChipKind::GitDiffStats
     ];
     if FeatureFlag::GithubPrPromptChip.is_enabled() {
         chips.push(ContextChipKind::GithubPullRequest);
@@ -578,16 +591,20 @@ pub fn available_chips() -> Vec<ContextChipKind> {
 pub fn git_line_changes_from_chips(chips: &[ChipResult]) -> Option<display_chip::GitLineChanges> {
     chips.iter().find_map(|chip| {
         if matches!(chip.kind(), ContextChipKind::GitDiffStats) {
-            chip.value().map(|value| match value {
-                // Structured data from GitRepoStatusModel — use directly.
-                ChipValue::GitDiffStats(g) => g.clone(),
-                // Raw shell command output (remote sessions) — parse.
-                ChipValue::Text(raw) => display_chip::GitLineChanges::parse_from_git_output(raw)
-                    .unwrap_or(display_chip::GitLineChanges {
-                        files_changed: 0,
-                        lines_added: 0,
-                        lines_removed: 0,
-                    }),
+            chip.value().map(|value| {
+                match value {
+                    // Structured data from GitRepoStatusModel — use directly.
+                    ChipValue::GitDiffStats(g) => g.clone(),
+                    // Raw shell command output (remote sessions) — parse.
+                    ChipValue::Text(raw) =>
+                        display_chip::GitLineChanges
+                            ::parse_from_git_output(raw)
+                            .unwrap_or(display_chip::GitLineChanges {
+                                files_changed: 0,
+                                lines_added: 0,
+                                lines_removed: 0,
+                            }),
+                }
             })
         } else {
             None
@@ -625,9 +642,7 @@ pub fn chips_to_string(chips: impl Iterator<Item = ChipResult>) -> String {
 
 pub(crate) fn agent_view_chip_color(appearance: &Appearance) -> ColorU {
     let theme = appearance.theme();
-    theme
-        .sub_text_color(blended_colors::neutral_1(theme).into())
-        .into_solid()
+    theme.sub_text_color(blended_colors::neutral_1(theme).into()).into_solid()
 }
 
 /// Helper function that adds specific styling to chips' text element.
@@ -638,7 +653,7 @@ pub fn render_text_from_kind(
     kind: ContextChipKind,
     value: String,
     is_in_agent_view: bool,
-    appearance: &Appearance,
+    appearance: &Appearance
 ) {
     let styles = kind.default_styles(appearance, is_in_agent_view);
     let prompt_colors: PromptColors = appearance.theme().clone().into();
@@ -653,7 +668,7 @@ pub fn render_text_from_kind(
                 } else {
                     prompt_colors.input_prompt_git
                 },
-                styles.font_properties,
+                styles.font_properties
             );
         }
         ContextChipKind::SvnBranch => {
@@ -664,7 +679,7 @@ pub fn render_text_from_kind(
                 } else {
                     prompt_colors.input_prompt_svn
                 },
-                styles.font_properties,
+                styles.font_properties
             );
         }
         ContextChipKind::SvnDirtyItems => {
@@ -675,7 +690,7 @@ pub fn render_text_from_kind(
                 } else {
                     prompt_colors.input_prompt_svn
                 },
-                styles.font_properties,
+                styles.font_properties
             );
         }
         ContextChipKind::KubernetesContext => {
@@ -690,7 +705,7 @@ pub fn render_text_from_kind(
                     styles.font_properties
                 } else {
                     Properties::default().weight(Weight::Thin)
-                },
+                }
             );
         }
         _ => (),
@@ -707,7 +722,7 @@ pub fn render_text_from_kind(
                 } else {
                     prompt_colors.input_prompt_git
                 },
-                styles.font_properties,
+                styles.font_properties
             );
         }
         ContextChipKind::SvnBranch => {
@@ -718,7 +733,7 @@ pub fn render_text_from_kind(
                 } else {
                     prompt_colors.input_prompt_svn
                 },
-                styles.font_properties,
+                styles.font_properties
             );
         }
         _ => (),

@@ -414,7 +414,7 @@ impl AmbientAgentRunner {
                     }
                 };
 
-            let harness_override = (args.harness != Harness::Oz).then_some(HarnessConfig {
+            let harness_override = Some(HarnessConfig {
                 harness_type: args.harness,
             });
             let harness_auth_secrets = args.claude_auth_secret.clone().map(|name| {

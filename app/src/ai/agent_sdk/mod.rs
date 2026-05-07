@@ -248,7 +248,7 @@ fn run_agent(
             if args.skill.is_some() && !FeatureFlag::OzPlatformSkills.is_enabled() {
                 return Err(anyhow::anyhow!("unexpected argument '--skill' found"));
             }
-            if args.harness != Harness::Oz && !FeatureFlag::AgentHarness.is_enabled() {
+            if !FeatureFlag::AgentHarness.is_enabled() {
                 return Err(anyhow::anyhow!("unexpected argument '--harness' found"));
             }
             if args.harness == Harness::OpenCode {
@@ -292,7 +292,7 @@ fn run_agent(
                     "unexpected argument '--conversation' found"
                 ));
             }
-            if args.harness != Harness::Oz && !FeatureFlag::AgentHarness.is_enabled() {
+            if !FeatureFlag::AgentHarness.is_enabled() {
                 return Err(anyhow::anyhow!("unexpected argument '--harness' found"));
             }
             if args.claude_auth_secret.is_some() && args.harness != Harness::Claude {
@@ -338,7 +338,7 @@ fn build_merged_config_and_task(
         None => (None, None),
     };
 
-    let harness_override = (args.harness != Harness::Oz).then_some(HarnessConfig {
+    let harness_override = Some(HarnessConfig {
         harness_type: args.harness,
     });
 
@@ -422,7 +422,7 @@ fn build_server_side_task(
         .map(|model_id| common::validate_agent_mode_base_model_id(model_id, ctx))
         .transpose()?;
 
-    let harness_override = (args.harness != Harness::Oz).then_some(HarnessConfig {
+    let harness_override = Some(HarnessConfig {
         harness_type: args.harness,
     });
 
@@ -1031,7 +1031,7 @@ impl AgentDriverRunner {
                     .as_ref()
                     .and_then(|c| c.harness.as_ref())
                     .map(|h| h.harness_type)
-                    .unwrap_or(Harness::Oz);
+                    .unwrap_or_default();
                 (
                     task_metadata.parent_run_id,
                     task_metadata.conversation_id,
@@ -1346,7 +1346,6 @@ fn resolve_orchestration_harness_label() -> &'static str {
         return "unknown";
     };
     match Harness::parse_orchestration_harness(&raw) {
-        Some(Harness::Oz) => "oz",
         Some(Harness::Claude) => "claude",
         Some(Harness::OpenCode) => "opencode",
         Some(Harness::Codex) => "codex",

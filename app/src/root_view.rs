@@ -1664,7 +1664,7 @@ impl LocalWelcomeView {
         })
         .with_cursor(Cursor::PointingHand)
         .on_click(|ctx, _, _| {
-            ctx.dispatch_typed_action(RootViewAction::ShowConfetti);
+            ctx.dispatch_typed_action(RootViewAction::ShowConfetti(DwarfConfettiPreset::Fireworks));
         })
         .finish();
 
@@ -1757,16 +1757,70 @@ impl TypedActionView for LocalWelcomeView {
     }
 }
 
-struct DwarfConfettiElement {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DwarfConfettiPreset {
+    Celebration,
+    Fireworks,
+    Snow,
+    Cannon,
+}
+
+#[derive(Clone, Copy)]
+struct DwarfConfettiRun {
     started_at: instant::Instant,
+    preset: DwarfConfettiPreset,
+}
+
+struct DwarfConfettiElement {
+    run: DwarfConfettiRun,
     size: Option<Vector2F>,
     origin: Option<Point>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum ConfettiShape {
     Ribbon,
     Circle,
+}
+
+#[derive(Clone, Copy)]
+struct ConfettiOrigin {
+    x: f32,
+    y: f32,
+}
+
+#[derive(Clone, Copy)]
+enum ConfettiPalette {
+    Bright,
+    Snow,
+}
+
+#[derive(Clone, Copy)]
+enum ConfettiShapeMix {
+    RibbonsAndCircles,
+    Circles,
+}
+
+#[derive(Clone, Copy)]
+struct ConfettiOptions {
+    particle_count: usize,
+    angle: f32,
+    spread: f32,
+    start_velocity: f32,
+    decay: f32,
+    gravity: f32,
+    drift: f32,
+    ticks: u32,
+    origin: ConfettiOrigin,
+    palette: ConfettiPalette,
+    shape_mix: ConfettiShapeMix,
+    scalar: f32,
+}
+
+#[derive(Clone, Copy)]
+struct ConfettiBurst {
+    options: ConfettiOptions,
+    delay_seconds: f32,
 }
 
 struct ConfettiParticle {
@@ -1774,32 +1828,54 @@ struct ConfettiParticle {
     shape: ConfettiShape,
     start_x: f32,
     start_y: f32,
-    velocity_x: f32,
-    velocity_y: f32,
+    angle_2d: f32,
+    velocity: f32,
+    decay: f32,
     gravity: f32,
     drift: f32,
     width: f32,
     height: f32,
-    delay: f32,
-    life: f32,
+    total_ticks: f32,
     spin: f32,
     wobble_speed: f32,
+    scalar: f32,
 }
 
 impl DwarfConfettiElement {
-    const DURATION: Duration = Duration::from_millis(4000);
     const FRAME: Duration = Duration::from_millis(16);
-    const BURST_COUNT: usize = 1;
-    const BURST_INTERVAL_SECONDS: f32 = 0.55;
-    const PARTICLES_PER_BURST: usize = 150;
-    const PARTICLE_COUNT: usize = Self::BURST_COUNT * Self::PARTICLES_PER_BURST;
-    const DECAY_DRAG: f32 = 6.32;
 
-    fn new(started_at: instant::Instant) -> Self {
+    fn new(run: DwarfConfettiRun) -> Self {
         Self {
-            started_at,
+            run,
             size: None,
             origin: None,
+        }
+    }
+
+    fn duration_for(preset: DwarfConfettiPreset) -> Duration {
+        let seconds = preset
+            .bursts()
+            .iter()
+            .map(|burst| burst.delay_seconds + burst.options.ticks as f32 / 60.)
+            .fold(0., f32::max)
+            + 0.25;
+        Duration::from_secs_f32(seconds)
+    }
+
+    fn default_options() -> ConfettiOptions {
+        ConfettiOptions {
+            particle_count: 50,
+            angle: 90.,
+            spread: 45.,
+            start_velocity: 45.,
+            decay: 0.9,
+            gravity: 1.,
+            drift: 0.,
+            ticks: 200,
+            origin: ConfettiOrigin { x: 0.5, y: 0.5 },
+            palette: ConfettiPalette::Bright,
+            shape_mix: ConfettiShapeMix::RibbonsAndCircles,
+            scalar: 1.,
         }
     }
 
@@ -1811,72 +1887,96 @@ impl DwarfConfettiElement {
         (value % 10_000) as f32 / 10_000.
     }
 
-    fn color_pair(slot: usize, alpha: u8) -> (ColorU, ColorU) {
-        match slot % 7 {
-            0 => (
-                ColorU::new(38, 204, 255, alpha),
-                ColorU::new(155, 235, 255, alpha),
-            ),
-            1 => (
-                ColorU::new(162, 90, 253, alpha),
-                ColorU::new(211, 183, 254, alpha),
-            ),
-            2 => (
-                ColorU::new(255, 94, 126, alpha),
-                ColorU::new(255, 174, 191, alpha),
-            ),
-            3 => (
-                ColorU::new(136, 255, 90, alpha),
-                ColorU::new(192, 255, 170, alpha),
-            ),
-            4 => (
-                ColorU::new(252, 255, 66, alpha),
-                ColorU::new(254, 255, 170, alpha),
-            ),
-            5 => (
-                ColorU::new(255, 166, 45, alpha),
-                ColorU::new(255, 210, 128, alpha),
-            ),
-            _ => (
-                ColorU::new(255, 54, 255, alpha),
-                ColorU::new(255, 169, 255, alpha),
-            ),
+    fn color_pair(palette: ConfettiPalette, slot: usize, alpha: u8) -> (ColorU, ColorU) {
+        match palette {
+            ConfettiPalette::Bright => match slot % 7 {
+                0 => (
+                    ColorU::new(38, 204, 255, alpha),
+                    ColorU::new(155, 235, 255, alpha),
+                ),
+                1 => (
+                    ColorU::new(162, 90, 253, alpha),
+                    ColorU::new(211, 183, 254, alpha),
+                ),
+                2 => (
+                    ColorU::new(255, 94, 126, alpha),
+                    ColorU::new(255, 174, 191, alpha),
+                ),
+                3 => (
+                    ColorU::new(136, 255, 90, alpha),
+                    ColorU::new(192, 255, 170, alpha),
+                ),
+                4 => (
+                    ColorU::new(252, 255, 66, alpha),
+                    ColorU::new(254, 255, 170, alpha),
+                ),
+                5 => (
+                    ColorU::new(255, 166, 45, alpha),
+                    ColorU::new(255, 210, 128, alpha),
+                ),
+                _ => (
+                    ColorU::new(255, 54, 255, alpha),
+                    ColorU::new(255, 169, 255, alpha),
+                ),
+            },
+            ConfettiPalette::Snow => match slot % 2 {
+                0 => (
+                    ColorU::new(255, 255, 255, alpha),
+                    ColorU::new(255, 255, 255, alpha),
+                ),
+                _ => (
+                    ColorU::new(224, 224, 224, alpha),
+                    ColorU::new(255, 255, 255, alpha),
+                ),
+            },
         }
     }
 
-    fn particle(index: usize) -> ConfettiParticle {
-        let burst_index = index / Self::PARTICLES_PER_BURST;
-        let particle_index = index % Self::PARTICLES_PER_BURST;
-        let angle = -std::f32::consts::FRAC_PI_2
-            + (Self::hash_unit(particle_index, 1 + burst_index as u32) - 0.5)
-                * std::f32::consts::PI
-                * 0.25;
-        let speed = (22.5 + Self::hash_unit(particle_index, 2 + burst_index as u32) * 45.) * 60.;
-        let width = 8. + Self::hash_unit(particle_index, 3 + burst_index as u32) * 4.;
-        let height = 5. + Self::hash_unit(particle_index, 4 + burst_index as u32) * 3.;
-        let shape = match particle_index % 2 {
-            0 => ConfettiShape::Circle,
-            _ => ConfettiShape::Ribbon,
+    fn particle(
+        options: &ConfettiOptions,
+        particle_index: usize,
+        burst_index: usize,
+    ) -> ConfettiParticle {
+        let salt = (burst_index as u32).wrapping_mul(31);
+        let rad_angle = options.angle.to_radians();
+        let rad_spread = options.spread.to_radians();
+        let angle_2d = -rad_angle
+            + (0.5 * rad_spread - Self::hash_unit(particle_index, 1 + salt) * rad_spread);
+        let velocity = options.start_velocity * (0.5 + Self::hash_unit(particle_index, 2 + salt));
+        let width = (8. + Self::hash_unit(particle_index, 3 + salt) * 4.) * options.scalar;
+        let height = (5. + Self::hash_unit(particle_index, 4 + salt) * 3.) * options.scalar;
+        let shape = match options.shape_mix {
+            ConfettiShapeMix::Circles => ConfettiShape::Circle,
+            ConfettiShapeMix::RibbonsAndCircles => match particle_index % 2 {
+                0 => ConfettiShape::Circle,
+                _ => ConfettiShape::Ribbon,
+            },
         };
-        let start_x = 0.5 + (Self::hash_unit(particle_index, 5 + burst_index as u32) - 0.5) * 0.22;
-        let start_y = 0.5 + (Self::hash_unit(particle_index, 6 + burst_index as u32) - 0.5) * 0.04;
 
         ConfettiParticle {
-            color_slot: index,
+            color_slot: particle_index + burst_index * 257,
             shape,
-            start_x,
-            start_y,
-            velocity_x: angle.cos() * speed,
-            velocity_y: angle.sin() * speed,
-            gravity: 180.,
-            drift: 0.,
+            start_x: options.origin.x,
+            start_y: options.origin.y,
+            angle_2d,
+            velocity,
+            decay: options.decay.clamp(0.01, 1.),
+            gravity: options.gravity * 3.,
+            drift: options.drift,
             width,
             height,
-            delay: burst_index as f32 * Self::BURST_INTERVAL_SECONDS
-                + Self::hash_unit(particle_index, 9 + burst_index as u32) * 0.08,
-            life: 3.25 + Self::hash_unit(particle_index, 10 + burst_index as u32) * 0.2,
-            spin: Self::hash_unit(particle_index, 11 + burst_index as u32) * std::f32::consts::TAU,
-            wobble_speed: 3. + Self::hash_unit(particle_index, 12 + burst_index as u32) * 3.6,
+            total_ticks: options.ticks as f32,
+            spin: Self::hash_unit(particle_index, 11 + salt) * std::f32::consts::TAU,
+            wobble_speed: 3. + Self::hash_unit(particle_index, 12 + salt) * 3.6,
+            scalar: options.scalar,
+        }
+    }
+
+    fn decayed_distance(particle: &ConfettiParticle, tick: f32) -> f32 {
+        if (1. - particle.decay).abs() <= f32::EPSILON {
+            particle.velocity * tick
+        } else {
+            particle.velocity * (1. - particle.decay.powf(tick)) / (1. - particle.decay)
         }
     }
 
@@ -1937,23 +2037,90 @@ impl DwarfConfettiElement {
     }
 }
 
+impl DwarfConfettiPreset {
+    fn bursts(self) -> Vec<ConfettiBurst> {
+        let default = DwarfConfettiElement::default_options();
+        match self {
+            Self::Celebration => vec![
+                ConfettiBurst {
+                    options: ConfettiOptions {
+                        particle_count: 50,
+                        angle: 60.,
+                        spread: 55.,
+                        origin: ConfettiOrigin { x: 0., y: 0.6 },
+                        ..default
+                    },
+                    delay_seconds: 0.,
+                },
+                ConfettiBurst {
+                    options: ConfettiOptions {
+                        particle_count: 50,
+                        angle: 120.,
+                        spread: 55.,
+                        origin: ConfettiOrigin { x: 1., y: 0.6 },
+                        ..default
+                    },
+                    delay_seconds: 0.18,
+                },
+            ],
+            Self::Fireworks => vec![ConfettiBurst {
+                options: ConfettiOptions {
+                    particle_count: 100,
+                    spread: 360.,
+                    start_velocity: 30.,
+                    gravity: 0.5,
+                    origin: ConfettiOrigin { x: 0.5, y: 0.5 },
+                    ..default
+                },
+                delay_seconds: 0.,
+            }],
+            Self::Snow => vec![ConfettiBurst {
+                options: ConfettiOptions {
+                    particle_count: 50,
+                    spread: 180.,
+                    start_velocity: 10.,
+                    gravity: 0.3,
+                    ticks: 400,
+                    origin: ConfettiOrigin { x: 0.5, y: 0. },
+                    palette: ConfettiPalette::Snow,
+                    shape_mix: ConfettiShapeMix::Circles,
+                    scalar: 0.85,
+                    ..default
+                },
+                delay_seconds: 0.,
+            }],
+            Self::Cannon => vec![ConfettiBurst {
+                options: ConfettiOptions {
+                    particle_count: 150,
+                    spread: 60.,
+                    start_velocity: 55.,
+                    origin: ConfettiOrigin { x: 0.5, y: 1. },
+                    ..default
+                },
+                delay_seconds: 0.,
+            }],
+        }
+    }
+}
+
 impl Element for DwarfConfettiElement {
     fn layout(
         &mut self,
         constraint: SizeConstraint,
-        _ctx: &mut LayoutContext,
+        ctx: &mut LayoutContext,
         _app: &AppContext,
     ) -> Vector2F {
+        let fallback = ctx.window_size.max(vec2f(1., 1.));
         let size = vec2f(
             if constraint.max.x().is_finite() {
                 constraint.max.x().max(1.)
             } else {
-                constraint.min.x().max(1.)
+                fallback.x().max(constraint.min.x()).max(1.)
             },
             if constraint.max.y().is_finite() {
                 constraint.max.y().max(1.)
             } else {
-                constraint.min.y().max(1.)
+                fallback.y().max(constraint.min.y()).max(1.)
             },
         );
         self.size = Some(size);
@@ -1969,50 +2136,55 @@ impl Element for DwarfConfettiElement {
 
         self.origin = Some(Point::from_vec2f(origin, ctx.scene.z_index()));
 
-        let elapsed = self.started_at.elapsed();
-        let progress = (elapsed.as_secs_f32() / Self::DURATION.as_secs_f32()).clamp(0., 1.);
+        let elapsed = self.run.started_at.elapsed();
+        let duration = Self::duration_for(self.run.preset);
+        let progress = (elapsed.as_secs_f32() / duration.as_secs_f32()).clamp(0., 1.);
         if progress >= 1. {
             return;
         }
 
         let time = elapsed.as_secs_f32();
 
-        // Native approximation of canvas-confetti defaults: 200 ticks at
-        // 60fps, startVelocity 45, decay 0.9, and gravity 1.
-        for index in 0..Self::PARTICLE_COUNT {
-            let particle = Self::particle(index);
-            let local_time = time - particle.delay;
+        for (burst_index, burst) in self.run.preset.bursts().into_iter().enumerate() {
+            let local_time = time - burst.delay_seconds;
             if local_time <= 0. {
                 continue;
             }
 
-            let life_progress = (local_time / particle.life).clamp(0., 1.);
-            if life_progress >= 1. {
-                continue;
+            for particle_index in 0..burst.options.particle_count {
+                let particle = Self::particle(&burst.options, particle_index, burst_index);
+                let tick = local_time * 60.;
+                let life_progress = (tick / particle.total_ticks).clamp(0., 1.);
+                if life_progress >= 1. {
+                    continue;
+                }
+
+                let alpha = ((1. - life_progress) * 255.).round() as u8;
+                let (color, highlight) =
+                    Self::color_pair(burst.options.palette, particle.color_slot, alpha);
+                let distance = Self::decayed_distance(&particle, tick);
+                let x = size.x() * particle.start_x
+                    + particle.angle_2d.cos() * distance
+                    + particle.drift * tick;
+                let y = size.y() * particle.start_y
+                    + particle.angle_2d.sin() * distance
+                    + particle.gravity * tick;
+
+                let padding = 24. * particle.scalar;
+                if x < -padding || x > size.x() + padding || y < -padding || y > size.y() + padding
+                {
+                    continue;
+                }
+
+                Self::draw_particle(
+                    &particle,
+                    origin + vec2f(x, y),
+                    local_time,
+                    color,
+                    highlight,
+                    ctx,
+                );
             }
-
-            let alpha = ((1. - life_progress) * 255.).round() as u8;
-            let (color, highlight) = Self::color_pair(particle.color_slot, alpha);
-            let drag_time = (1. - (-local_time * Self::DECAY_DRAG).exp()) / Self::DECAY_DRAG;
-            let x = size.x() * particle.start_x
-                + particle.velocity_x * drag_time
-                + particle.drift * local_time;
-            let y = size.y() * particle.start_y
-                + particle.velocity_y * drag_time
-                + particle.gravity * local_time;
-
-            if x < -20. || x > size.x() + 20. || y < -20. || y > size.y() + 20. {
-                continue;
-            }
-
-            Self::draw_particle(
-                &particle,
-                origin + vec2f(x, y),
-                local_time,
-                color,
-                highlight,
-                ctx,
-            );
         }
 
         ctx.repaint_after(Self::FRAME);
@@ -2109,7 +2281,7 @@ pub struct RootView {
     /// settings to apply after a new user login / initial cloud load completes
     pending_post_auth_onboarding_settings: Option<SelectedSettings>,
     paste_auth_token_modal: Option<ViewHandle<PasteAuthTokenModalView>>,
-    confetti_started_at: Option<instant::Instant>,
+    confetti_run: Option<DwarfConfettiRun>,
 }
 
 impl RootView {
@@ -2206,11 +2378,14 @@ impl RootView {
             view
         };
 
-        let confetti_started_at = matches!(
+        let confetti_run = matches!(
             auth_onboarding_state,
             AuthOnboardingState::LocalWelcome { .. }
         )
-        .then(instant::Instant::now);
+        .then_some(DwarfConfettiRun {
+            started_at: instant::Instant::now(),
+            preset: DwarfConfettiPreset::Celebration,
+        });
 
         let root_view = Self {
             auth_onboarding_state,
@@ -2227,7 +2402,7 @@ impl RootView {
             pending_tutorial: None,
             pending_post_auth_onboarding_settings: None,
             paste_auth_token_modal: None,
-            confetti_started_at,
+            confetti_run,
         };
 
         match &root_view.auth_onboarding_state {
@@ -3786,11 +3961,19 @@ impl View for RootView {
             stack.add_child(ChildView::new(modal).finish());
         }
 
-        if let Some(started_at) = self
-            .confetti_started_at
-            .filter(|started_at| started_at.elapsed() < DwarfConfettiElement::DURATION)
+        if let Some(run) = self
+            .confetti_run
+            .filter(|run| run.started_at.elapsed() < DwarfConfettiElement::duration_for(run.preset))
         {
-            stack.add_overlay_child(DwarfConfettiElement::new(started_at).finish());
+            stack.add_positioned_overlay_child(
+                DwarfConfettiElement::new(run).finish(),
+                OffsetPositioning::offset_from_parent(
+                    vec2f(0., 0.),
+                    ParentOffsetBounds::ParentBySize,
+                    ParentAnchor::TopLeft,
+                    ChildAnchor::TopLeft,
+                ),
+            );
         }
 
         if let Some(traffic_light_data) = self.traffic_light_data(app) {
@@ -3849,7 +4032,7 @@ pub enum RootViewAction {
     ShowOrHideNonQuakeModeWindows,
     ToggleFullscreen,
     DebugEnterOnboardingState,
-    ShowConfetti,
+    ShowConfetti(DwarfConfettiPreset),
 }
 
 impl TypedActionView for RootView {
@@ -3873,8 +4056,11 @@ impl TypedActionView for RootView {
             RootViewAction::DebugEnterOnboardingState => {
                 self.debug_enter_onboarding_state(&(), ctx);
             }
-            RootViewAction::ShowConfetti => {
-                self.confetti_started_at = Some(instant::Instant::now());
+            RootViewAction::ShowConfetti(preset) => {
+                self.confetti_run = Some(DwarfConfettiRun {
+                    started_at: instant::Instant::now(),
+                    preset: *preset,
+                });
                 ctx.notify();
             }
         }

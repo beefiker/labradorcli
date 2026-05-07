@@ -376,7 +376,7 @@ impl SlashCommandDataSource {
             .as_ref()
             .and_then(|s| s.harness.as_ref())
         {
-            Some(config) => config.harness_type == Harness::Oz,
+            Some(_) => false,
             None => true,
         }
     }

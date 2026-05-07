@@ -679,7 +679,7 @@ impl AgentManagementView {
             )),
         )];
 
-        for harness in [Harness::Oz, Harness::Claude, Harness::Codex] {
+        for harness in [Harness::Claude, Harness::Codex] {
             let mut fields = MenuItemFields::new(harness_display::display_name(harness))
                 .with_icon(harness_display::icon_for(harness))
                 .with_on_select_action(DropdownAction::SelectActionAndClose(
@@ -1312,8 +1312,7 @@ impl AgentManagementView {
                 // local conversation (always Dwarf Agent).
                 let harness = navigation_data
                     .and_then(|nav| history_model.get_server_conversation_metadata(&nav.id))
-                    .map(|m| Harness::from(m.harness))
-                    .or(Some(Harness::Oz));
+                    .map(|m| Harness::from(m.harness));
 
                 ConversationDetailsData::from_conversation_metadata(
                     *conversation_id,

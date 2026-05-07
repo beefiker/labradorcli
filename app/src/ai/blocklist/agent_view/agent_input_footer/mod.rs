@@ -847,19 +847,9 @@ impl AgentInputFooter {
 
         right = right.with_child(ChildView::new(&self.file_button).finish());
 
-        // The V2 model selector is Oz-specific; hide it for other harnesses
-        // until they support model selection.
-        let is_oz_harness =
-            self.ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model.as_ref(app).selected_harness() == Harness::Oz
-                });
-        if is_oz_harness {
-            if let Some(model_selector) = self.v2_model_selector.as_ref() {
-                right = right.with_child(ChildView::new(model_selector).finish());
-            }
-        }
+        // The V2 model selector was Oz-specific and has been removed along
+        // with the Oz harness.
+        let _ = app;
 
         Flex::row()
             .with_main_axis_size(MainAxisSize::Max)

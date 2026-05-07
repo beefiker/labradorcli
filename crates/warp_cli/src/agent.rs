@@ -118,14 +118,12 @@ impl HiddenComputerUseArgs {
         }
     }
 }
-/// The execution harness for an agent run.
+/// The execution harness for an agent run. Dwarf is local-CLI-only; the
+/// previous Warp-hosted "oz" harness has been removed.
 #[derive(Debug, Copy, Clone, ValueEnum, Eq, PartialEq, Default)]
 pub enum Harness {
-    /// Use Dwarf's built-in agent infrastructure (default).
-    #[default]
-    #[value(name = "oz")]
-    Oz,
     /// Delegate to the `claude` CLI.
+    #[default]
     #[value(name = "claude", alias = "claude-code")]
     Claude,
     /// Delegate to the `opencode` CLI.
@@ -151,13 +149,12 @@ impl Harness {
     pub fn parse_local_child_harness(value: &str) -> Option<Self> {
         match Self::parse_orchestration_harness(value) {
             Some(harness @ (Self::Claude | Self::OpenCode)) => Some(harness),
-            Some(Self::Oz) | Some(Self::Codex) | Some(Self::Unknown) | None => None,
+            Some(Self::Codex) | Some(Self::Unknown) | None => None,
         }
     }
 
     pub fn display_name(self) -> &'static str {
         match self {
-            Self::Oz => "Dwarf",
             Self::Claude => "Claude Code",
             Self::OpenCode => "OpenCode",
             Self::Codex => "Codex",
@@ -169,7 +166,6 @@ impl Harness {
 impl fmt::Display for Harness {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
-            Harness::Oz => "oz",
             Harness::Claude => "claude",
             Harness::OpenCode => "opencode",
             Harness::Codex => "codex",
@@ -303,7 +299,7 @@ pub struct RunAgentArgs {
     ///
     /// "oz" (default) uses Warp's built-in agent infrastructure.
     /// "claude" delegates to the `claude` CLI.
-    #[arg(long = "harness", value_name = "HARNESS", default_value_t = Harness::Oz, hide = true)]
+    #[arg(long = "harness", value_name = "HARNESS", default_value_t = Harness::Claude, hide = true)]
     pub harness: Harness,
 }
 
@@ -424,7 +420,7 @@ pub struct RunCloudArgs {
     ///
     /// "oz" (default) uses Warp's built-in agent infrastructure.
     /// "claude" delegates to the `claude` CLI.
-    #[arg(long = "harness", value_name = "HARNESS", default_value_t = Harness::Oz, hide = true)]
+    #[arg(long = "harness", value_name = "HARNESS", default_value_t = Harness::Claude, hide = true)]
     pub harness: Harness,
 
     /// Name of a managed secret for Claude Code harness authentication.

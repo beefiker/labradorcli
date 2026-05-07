@@ -134,8 +134,7 @@ pub(crate) enum HarnessKind {
     /// Third-party CLI-backed harness (e.g. Claude, Codex).
     ThirdParty(Box<dyn ThirdPartyHarness>),
     /// Harnesses that exist in the shared CLI enum but are not supported by the
-    /// standalone agent driver. Includes `Harness::Oz` after the local-only
-    /// transition: the Oz hosted-agent path is no longer supported.
+    /// standalone agent driver.
     Unsupported(Harness),
 }
 
@@ -162,7 +161,6 @@ impl fmt::Debug for HarnessKind {
 /// it.
 pub(crate) fn harness_kind(harness: Harness) -> Result<HarnessKind, AgentDriverError> {
     match harness {
-        Harness::Oz => Ok(HarnessKind::Unsupported(Harness::Oz)),
         Harness::Claude => Ok(HarnessKind::ThirdParty(Box::new(ClaudeHarness))),
         Harness::OpenCode => Ok(HarnessKind::Unsupported(Harness::OpenCode)),
         Harness::Codex => Ok(HarnessKind::ThirdParty(Box::new(CodexHarness))),

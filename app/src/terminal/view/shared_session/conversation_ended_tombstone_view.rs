@@ -130,14 +130,10 @@ impl TombstoneDisplayData {
         }
         if let Some(config) = &task.agent_config_snapshot {
             self.skill_name = config.name.clone();
-            // Default to Oz when the snapshot exists but has no explicit harness.
-            self.harness = Some(
-                config
-                    .harness
-                    .as_ref()
-                    .map(|h| h.harness_type)
-                    .unwrap_or(Harness::Oz),
-            );
+            self.harness = config
+                .harness
+                .as_ref()
+                .map(|h| h.harness_type);
         }
 
         if task.state.is_failure_like() {
@@ -480,8 +476,7 @@ impl ConversationEndedTombstoneView {
             // forked into a local Warp conversation. Unknown harness (None) is
             // treated as allowed so plain conversations and pre-load tasks still
             // show the button.
-            let harness_allows_continue =
-                !matches!(self.display_data.harness, Some(h) if h != Harness::Oz);
+            let harness_allows_continue = self.display_data.harness.is_none();
             if self.continue_locally_button.is_some()
                 && AISettings::as_ref(app).is_any_ai_enabled(app)
                 && harness_allows_continue

@@ -231,7 +231,6 @@ fn build_menu_items(
 
     vec![
         header,
-        item_for(Harness::Oz),
         item_for(Harness::Claude),
         item_for(Harness::Codex),
     ]

@@ -250,7 +250,7 @@ impl TerminalView {
                             environment,
                             DOCKER_SANDBOX_HOME_DIR.into(),
                             true, /* is_sandbox */
-                            Harness::Oz,
+                            Harness::default(),
                             ctx,
                         )
                     })

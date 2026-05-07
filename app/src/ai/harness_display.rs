@@ -15,7 +15,6 @@ use crate::ui_components::icons::Icon;
 /// User-visible display name for a [`Harness`].
 pub fn display_name(harness: Harness) -> &'static str {
     match harness {
-        Harness::Oz => "Dwarf",
         Harness::Claude => "Claude Code",
         Harness::OpenCode => "OpenCode",
         Harness::Codex => "Codex",
@@ -26,7 +25,6 @@ pub fn display_name(harness: Harness) -> &'static str {
 /// Leading icon for a [`Harness`].
 pub fn icon_for(harness: Harness) -> Icon {
     match harness {
-        Harness::Oz => Icon::Warp,
         Harness::Claude => Icon::ClaudeLogo,
         Harness::OpenCode => Icon::OpenCodeLogo,
         Harness::Codex => Icon::OpenAILogo,
@@ -38,7 +36,6 @@ pub fn icon_for(harness: Harness) -> Icon {
 /// default foreground color".
 pub fn brand_color(harness: Harness) -> Option<ColorU> {
     match harness {
-        Harness::Oz => None,
         Harness::Claude => Some(CLAUDE_ORANGE),
         Harness::OpenCode => None,
         Harness::Codex => Some(OPENAI_COLOR),
@@ -47,15 +44,16 @@ pub fn brand_color(harness: Harness) -> Option<ColorU> {
 }
 
 /// Map [`AIAgentHarness`] (from `ServerAIConversationMetadata`) to the
-/// canonical [`Harness`]. Server-only `Gemini` conversations surface as
-/// `Unknown` since dwarf no longer drives Gemini.
+/// canonical [`Harness`]. Server-only `Oz` and `Gemini` conversations surface
+/// as `Unknown` since dwarf no longer drives them.
 impl From<AIAgentHarness> for Harness {
     fn from(harness: AIAgentHarness) -> Self {
         match harness {
-            AIAgentHarness::Oz => Harness::Oz,
             AIAgentHarness::ClaudeCode => Harness::Claude,
             AIAgentHarness::Codex => Harness::Codex,
-            AIAgentHarness::Gemini | AIAgentHarness::Unknown => Harness::Unknown,
+            AIAgentHarness::Oz | AIAgentHarness::Gemini | AIAgentHarness::Unknown => {
+                Harness::Unknown
+            }
         }
     }
 }

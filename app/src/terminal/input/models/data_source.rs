@@ -329,17 +329,20 @@ struct ModelSearchItem {
 
 impl ModelSearchItem {
     fn new(llm: &LLMInfo, active_llm_id: &LLMId, app: &AppContext) -> Self {
+        let setup_kind = local_auth_setup_kind_for_provider(&llm.provider);
         // If the model requires an upgrade but the user already has a BYOK key
         // for this provider, treat it as enabled by clearing the disable reason.
-        let disable_reason = local_auth_disable_reason(&llm.provider).or_else(|| {
-            if llm.disable_reason == Some(DisableReason::RequiresUpgrade)
-                && is_using_api_key_for_provider(&llm.provider, app)
-            {
-                None
-            } else {
-                llm.disable_reason.clone()
-            }
-        });
+        let disable_reason = setup_kind
+            .map(|_| DisableReason::LocalAuthMissing)
+            .or_else(|| {
+                if llm.disable_reason == Some(DisableReason::RequiresUpgrade)
+                    && is_using_api_key_for_provider(&llm.provider, app)
+                {
+                    None
+                } else {
+                    llm.disable_reason.clone()
+                }
+            });
         Self {
             id: llm.id.clone(),
             provider: llm.provider.clone(),
@@ -348,7 +351,7 @@ impl ModelSearchItem {
             display_text: llm.display_name.clone(),
             is_selected: &llm.id == active_llm_id,
             disable_reason,
-            setup_kind: None,
+            setup_kind,
             name_match_result: None,
             score: OrderedFloat(f64::MIN),
             manage_api_key_mouse_state: Default::default(),
@@ -385,16 +388,24 @@ impl ModelSearchItem {
         self.score = score;
         self
     }
+
+    fn action_id(&self) -> LLMId {
+        self.setup_kind
+            .map(LocalAuthSetupKind::id)
+            .unwrap_or_else(|| self.id.clone())
+    }
 }
 
-fn local_auth_disable_reason(provider: &LLMProvider) -> Option<DisableReason> {
-    let auth_missing = match provider {
-        LLMProvider::OpenAI => !ai::local_openai_auth::has_access_token(),
-        LLMProvider::Anthropic => !ai::local_claude_auth::has_auth_state(),
-        _ => false,
-    };
-
-    auth_missing.then_some(DisableReason::LocalAuthMissing)
+fn local_auth_setup_kind_for_provider(provider: &LLMProvider) -> Option<LocalAuthSetupKind> {
+    match provider {
+        LLMProvider::OpenAI if !ai::local_openai_auth::has_access_token() => {
+            Some(LocalAuthSetupKind::Codex)
+        }
+        LLMProvider::Anthropic if !ai::local_claude_auth::has_auth_state() => {
+            Some(LocalAuthSetupKind::Claude)
+        }
+        _ => None,
+    }
 }
 
 impl SearchItem for ModelSearchItem {
@@ -733,7 +744,7 @@ impl SearchItem for ModelSearchItem {
 
     fn accept_result(&self) -> Self::Action {
         AcceptModel {
-            id: self.id.clone(),
+            id: self.action_id(),
         }
     }
 
@@ -742,7 +753,7 @@ impl SearchItem for ModelSearchItem {
     }
 
     fn is_disabled(&self) -> bool {
-        self.disable_reason.is_some()
+        self.disable_reason.is_some() && self.setup_kind.is_none()
     }
 
     fn tooltip(&self) -> Option<String> {

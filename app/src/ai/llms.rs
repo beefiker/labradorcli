@@ -416,6 +416,57 @@ const LOCAL_CODEX_MODEL_IDS: &[&str] = &[
 ];
 const LOCAL_CLAUDE_MODEL_IDS: &[&str] = &["claude-code", "sonnet", "haiku", "opus"];
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LocalModelRuntime {
+    Codex,
+    Claude,
+}
+
+impl LocalModelRuntime {
+    fn has_auth(self) -> bool {
+        match self {
+            Self::Codex => ai::local_openai_auth::has_access_token(),
+            Self::Claude => ai::local_claude_auth::has_auth_state(),
+        }
+    }
+
+    fn default_model_id(self) -> &'static str {
+        match self {
+            Self::Codex => "gpt-5.5",
+            Self::Claude => "claude-code",
+        }
+    }
+}
+
+fn local_model_runtime_for_id(id: &LLMId) -> Option<LocalModelRuntime> {
+    let id = id.as_str();
+    if id == "auto" || LOCAL_CODEX_MODEL_IDS.contains(&id) {
+        Some(LocalModelRuntime::Codex)
+    } else if LOCAL_CLAUDE_MODEL_IDS.contains(&id) {
+        Some(LocalModelRuntime::Claude)
+    } else {
+        None
+    }
+}
+
+fn is_defaultish_local_model(id: &LLMId, runtime: LocalModelRuntime) -> bool {
+    match runtime {
+        LocalModelRuntime::Codex => matches!(id.as_str(), "auto" | "gpt-5.5"),
+        LocalModelRuntime::Claude => matches!(id.as_str(), "claude-code"),
+    }
+}
+
+fn only_authed_local_runtime() -> Option<LocalModelRuntime> {
+    match (
+        ai::local_openai_auth::has_access_token(),
+        ai::local_claude_auth::has_auth_state(),
+    ) {
+        (true, false) => Some(LocalModelRuntime::Codex),
+        (false, true) => Some(LocalModelRuntime::Claude),
+        _ => None,
+    }
+}
+
 fn local_codex_llm_info(id: &str) -> LLMInfo {
     LLMInfo {
         display_name: id.to_owned(),
@@ -466,6 +517,14 @@ fn local_claude_llm_info(id: &str) -> LLMInfo {
 }
 
 fn local_agent_available_llms() -> AvailableLLMs {
+    let default_id = if ai::local_openai_auth::has_access_token() {
+        "gpt-5.5"
+    } else if ai::local_claude_auth::has_auth_state() {
+        "claude-code"
+    } else {
+        "auto"
+    };
+
     let mut choices = vec![LLMInfo {
         display_name: "Codex default".to_owned(),
         base_model_name: "Codex default".to_owned(),
@@ -497,7 +556,7 @@ fn local_agent_available_llms() -> AvailableLLMs {
     );
 
     AvailableLLMs {
-        default_id: "gpt-5.5".to_owned().into(),
+        default_id: default_id.to_owned().into(),
         choices,
         preferred_codex_model_id: Some("gpt-5.5".to_owned().into()),
     }
@@ -696,6 +755,15 @@ impl LLMPreferences {
         app: &AppContext,
         terminal_view_id: Option<EntityId>,
     ) -> &LLMInfo {
+        let selected = self.get_configured_base_model(app, terminal_view_id);
+        self.resolve_effective_local_agent_model(selected)
+    }
+
+    fn get_configured_base_model(
+        &self,
+        app: &AppContext,
+        terminal_view_id: Option<EntityId>,
+    ) -> &LLMInfo {
         if let Some(terminal_view_id) = terminal_view_id {
             let raw_override = self.base_llm_for_terminal_view.get(&terminal_view_id);
             if let Some(llm_id) = raw_override {
@@ -713,6 +781,25 @@ impl LLMPreferences {
             .clone()
             .and_then(|id| self.models_by_feature.agent_mode.info_for_id(&id))
             .unwrap_or_else(|| self.models_by_feature.agent_mode.default_llm_info())
+    }
+
+    fn resolve_effective_local_agent_model<'a>(&'a self, selected: &'a LLMInfo) -> &'a LLMInfo {
+        let Some(runtime) = local_model_runtime_for_id(&selected.id) else {
+            return selected;
+        };
+
+        if runtime.has_auth() || !is_defaultish_local_model(&selected.id, runtime) {
+            return selected;
+        }
+
+        let Some(fallback_runtime) = only_authed_local_runtime() else {
+            return selected;
+        };
+
+        self.models_by_feature
+            .agent_mode
+            .info_for_id(&fallback_runtime.default_model_id().into())
+            .unwrap_or(selected)
     }
 
     pub fn get_active_coding_model<'a>(

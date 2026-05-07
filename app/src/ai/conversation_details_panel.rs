@@ -283,8 +283,7 @@ impl ConversationDetailsData {
 
         let harness = conversation
             .server_metadata()
-            .map(|m| Harness::from(m.harness))
-            .or(Some(Harness::Oz));
+            .map(|m| Harness::from(m.harness));
 
         ConversationDetailsData {
             mode: PanelMode::Conversation {
@@ -340,11 +339,7 @@ impl ConversationDetailsData {
             .and_then(|spec_str| SkillSpec::from_str(spec_str).ok());
 
         let harness = task.agent_config_snapshot.as_ref().and_then(|config| {
-            config
-                .harness
-                .as_ref()
-                .map(|h| h.harness_type)
-                .or(Some(Harness::Oz))
+            config.harness.as_ref().map(|h| h.harness_type)
         });
 
         ConversationDetailsData {
@@ -591,7 +586,7 @@ impl ConversationDetailsPanel {
                 }
                 // Hide for non-Oz harnesses (e.g. Claude, Gemini): they can't be
                 // forked into a local Warp conversation.
-                if matches!(self.data.harness, Some(h) if h != Harness::Oz) {
+                if self.data.harness.is_some() {
                     return None;
                 }
 

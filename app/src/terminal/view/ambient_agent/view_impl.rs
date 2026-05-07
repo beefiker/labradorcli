@@ -471,7 +471,6 @@ impl TerminalView {
             return false;
         };
         match ambient_agent_view_model.as_ref(ctx).selected_harness() {
-            Harness::Oz => false,
             Harness::Claude => matches!(cli_agent, CLIAgent::Claude),
             Harness::OpenCode => matches!(cli_agent, CLIAgent::OpenCode),
             Harness::Codex => matches!(cli_agent, CLIAgent::Codex),

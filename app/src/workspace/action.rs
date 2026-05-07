@@ -201,6 +201,9 @@ pub enum WorkspaceAction {
     ViewUserDocs,
     ViewLatestChangelog,
     ShowConfetti,
+    ShowFireworksConfetti,
+    ShowSnowConfetti,
+    ShowCannonConfetti,
     ViewPrivacyPolicy,
     SendFeedback,
     /// Open the log directory in the system file explorer with the current log file selected.
@@ -787,6 +790,9 @@ impl WorkspaceAction {
             | ViewUserDocs
             | ViewLatestChangelog
             | ShowConfetti
+            | ShowFireworksConfetti
+            | ShowSnowConfetti
+            | ShowCannonConfetti
             | ViewPrivacyPolicy
             | SendFeedback
             | ChangeCursor(_)
