@@ -1214,54 +1214,6 @@ impl AgentDriver {
         // MCP servers *may* rely on cloud provider credentials.
         Self::setup_cloud_providers(&foreground).await?;
 
-        // For the Oz harness only: set up MCP servers, model overrides, and profile information.
-        if matches!(task.harness, HarnessKind::Oz) {
-            // Resolve MCP specs into existing server UUIDs and ephemeral installations.
-            let mcp_specs = task.mcp_specs.clone();
-            let (existing_uuids, ephemeral_installations) = foreground
-                .spawn(move |_, _| Self::resolve_mcp_specs(&mcp_specs))
-                .await??;
-
-            // Start any requested existing MCP servers first.
-            log::info!(
-                "Starting {} existing and {} ephemeral MCP servers",
-                existing_uuids.len(),
-                ephemeral_installations.len()
-            );
-
-            // TODO(BenS): combine these
-            if !existing_uuids.is_empty() {
-                foreground
-                    .spawn(move |me, ctx| me.start_mcp_servers(&existing_uuids, ctx))
-                    .await?
-                    .await?;
-            }
-            // Start ephemeral MCP servers from inline JSON specs.
-            if !ephemeral_installations.is_empty() {
-                foreground
-                    .spawn(move |me, ctx| {
-                        me.start_ephemeral_mcp_servers(ephemeral_installations, ctx)
-                    })
-                    .await?
-                    .await?;
-            }
-            let profile = task.profile.clone();
-            foreground
-                .spawn(move |me, ctx| me.configure_terminal(profile, ctx))
-                .await??;
-
-            if let Some(model_id) = task.model.clone() {
-                foreground
-                    .spawn(move |me, ctx| me.set_base_model_override(model_id, ctx))
-                    .await??;
-            }
-
-            foreground
-                .spawn(|me, ctx| me.start_profile_mcp_servers(ctx))
-                .await?
-                .await?;
-        }
-
         // For all harnesses: wait for the shared session and prepare the environment.
         foreground
             .spawn(|me, ctx| {
@@ -1277,28 +1229,10 @@ impl AgentDriver {
             log::info!("Loading environment...");
             let environment_github_repos = environment.github_repos.clone();
 
-            // Subscribe to file-based MCP discovery BEFORE prepare_environment triggers the
-            // pipeline so no CloudEnvMcpScanComplete events are missed.
-            //
-            // File-based MCP discovery is Oz-only.
-            // TODO(REMOTE-1345): handle MCP setup for third-party harnesses.
-            let file_based_discovery_rx = match &task.harness {
-                HarnessKind::Oz => {
-                    let github_repos = environment_github_repos.clone();
-                    Some(
-                        foreground
-                            .spawn(move |me, ctx| {
-                                let expected_repo_paths: Vec<PathBuf> = github_repos
-                                    .iter()
-                                    .map(|repo| me.working_dir.join(&repo.repo))
-                                    .collect();
-                                me.setup_file_based_mcp_discovery(expected_repo_paths, ctx)
-                            })
-                            .await?,
-                    )
-                }
-                HarnessKind::ThirdParty(_) | HarnessKind::Unsupported(_) => None,
-            };
+            // File-based MCP discovery used to be Oz-only and has been removed
+            // along with the Oz harness. Third-party harnesses will need their
+            // own MCP setup (TODO REMOTE-1345).
+            let file_based_discovery_rx: Option<futures::channel::oneshot::Receiver<Vec<uuid::Uuid>>> = None;
 
             let harness = task.harness.harness();
             foreground
@@ -1354,64 +1288,13 @@ impl AgentDriver {
                 }
             }
 
-            // Skill loading is Oz-only; third-party harnesses have their own skill systems.
-            match &task.harness {
-                HarnessKind::Oz => {
-                    // Load skills from environment repos synchronously so the initial
-                    // message includes them. File trees are ready after prepare_environment.
-                    let github_repos = environment_github_repos.clone();
-                    let load_skills_result = foreground
-                        .spawn(move |me, ctx| {
-                            let repo_paths: Vec<PathBuf> = github_repos
-                                .iter()
-                                .map(|repo| me.working_dir.join(&repo.repo))
-                                .collect();
-                            let skills = SkillWatcher::read_skills_for_repos(&repo_paths, ctx);
-                            if !skills.is_empty() {
-                                log::info!(
-                                    "Loaded {} skill(s) from environment repos",
-                                    skills.len()
-                                );
-                            }
-                            SkillManager::handle(ctx).update(ctx, |manager, _| {
-                                // All repo skills should be in scope regardless of cwd when
-                                // a cloud environment is configured.
-                                manager.set_cloud_environment(true);
-                                manager.handle_skills_added(skills);
-                            });
-                        })
-                        .await;
-
-                    if let Err(err) = load_skills_result {
-                        log::warn!("Failed to load environment repo skills: {err}");
-                    }
-                }
-                HarnessKind::ThirdParty(_) | HarnessKind::Unsupported(_) => {}
-            }
+            // Repo-skill loading from cloud environments was Oz-only and has
+            // been removed. Third-party harnesses use their own skill systems.
+            let _ = environment_github_repos;
         }
 
         // Run the harness with a prompt
         match task.harness {
-            HarnessKind::Oz => {
-                let conversation_status = foreground
-                    .spawn(move |me, ctx| me.execute_run(task.prompt, ctx))
-                    .await?
-                    .await
-                    .map_err(|_| {
-                        log::error!("Subscription dropped before agent finished");
-                        AgentDriverError::InvalidRuntimeState
-                    })?;
-
-                // Pause before returning to make sure that all conversation events are transmitted before the session is closed.
-                // TODO: This is a bit of a bandaid fix, and it would be better if we explicitly waited for the session to end before terminating.
-                // The way we could do that is through having the driver wait for all in-flight streams to be finished before terminating
-                // and then call stop_sharing_session when they're done. To know when streams are finished, we would need to modify start_ordered_terminal_events_listener
-                // to send a message when the streams are finished, flushed, and the websocket is disconnected. For now, we'll just sleep for a second, as this seems
-                // to be enough time for the streams to be finished and the events to be flushed.
-                warpui::r#async::Timer::after(Duration::from_secs(1)).await;
-
-                conversation_status.into_result()
-            }
             HarnessKind::ThirdParty(harness) => {
                 let harness_exit_rx = Self::setup_harness(harness.as_ref(), &foreground).await?;
                 let runner =

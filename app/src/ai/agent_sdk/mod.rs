@@ -640,7 +640,7 @@ impl AgentDriverRunner {
                         ),
                     });
                 }
-                HarnessKind::Oz | HarnessKind::ThirdParty(_) => {}
+                HarnessKind::ThirdParty(_) => {}
             }
 
             // Validate that the third-party harness is installed and authed.
@@ -1108,40 +1108,6 @@ impl AgentDriverRunner {
         harness: &HarnessKind,
     ) -> Result<Option<driver::ResumeOptions>, AgentDriverError> {
         match harness {
-            HarnessKind::Oz => {
-                let server_api = foreground
-                    .spawn(|_, ctx| {
-                        ServerApiProvider::handle(ctx)
-                            .as_ref(ctx)
-                            .get_ai_client()
-                            .clone()
-                    })
-                    .await?;
-                let token = ServerConversationToken::new(conversation_id.clone());
-                let (conversation_data, metadata) = server_api
-                    .get_ai_conversation(token)
-                    .await
-                    .map_err(|err| AgentDriverError::ConversationLoadFailed(format!("{err}")))?;
-                let conversation = convert_conversation_data_to_ai_conversation(
-                    AIConversationId::default(),
-                    &conversation_data,
-                    metadata,
-                    RestorationMode::Continue,
-                )
-                .ok_or_else(|| {
-                    AgentDriverError::ConversationLoadFailed(
-                        "Failed to convert conversation data to AIConversation".into(),
-                    )
-                })?;
-
-                Ok(Some(driver::ResumeOptions::Oz(Box::new(
-                    ConversationRestorationInNewPaneType::Historical {
-                        conversation,
-                        should_use_live_appearance: false,
-                        ambient_agent_task_id: None,
-                    },
-                ))))
-            }
             HarnessKind::ThirdParty(h) => {
                 let harness_support_client = foreground
                     .spawn(|_, ctx| ServerApiProvider::as_ref(ctx).get_harness_support_client())

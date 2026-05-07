@@ -131,11 +131,11 @@ pub(crate) trait ThirdPartyHarness: Send + Sync {
 
 /// Harness type for driver dispatch.
 pub(crate) enum HarnessKind {
-    Oz,
-    /// Third-party CLI-backed harness (e.g. Claude, Gemini).
+    /// Third-party CLI-backed harness (e.g. Claude, Codex).
     ThirdParty(Box<dyn ThirdPartyHarness>),
     /// Harnesses that exist in the shared CLI enum but are not supported by the
-    /// standalone agent driver.
+    /// standalone agent driver. Includes `Harness::Oz` after the local-only
+    /// transition: the Oz hosted-agent path is no longer supported.
     Unsupported(Harness),
 }
 
@@ -143,7 +143,6 @@ impl HarnessKind {
     /// Corresponding [`Harness`] enum value.
     pub(crate) fn harness(&self) -> Harness {
         match self {
-            HarnessKind::Oz => Harness::Oz,
             HarnessKind::ThirdParty(h) => h.harness(),
             HarnessKind::Unsupported(harness) => *harness,
         }
@@ -163,7 +162,7 @@ impl fmt::Debug for HarnessKind {
 /// it.
 pub(crate) fn harness_kind(harness: Harness) -> Result<HarnessKind, AgentDriverError> {
     match harness {
-        Harness::Oz => Ok(HarnessKind::Oz),
+        Harness::Oz => Ok(HarnessKind::Unsupported(Harness::Oz)),
         Harness::Claude => Ok(HarnessKind::ThirdParty(Box::new(ClaudeHarness))),
         Harness::OpenCode => Ok(HarnessKind::Unsupported(Harness::OpenCode)),
         Harness::Codex => Ok(HarnessKind::ThirdParty(Box::new(CodexHarness))),
