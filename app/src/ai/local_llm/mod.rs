@@ -7,6 +7,7 @@
 
 mod claude;
 mod codex;
+pub mod suggestion;
 
 use async_trait::async_trait;
 use std::sync::Arc;

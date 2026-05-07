@@ -13,6 +13,11 @@ use crate::ai::blocklist::{
     apply_edits, BlocklistAIHistoryModel, FileReadResult, RequestFileEditsFormatKind,
     SessionContext,
 };
+use crate::ai::local_llm::{
+    resolve_provider as resolve_local_provider,
+    suggestion::{generate_prompt_suggestion, LocalPromptSuggestion},
+    Provider as LocalProvider,
+};
 use crate::ai::paths::host_native_absolute_path;
 use crate::auth::auth_state::AuthStateProvider;
 use crate::server::server_api::ServerApiProvider;
@@ -158,6 +163,17 @@ impl PassiveSuggestionsModel {
         supported_tools: Vec<warp_multi_agent_api::ToolType>,
         ctx: &mut ModelContext<Self>,
     ) {
+        // If the user has a local CLI provider installed, generate the
+        // suggestion locally instead of through the MAA endpoint. This skips
+        // the streaming pipeline entirely and emits a one-shot prompt
+        // suggestion. Code-diff suggestions are not produced on the local
+        // path (punted to a follow-up phase).
+        // TODO(phase-4): read default_preference from AISettings.
+        if let Some(provider) = resolve_local_provider(LocalProvider::Codex) {
+            self.send_local_request(provider, followup_conversation_id, trigger, ctx);
+            return;
+        }
+
         // Capture before the call — `Some` means there's a real conversation
         // the user can continue in; `None` means ephemeral.
         let continuable_conversation_id = followup_conversation_id;
@@ -305,6 +321,95 @@ impl PassiveSuggestionsModel {
                         );
                     }
                 }
+            },
+        );
+
+        self.latest_request = Some(Request {
+            _stream_handle: stream_handle,
+            _cancellation_tx: cancellation_tx,
+            conversation_id,
+            trigger,
+            start_ts: Utc::now(),
+        });
+    }
+
+    /// Local-CLI replacement for `send_request`. Builds a one-shot prompt
+    /// based on the trigger + full conversation history, calls the user's
+    /// installed CLI agent, and emits a `NewPromptSuggestion` event.
+    ///
+    /// Code-diff suggestions are never produced on this path; only prompt
+    /// suggestions.
+    fn send_local_request(
+        &mut self,
+        provider: LocalProvider,
+        followup_conversation_id: Option<AIConversationId>,
+        trigger: PassiveSuggestionTrigger,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let continuable_conversation_id = followup_conversation_id;
+        let conversation_id = followup_conversation_id.unwrap_or_else(AIConversationId::new);
+
+        // Snapshot the conversation history (full markdown export) so the
+        // async task doesn't need access to the history model.
+        let history_markdown = followup_conversation_id
+            .and_then(|id| {
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&id)
+                    .map(|c| c.export_to_markdown(None))
+            })
+            .unwrap_or_default();
+
+        let (cancellation_tx, _cancellation_rx) = futures::channel::oneshot::channel();
+        let trigger_for_async = trigger.clone();
+
+        let stream_handle = ctx.spawn(
+            async move {
+                // Cancellation is handled at the spawn-handle level: dropping
+                // the `Request` (which owns the handle) cancels the future.
+                match generate_prompt_suggestion(
+                    &trigger_for_async,
+                    &history_markdown,
+                    provider,
+                )
+                .await
+                {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log::warn!("[passive-suggestions] local LLM failed: {e}");
+                        None
+                    }
+                }
+            },
+            move |me, result, ctx| {
+                let Some(latest_request) = &me.latest_request else {
+                    return;
+                };
+                if latest_request.conversation_id != conversation_id {
+                    return;
+                }
+                if !me.is_suggestion_still_valid(ctx) {
+                    return;
+                }
+                let Some(LocalPromptSuggestion { prompt, label }) = result else {
+                    return;
+                };
+                if prompt.is_empty() {
+                    return;
+                }
+
+                let request_duration_ms = Utc::now()
+                    .signed_duration_since(latest_request.start_ts)
+                    .num_milliseconds()
+                    .max(0) as u64;
+
+                ctx.emit(PassiveSuggestionsEvent::NewPromptSuggestion {
+                    prompt,
+                    label,
+                    request_duration_ms,
+                    trigger: Some(latest_request.trigger.clone()),
+                    conversation_id: continuable_conversation_id,
+                    server_request_token: None,
+                });
             },
         );
 
