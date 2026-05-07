@@ -1100,9 +1100,6 @@ fn handle_terminal_view_event(
                     open_code_review: open_code_review.clone(),
                 });
             }
-            Event::ShowCloudAgentCapacityModal { variant } => {
-                ctx.emit(pane_group::Event::ShowCloudAgentCapacityModal { variant: *variant });
-            }
             Event::FreeTierLimitCheckTriggered => {
                 ctx.emit(pane_group::Event::FreeTierLimitCheckTriggered);
             }

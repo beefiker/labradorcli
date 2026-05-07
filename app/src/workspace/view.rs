@@ -1,5 +1,4 @@
 mod build_plan_migration_modal;
-pub(crate) mod cloud_agent_capacity_modal;
 pub(crate) mod codex_modal;
 pub mod conversation_list;
 #[cfg(enable_crash_recovery)]
@@ -118,9 +117,6 @@ use crate::workspace::header_toolbar_item::HeaderToolbarItemKind;
 use crate::workspace::tab_settings::TabCloseButtonPosition;
 use crate::workspace::view::build_plan_migration_modal::{
     BuildPlanMigrationModal, BuildPlanMigrationModalEvent,
-};
-use crate::workspace::view::cloud_agent_capacity_modal::{
-    CloudAgentCapacityModal, CloudAgentCapacityModalEvent, CloudAgentCapacityModalVariant,
 };
 use crate::workspace::view::codex_modal::{CodexModal, CodexModalEvent};
 use crate::workspace::view::free_tier_limit_hit_modal::{
@@ -264,7 +260,8 @@ use crate::resource_center::{
 };
 use crate::reward_view::{RewardEvent, RewardKind, RewardView};
 use crate::root_view::{
-    quake_mode_window_id, NewWorkspaceSource, OpenLaunchConfigArg, RootViewAction,
+    quake_mode_window_id, DwarfConfettiPreset, NewWorkspaceSource, OpenLaunchConfigArg,
+    RootViewAction,
 };
 use crate::search::command_search::searcher::{
     AcceptedHistoryItem, AcceptedWorkflow, CommandSearchItemAction,
@@ -972,7 +969,6 @@ pub struct Workspace {
     enable_auto_reload_modal: ViewHandle<EnableAutoReloadModal>,
     build_plan_migration_modal: ViewHandle<BuildPlanMigrationModal>,
     codex_modal: ViewHandle<CodexModal>,
-    cloud_agent_capacity_modal: ViewHandle<CloudAgentCapacityModal>,
     free_tier_limit_hit_modal: ViewHandle<FreeTierLimitHitModal>,
     free_tier_limit_check_triggered: bool,
     toast_stack: ViewHandle<DismissibleToastStack<WorkspaceAction>>,
@@ -2634,12 +2630,6 @@ impl Workspace {
             me.handle_codex_modal_event(event, ctx);
         });
 
-        let cloud_agent_capacity_modal =
-            ctx.add_typed_action_view(|_| CloudAgentCapacityModal::new());
-        ctx.subscribe_to_view(&cloud_agent_capacity_modal, |me, _, event, ctx| {
-            me.handle_cloud_agent_capacity_modal_event(event, ctx);
-        });
-
         let free_tier_limit_hit_modal = ctx.add_typed_action_view(FreeTierLimitHitModal::new);
         ctx.subscribe_to_view(&free_tier_limit_hit_modal, |me, _, event, ctx| {
             me.handle_free_tier_limit_modal_event(event, ctx);
@@ -3149,7 +3139,6 @@ impl Workspace {
             notification_mailbox_view,
             notification_toast_stack,
             codex_modal,
-            cloud_agent_capacity_modal,
             free_tier_limit_hit_modal,
             free_tier_limit_check_triggered: false,
             lightbox_view: None,
@@ -8312,8 +8301,17 @@ impl Workspace {
             MenuItemFields::new("Keyboard shortcuts")
                 .with_on_select_action(WorkspaceAction::ToggleKeybindingsPage)
                 .into_item(),
-            MenuItemFields::new("Confetti")
+            MenuItemFields::new("Confetti: Celebration")
                 .with_on_select_action(WorkspaceAction::ShowConfetti)
+                .into_item(),
+            MenuItemFields::new("Confetti: Fireworks")
+                .with_on_select_action(WorkspaceAction::ShowFireworksConfetti)
+                .into_item(),
+            MenuItemFields::new("Confetti: Snow")
+                .with_on_select_action(WorkspaceAction::ShowSnowConfetti)
+                .into_item(),
+            MenuItemFields::new("Confetti: Cannon")
+                .with_on_select_action(WorkspaceAction::ShowCannonConfetti)
                 .into_item(),
             MenuItem::Separator,
             MenuItemFields::new("Documentation")
@@ -14023,9 +14021,6 @@ impl Workspace {
                     });
                 }
             }
-            pane_group::Event::ShowCloudAgentCapacityModal { variant } => {
-                self.open_cloud_agent_capacity_modal(*variant, ctx);
-            }
             pane_group::Event::FreeTierLimitCheckTriggered => {
                 self.free_tier_limit_check_triggered = true;
             }
@@ -16031,29 +16026,6 @@ impl Workspace {
                 }
             });
         }
-    }
-
-    fn handle_cloud_agent_capacity_modal_event(
-        &mut self,
-        event: &CloudAgentCapacityModalEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            CloudAgentCapacityModalEvent::Close => {
-                self.current_workspace_state
-                    .is_cloud_agent_capacity_modal_open = false;
-                self.focus_active_tab(ctx);
-                ctx.notify();
-            }
-        }
-    }
-
-    pub fn open_cloud_agent_capacity_modal(
-        &mut self,
-        variant: CloudAgentCapacityModalVariant,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let _ = (variant, ctx);
     }
 
     fn handle_free_tier_limit_modal_event(
@@ -19916,7 +19888,17 @@ impl TypedActionView for Workspace {
             JoinSlack => self.join_slack(ctx),
             ViewUserDocs => self.view_user_docs(ctx),
             ViewLatestChangelog => self.view_latest_changelog(ctx),
-            ShowConfetti => ctx.dispatch_typed_action(&RootViewAction::ShowConfetti),
+            ShowConfetti => ctx.dispatch_typed_action(&RootViewAction::ShowConfetti(
+                DwarfConfettiPreset::Celebration,
+            )),
+            ShowFireworksConfetti => ctx.dispatch_typed_action(&RootViewAction::ShowConfetti(
+                DwarfConfettiPreset::Fireworks,
+            )),
+            ShowSnowConfetti => {
+                ctx.dispatch_typed_action(&RootViewAction::ShowConfetti(DwarfConfettiPreset::Snow))
+            }
+            ShowCannonConfetti => ctx
+                .dispatch_typed_action(&RootViewAction::ShowConfetti(DwarfConfettiPreset::Cannon)),
             ViewPrivacyPolicy => self.view_privacy_policy(ctx),
             SendFeedback => self.send_feedback(ctx),
             #[cfg(not(target_family = "wasm"))]
@@ -22499,14 +22481,6 @@ impl View for Workspace {
 
         if self.current_workspace_state.is_codex_modal_open {
             stack.add_child(ChildView::new(&self.codex_modal).finish());
-        }
-
-        if FeatureFlag::CloudMode.is_enabled()
-            && self
-                .current_workspace_state
-                .is_cloud_agent_capacity_modal_open
-        {
-            stack.add_child(ChildView::new(&self.cloud_agent_capacity_modal).finish());
         }
 
         if self

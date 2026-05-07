@@ -162,7 +162,6 @@ use crate::terminal::view::ssh_remote_server_failed_banner::{
     SshRemoteServerFailedBanner, SshRemoteServerFailedBannerEvent, SshRemoteServerFailureKind,
 };
 use crate::terminal::view::telemetry::PromptSuggestionFallbackReason;
-use crate::workspace::view::cloud_agent_capacity_modal::CloudAgentCapacityModalVariant;
 use crate::workspaces::user_workspaces::UserWorkspacesEvent;
 
 pub use self::link_detection::GridHighlightedLink;
@@ -251,7 +250,7 @@ use crate::env_vars::{
 };
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::persistence::{self, FinishedCommandMetadata};
-use crate::root_view::RootViewAction;
+use crate::root_view::{DwarfConfettiPreset, RootViewAction};
 use crate::safe_warn;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ObjectUid, SyncId};
@@ -2036,10 +2035,6 @@ pub enum Event {
     PluggableNotification {
         title: Option<String>,
         body: String,
-    },
-    /// Emitted when cloud mode runs should display the cloud-agent capacity/credits modal.
-    ShowCloudAgentCapacityModal {
-        variant: CloudAgentCapacityModalVariant,
     },
     FreeTierLimitCheckTriggered,
     /// Emitted when the StartAgent executor needs the workspace to create a new child
@@ -14749,7 +14744,9 @@ impl TerminalView {
             && is_build_test_or_check_command(&block.command);
 
         if completed_long_running_command || fixed_previous_failure {
-            ctx.dispatch_typed_action(&RootViewAction::ShowConfetti);
+            ctx.dispatch_typed_action(&RootViewAction::ShowConfetti(
+                DwarfConfettiPreset::Celebration,
+            ));
         }
     }
 
