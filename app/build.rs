@@ -158,15 +158,52 @@ fn generate_channel_config_if_needed(target_family: &str, target_os: &str) {
 
     let config_bin = "warp-channel-config";
 
-    // Check if the config binary is available on PATH. If not, we can't generate embedded
-    // configs. This is expected for external contributors building Warp OSS.
-    if Command::new(config_bin)
+    // Check if the config binary is available on PATH. If not, fall back to writing a
+    // minimal stub config for each channel so `include_str!` in `channel_config.rs`
+    // doesn't fail at compile time. The stub points at empty server URLs and disables
+    // telemetry/autoupdate/crash-reporting/MCP-static — appropriate for a local-only
+    // OSS build that doesn't have access to the private channel-config repo.
+    let generator_available = Command::new(config_bin)
         .arg("--help")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
-        .is_err()
-    {
+        .is_ok();
+
+    if !generator_available {
+        let out_dir = env::var("OUT_DIR").expect("OUT_DIR must be set");
+        for (channel, app_name) in [
+            ("local", "WarpLocal"),
+            ("dev", "WarpDev"),
+            ("stable", "Warp"),
+            ("preview", "WarpPreview"),
+        ] {
+            let stub = format!(
+                r#"{{
+  "app_id": "dev.warp.{app_name}",
+  "logfile_name": "warp.log",
+  "server_config": {{
+    "server_root_url": "",
+    "rtc_server_url": "",
+    "session_sharing_server_url": null,
+    "firebase_auth_api_key": ""
+  }},
+  "oz_config": {{
+    "oz_root_url": "",
+    "workload_audience_url": null
+  }},
+  "telemetry_config": null,
+  "autoupdate_config": null,
+  "crash_reporting_config": null,
+  "mcp_static_config": null
+}}
+"#
+            );
+            let config_path = Path::new(&out_dir).join(format!("{channel}_config.json"));
+            fs::write(&config_path, stub).unwrap_or_else(|err| {
+                panic!("Failed to write stub config to {}: {err}", config_path.display())
+            });
+        }
         return;
     }
 

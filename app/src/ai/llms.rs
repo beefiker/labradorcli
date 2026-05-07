@@ -827,28 +827,39 @@ impl LLMPreferences {
     }
 
     /// Returns the set of LLMs available for Agent Mode use.
+    ///
+    /// Filtered to local-CLI-runnable models only: dwarf is local-auth-only,
+    /// so Warp's hosted-only catalog entries (gemini, glm, paywalled gpt
+    /// reasoning tiers, etc.) are hidden from the picker.
     pub fn get_base_llm_choices_for_agent_mode(&self) -> impl Iterator<Item = &LLMInfo> {
-        // Don't show admin-disabled models in the dropdown
         self.models_by_feature
             .agent_mode
             .choices
             .iter()
             .filter(|llm| !matches!(llm.disable_reason, Some(DisableReason::AdminDisabled)))
+            .filter(|llm| local_model_runtime_for_id(&llm.id).is_some())
     }
 
     /// Returns the set of LLMs available for coding.
+    ///
+    /// See `get_base_llm_choices_for_agent_mode` for filtering rationale.
     pub fn get_coding_llm_choices(&self) -> impl Iterator<Item = &LLMInfo> {
-        // Don't show admin-disabled models in the dropdown
         self.models_by_feature
             .coding
             .choices
             .iter()
             .filter(|llm| !matches!(llm.disable_reason, Some(DisableReason::AdminDisabled)))
+            .filter(|llm| local_model_runtime_for_id(&llm.id).is_some())
     }
 
     /// Returns the set of LLMs available for CLI agent.
+    ///
+    /// Filtered to local-CLI-runnable models only.
     pub fn get_cli_agent_llm_choices(&self) -> impl Iterator<Item = &LLMInfo> {
-        self.get_cli_agent_available().choices.iter()
+        self.get_cli_agent_available()
+            .choices
+            .iter()
+            .filter(|llm| local_model_runtime_for_id(&llm.id).is_some())
     }
 
     /// Returns the `LLMInfo` for the CLI agent model.
