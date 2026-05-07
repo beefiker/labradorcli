@@ -23,6 +23,11 @@ fn main() -> Result<()> {
             mcp_static_config: None,
         },
     );
+    // Enable the in-pane git ops (commit / push / Create-PR) in debug builds.
+    // For release bundles this comes through RELEASE_FLAGS automatically.
+    state = state.with_additional_features(&[
+        warp_core::features::FeatureFlag::GitOperationsInCodeReview,
+    ]);
     if cfg!(debug_assertions) {
         state = state.with_additional_features(warp_core::features::DEBUG_FLAGS);
     }

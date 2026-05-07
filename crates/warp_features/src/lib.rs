@@ -943,6 +943,11 @@ pub const RELEASE_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::Autoupdate,
     FeatureFlag::Changelog,
     FeatureFlag::CrashReporting,
+    // Promoted from PREVIEW_FLAGS for dwarf: the in-pane commit / push / Create-PR
+    // actions are dwarf's primary surface for the local-LLM PR/commit-message
+    // generator. They need to be on for all channels including OSS, otherwise
+    // the entire git-ops button bar in the Code Review pane is hidden.
+    FeatureFlag::GitOperationsInCodeReview,
     // Marked text is currently only supported on MacOS.
     #[cfg(target_os = "macos")]
     FeatureFlag::ImeMarkedText,
