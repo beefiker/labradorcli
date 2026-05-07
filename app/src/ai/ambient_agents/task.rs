@@ -91,7 +91,6 @@ pub(crate) fn harness_from_name(name: &str) -> Harness {
     match name {
         "claude" => Harness::Claude,
         "opencode" => Harness::OpenCode,
-        "gemini" => Harness::Gemini,
         "codex" => Harness::Codex,
         "oz" => Harness::Oz,
         other => {

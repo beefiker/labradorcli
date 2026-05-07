@@ -9,7 +9,7 @@ use warp_cli::agent::Harness;
 
 use crate::ai::agent::conversation::AIAgentHarness;
 use crate::ai::blocklist::CLAUDE_ORANGE;
-use crate::terminal::cli_agent::{GEMINI_BLUE, OPENAI_COLOR};
+use crate::terminal::cli_agent::OPENAI_COLOR;
 use crate::ui_components::icons::Icon;
 
 /// User-visible display name for a [`Harness`].
@@ -18,7 +18,6 @@ pub fn display_name(harness: Harness) -> &'static str {
         Harness::Oz => "Dwarf",
         Harness::Claude => "Claude Code",
         Harness::OpenCode => "OpenCode",
-        Harness::Gemini => "Gemini CLI",
         Harness::Codex => "Codex",
         Harness::Unknown => "Unknown",
     }
@@ -30,7 +29,6 @@ pub fn icon_for(harness: Harness) -> Icon {
         Harness::Oz => Icon::Warp,
         Harness::Claude => Icon::ClaudeLogo,
         Harness::OpenCode => Icon::OpenCodeLogo,
-        Harness::Gemini => Icon::GeminiLogo,
         Harness::Codex => Icon::OpenAILogo,
         Harness::Unknown => Icon::HelpCircle,
     }
@@ -43,22 +41,21 @@ pub fn brand_color(harness: Harness) -> Option<ColorU> {
         Harness::Oz => None,
         Harness::Claude => Some(CLAUDE_ORANGE),
         Harness::OpenCode => None,
-        Harness::Gemini => Some(GEMINI_BLUE),
         Harness::Codex => Some(OPENAI_COLOR),
         Harness::Unknown => None,
     }
 }
 
 /// Map [`AIAgentHarness`] (from `ServerAIConversationMetadata`) to the
-/// canonical [`Harness`].
+/// canonical [`Harness`]. Server-only `Gemini` conversations surface as
+/// `Unknown` since dwarf no longer drives Gemini.
 impl From<AIAgentHarness> for Harness {
     fn from(harness: AIAgentHarness) -> Self {
         match harness {
             AIAgentHarness::Oz => Harness::Oz,
             AIAgentHarness::ClaudeCode => Harness::Claude,
-            AIAgentHarness::Gemini => Harness::Gemini,
             AIAgentHarness::Codex => Harness::Codex,
-            AIAgentHarness::Unknown => Harness::Unknown,
+            AIAgentHarness::Gemini | AIAgentHarness::Unknown => Harness::Unknown,
         }
     }
 }

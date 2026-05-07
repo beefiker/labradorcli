@@ -131,9 +131,6 @@ pub enum Harness {
     /// Delegate to the `opencode` CLI.
     #[value(name = "opencode", alias = "open-code")]
     OpenCode,
-    /// Delegate to the `gemini` CLI.
-    #[value(name = "gemini")]
-    Gemini,
     /// Delegate to the `codex` CLI.
     #[value(name = "codex")]
     Codex,
@@ -154,8 +151,7 @@ impl Harness {
     pub fn parse_local_child_harness(value: &str) -> Option<Self> {
         match Self::parse_orchestration_harness(value) {
             Some(harness @ (Self::Claude | Self::OpenCode)) => Some(harness),
-            Some(Self::Oz) | Some(Self::Gemini) | Some(Self::Codex) | Some(Self::Unknown)
-            | None => None,
+            Some(Self::Oz) | Some(Self::Codex) | Some(Self::Unknown) | None => None,
         }
     }
 
@@ -164,7 +160,6 @@ impl Harness {
             Self::Oz => "Dwarf",
             Self::Claude => "Claude Code",
             Self::OpenCode => "OpenCode",
-            Self::Gemini => "Gemini CLI",
             Self::Codex => "Codex",
             Self::Unknown => "Unknown",
         }
@@ -177,7 +172,6 @@ impl fmt::Display for Harness {
             Harness::Oz => "oz",
             Harness::Claude => "claude",
             Harness::OpenCode => "opencode",
-            Harness::Gemini => "gemini",
             Harness::Codex => "codex",
             Harness::Unknown => "unknown",
         };

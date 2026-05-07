@@ -135,7 +135,7 @@ pub async fn load_conversation_from_server(
                         }
                     }
                 }
-                AIAgentHarness::ClaudeCode | AIAgentHarness::Gemini | AIAgentHarness::Codex => {
+                AIAgentHarness::ClaudeCode | AIAgentHarness::Codex => {
                     if !FeatureFlag::AgentHarness.is_enabled() {
                         log::warn!("Ignoring non-Dwarf conversation {conversation_id}: AgentHarness flag is disabled");
                         return None;
@@ -162,9 +162,10 @@ pub async fn load_conversation_from_server(
                         }
                     }
                 }
-                AIAgentHarness::Unknown => {
+                AIAgentHarness::Gemini | AIAgentHarness::Unknown => {
                     log::warn!(
-                        "Ignoring conversation {conversation_id}: server reported an unknown harness; this client may be out of date"
+                        "Ignoring conversation {conversation_id}: server reported an unsupported or unknown harness ({:?})",
+                        server_metadata.harness
                     );
                     None
                 }

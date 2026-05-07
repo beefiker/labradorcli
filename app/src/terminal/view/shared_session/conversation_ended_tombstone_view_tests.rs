@@ -181,7 +181,7 @@ fn snapshot_with_explicit_harness_propagates() {
     for harness in [
         Harness::Oz,
         Harness::Claude,
-        Harness::Gemini,
+        Harness::Codex,
         Harness::Unknown,
     ] {
         let mut task = task_with_run_time_and_credits();

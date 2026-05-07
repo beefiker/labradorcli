@@ -160,7 +160,7 @@ fn test_from_conversation_metadata_passes_harness_through() {
         None,
         Some(Harness::Oz),
         Some(Harness::Claude),
-        Some(Harness::Gemini),
+        Some(Harness::Codex),
         Some(Harness::Unknown),
     ] {
         let data = ConversationDetailsData::from_conversation_metadata(
@@ -208,7 +208,7 @@ fn test_from_task_resolves_harness() {
             for harness in [
                 Harness::Oz,
                 Harness::Claude,
-                Harness::Gemini,
+                Harness::Codex,
                 Harness::Unknown,
             ] {
                 let mut task = base_task.clone();

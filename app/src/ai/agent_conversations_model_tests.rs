@@ -955,7 +955,7 @@ fn test_harness_filter_matches_only_selected_harness() {
         let mut model = create_test_model();
 
         let task_claude = task_with_harness(5100, "user-a", Some(Some(Harness::Claude)));
-        let task_gemini = task_with_harness(5101, "user-a", Some(Some(Harness::Gemini)));
+        let task_gemini = task_with_harness(5101, "user-a", Some(Some(Harness::Codex)));
         // Snapshot present but no harness set → Some(Oz), matches Dwarf Agent.
         let task_oz_default = task_with_harness(5102, "user-a", Some(None));
         // No snapshot at all → None, matches only `All`.
@@ -1005,7 +1005,7 @@ fn test_harness_filter_matches_only_selected_harness() {
             assert_eq!(claude_items, vec![format!("task:{}", task_claude.task_id)]);
 
             // Gemini → only the gemini task.
-            let gemini_items = items_for(HarnessFilter::Specific(Harness::Gemini));
+            let gemini_items = items_for(HarnessFilter::Specific(Harness::Codex));
             assert_eq!(gemini_items, vec![format!("task:{}", task_gemini.task_id)]);
 
             // Dwarf Agent / Oz → default-snapshot task and local conversation.
