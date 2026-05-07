@@ -587,8 +587,12 @@ impl From<Icon> for &'static str {
             Icon::AuggieLogo => "bundled/svg/auggie.svg",
             Icon::CursorLogo => "bundled/svg/cursor.svg",
             Icon::NLD => "bundled/svg/nld.svg",
-            Icon::Oz => "bundled/svg/oz.svg",
-            Icon::OzCloud => "bundled/svg/oz-cloud.svg",
+            // Repointed to the generic agent icon — dwarf is local-CLI-only and
+            // doesn't ship the Warp-hosted "Oz" brand. All ~18 call sites that
+            // request `Icon::Oz` (use-agent buttons, agent-type selector,
+            // model picker fallback, orchestration pills, etc.) pick this up.
+            Icon::Oz => "bundled/svg/agentmode.svg",
+            Icon::OzCloud => "bundled/svg/agentmode.svg",
             Icon::Conversation => "bundled/svg/conversation.svg",
             Icon::Prompt => "bundled/svg/prompt.svg",
             Icon::Grid => "bundled/svg/grid.svg",

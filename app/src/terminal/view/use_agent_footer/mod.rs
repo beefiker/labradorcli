@@ -970,7 +970,7 @@ impl UseAgentToolbar {
                 "Use agent",
                 AgentFooterButtonTheme::new(Some(terminal_model.clone())),
             )
-            .with_icon(Icon::Oz)
+            .with_icon(Icon::AgentMode)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
             .with_tooltip("Ask the Dwarf agent to assist")
@@ -984,7 +984,7 @@ impl UseAgentToolbar {
                 "Give control back to agent",
                 AgentFooterButtonTheme::new(Some(terminal_model.clone())),
             )
-            .with_icon(Icon::Oz)
+            .with_icon(Icon::AgentMode)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
             .with_tooltip("Ask the Dwarf agent to resume")

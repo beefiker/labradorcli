@@ -34,7 +34,7 @@ impl WarpifyFooterView {
 
         let warpify_button = ctx.add_typed_action_view(|_ctx| {
             ActionButton::new("Dwarfify subshell", AgentFooterButtonTheme::new(None))
-                .with_icon(Icon::Warp)
+                .with_icon(Icon::AgentMode)
                 .with_size(button_size)
                 .with_tooltip("Enable Dwarf shell integration in this session")
                 .with_tooltip_alignment(TooltipAlignment::Left)
@@ -45,7 +45,7 @@ impl WarpifyFooterView {
 
         let use_agent_button = ctx.add_typed_action_view(|ctx| {
             ActionButton::new("Use agent", AgentFooterButtonTheme::new(None))
-                .with_icon(Icon::Oz)
+                .with_icon(Icon::AgentMode)
                 .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
                 .with_size(button_size)
                 .with_tooltip("Ask the Dwarf agent to assist")
