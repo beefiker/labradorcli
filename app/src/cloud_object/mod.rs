@@ -12,7 +12,6 @@ use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::{
     ai::cloud_environments::CloudAmbientAgentEnvironmentModel,
     ai::{
-        ambient_agents::scheduled::CloudScheduledAmbientAgentModel,
         document::ai_document_model::AIDocumentId,
         execution_profiles::CloudAIExecutionProfileModel,
         facts::CloudAIFactModel,
@@ -1184,7 +1183,6 @@ pub enum ServerCloudObject {
     AIExecutionProfile(ServerAIExecutionProfile),
     TemplatableMCPServer(ServerTemplatableMCPServer),
     AmbientAgentEnvironment(ServerAmbientAgentEnvironment),
-    ScheduledAmbientAgent(ServerScheduledAmbientAgent),
 }
 
 impl ServerCloudObject {
@@ -1207,9 +1205,6 @@ impl ServerCloudObject {
             ServerCloudObject::AmbientAgentEnvironment(ambient_agent_environment) => {
                 &ambient_agent_environment.metadata
             }
-            ServerCloudObject::ScheduledAmbientAgent(scheduled_ambient_agent) => {
-                &scheduled_ambient_agent.metadata
-            }
         }
     }
 
@@ -1231,9 +1226,6 @@ impl ServerCloudObject {
             }
             ServerCloudObject::AmbientAgentEnvironment(ambient_agent_environment) => {
                 ambient_agent_environment.id.uid()
-            }
-            ServerCloudObject::ScheduledAmbientAgent(scheduled_ambient_agent) => {
-                scheduled_ambient_agent.id.uid()
             }
         }
     }
@@ -1278,10 +1270,6 @@ where
             .downcast_ref::<ServerAmbientAgentEnvironment>(
         ) {
             ServerCloudObject::AmbientAgentEnvironment(server_ambient_agent_environment.clone())
-        } else if let Some(server_scheduled_ambient_agent) =
-            value.as_any().downcast_ref::<ServerScheduledAmbientAgent>()
-        {
-            ServerCloudObject::ScheduledAmbientAgent(server_scheduled_ambient_agent.clone())
         } else {
             panic!("Unknown server object type");
         }
@@ -1386,8 +1374,6 @@ pub type ServerTemplatableMCPServer =
     GenericServerObject<GenericStringObjectId, CloudTemplatableMCPServerModel>;
 pub type ServerAmbientAgentEnvironment =
     GenericServerObject<GenericStringObjectId, CloudAmbientAgentEnvironmentModel>;
-pub type ServerScheduledAmbientAgent =
-    GenericServerObject<GenericStringObjectId, CloudScheduledAmbientAgentModel>;
 
 impl<T, S> GenericServerObject<GenericStringObjectId, GenericStringModel<T, S>>
 where

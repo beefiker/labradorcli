@@ -24,7 +24,6 @@ use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::{
     ai::cloud_environments::CloudAmbientAgentEnvironmentModel,
     ai::{
-        ambient_agents::scheduled::CloudScheduledAmbientAgentModel,
         execution_profiles::CloudAIExecutionProfileModel, facts::CloudAIFactModel,
         mcp::CloudMCPServerModel,
     },
@@ -221,11 +220,6 @@ pub enum QueueItem {
     },
     UpdateCloudEnvironment {
         model: Arc<CloudAmbientAgentEnvironmentModel>,
-        id: SyncId,
-        revision: Option<Revision>,
-    },
-    UpdateScheduledAmbientAgent {
-        model: Arc<CloudScheduledAmbientAgentModel>,
         id: SyncId,
         revision: Option<Revision>,
     },
@@ -452,7 +446,6 @@ impl SyncQueue {
             QueueItem::UpdateEnvVarCollection { id, .. } => self.get_update_dependencies(id),
             QueueItem::UpdateWorkflowEnum { id, .. } => self.get_update_dependencies(id),
             QueueItem::UpdateCloudEnvironment { id, .. } => self.get_update_dependencies(id),
-            QueueItem::UpdateScheduledAmbientAgent { id, .. } => self.get_update_dependencies(id),
 
             // Update workflow requests should depend on existing requests to that object, as well as
             // any enums or env vars they reference.
@@ -555,7 +548,6 @@ impl SyncQueue {
                 QueueItem::UpdateAIExecutionProfile { id, .. } => id.uid() == item_id,
                 QueueItem::UpdateTemplatableMCPServer { id, .. } => id.uid() == item_id,
                 QueueItem::UpdateCloudEnvironment { id, .. } => id.uid() == item_id,
-                QueueItem::UpdateScheduledAmbientAgent { id, .. } => id.uid() == item_id,
                 // We don't depend on object actions, since they don't affect an object's own content or metadata
                 QueueItem::RecordObjectAction { .. } => false,
             })
@@ -825,20 +817,6 @@ impl SyncQueue {
                     );
                 }
                 QueueItem::UpdateCloudEnvironment {
-                    model,
-                    id,
-                    revision,
-                } => {
-                    self.update_object(
-                        model.clone(),
-                        id,
-                        revision,
-                        object_client,
-                        dequeued_item_id,
-                        ctx,
-                    );
-                }
-                QueueItem::UpdateScheduledAmbientAgent {
                     model,
                     id,
                     revision,
@@ -1246,16 +1224,12 @@ impl SyncQueue {
                                 )
                                 .await
                             }
-                            JsonObjectType::ScheduledAmbientAgent => {
-                                CloudScheduledAmbientAgentModel::send_create_request(
-                                    object_client_clone,
-                                    create_request,
-                                )
-                                .await
-                            }
-                            // CloudAgentConfig sync was Oz-only and removed.
-                            JsonObjectType::CloudAgentConfig => Err(anyhow::anyhow!(
-                                "CloudAgentConfig sync is no longer supported"
+                            // Server-side sync of these GSO variants was Oz-only and is no
+                            // longer supported.
+                            JsonObjectType::ScheduledAmbientAgent
+                            | JsonObjectType::CloudAgentConfig => Err(anyhow::anyhow!(
+                                "{:?} sync is no longer supported",
+                                json_object_type
                             )),
                         },
                     }
@@ -1828,9 +1802,6 @@ impl SyncQueue {
                     self.handle_update_failure_response(id, item_id, ctx);
                 }
                 QueueItem::UpdateCloudEnvironment { id, .. } => {
-                    self.handle_update_failure_response(id, item_id, ctx);
-                }
-                QueueItem::UpdateScheduledAmbientAgent { id, .. } => {
                     self.handle_update_failure_response(id, item_id, ctx);
                 }
                 QueueItem::RecordObjectAction {

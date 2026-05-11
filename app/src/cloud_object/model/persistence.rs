@@ -530,9 +530,6 @@ impl CloudModel {
             ServerCloudObject::AmbientAgentEnvironment(ambient_agent_environment) => {
                 self.upsert_from_server_object(ambient_agent_environment, ctx);
             }
-            ServerCloudObject::ScheduledAmbientAgent(scheduled_ambient_agent) => {
-                self.upsert_from_server_object(scheduled_ambient_agent, ctx);
-            }
         }
     }
 

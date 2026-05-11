@@ -3,7 +3,6 @@ use crate::ai::mcp::templatable::{CloudTemplatableMCPServerModel, TemplatableMCP
 use crate::{
     ai::{
         agent::conversation::AIConversationId,
-        ambient_agents::scheduled::{CloudScheduledAmbientAgentModel, ScheduledAmbientAgent},
         blocklist::BlocklistAIHistoryModel,
         cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironmentModel},
         execution_profiles::{
@@ -29,7 +28,7 @@ use crate::{
         ServerAIExecutionProfile, ServerAIFact, ServerAmbientAgentEnvironment,
         ServerCloudObject, ServerEnvVarCollection, ServerFolder,
         ServerMCPServer, ServerMetadata, ServerNotebook, ServerObject, ServerPermissions,
-        ServerPreference, ServerScheduledAmbientAgent, ServerTemplatableMCPServer, ServerWorkflow,
+        ServerPreference, ServerTemplatableMCPServer, ServerWorkflow,
         ServerWorkflowEnum, Space, UpdateCloudObjectResult,
     },
     drive::{
@@ -992,21 +991,8 @@ impl UpdateManager {
                         ctx,
                     ));
                 }
-                GenericStringObjectFormat::Json(JsonObjectType::ScheduledAmbientAgent) => {
-                    let typed_objects = objects
-                        .iter()
-                        .filter_map(|obj| {
-                            let server_obj: Option<&ServerScheduledAmbientAgent> = obj.into();
-                            server_obj.cloned()
-                        })
-                        .collect::<Vec<_>>();
-                    sqlite_events.push(Self::handle_object_updates(
-                        typed_objects,
-                        force_refresh,
-                        !is_first_load,
-                        ctx,
-                    ));
-                }
+                // Server-side scheduled-ambient-agent sync was Oz-only and removed.
+                GenericStringObjectFormat::Json(JsonObjectType::ScheduledAmbientAgent) => {}
                 // Server-side cloud-agent-config sync was Oz-only and removed.
                 GenericStringObjectFormat::Json(JsonObjectType::CloudAgentConfig) => {}
             }
@@ -1846,8 +1832,7 @@ impl UpdateManager {
             | ServerCloudObject::AIFact(_)
             | ServerCloudObject::MCPServer(_)
             | ServerCloudObject::TemplatableMCPServer(_)
-            | ServerCloudObject::AmbientAgentEnvironment(_)
-            | ServerCloudObject::ScheduledAmbientAgent(_) => {}
+            | ServerCloudObject::AmbientAgentEnvironment(_) => {}
         }
     }
 
@@ -3199,41 +3184,6 @@ impl UpdateManager {
             // When adding the initiated_by parameter to this function call, InitiatedBy::User was set as a default value.
             // This can be changed to InitiatedBy::System if this action was automatically kicked off by the system and we do not want a user facing toast.
             InitiatedBy::User,
-            ctx,
-        )
-    }
-
-    #[cfg_attr(target_family = "wasm", allow(dead_code))]
-    pub fn create_scheduled_ambient_agent_online(
-        &mut self,
-        scheduled_ambient_agent: ScheduledAmbientAgent,
-        client_id: ClientId,
-        owner: Owner,
-        ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = anyhow::Result<ServerId>> {
-        self.create_object_online(
-            CloudScheduledAmbientAgentModel::new(scheduled_ambient_agent),
-            owner,
-            client_id,
-            Default::default(),
-            false,
-            None,
-            ctx,
-        )
-    }
-
-    #[cfg_attr(target_family = "wasm", allow(dead_code))]
-    pub fn update_scheduled_ambient_agent_online(
-        &mut self,
-        scheduled_ambient_agent: ScheduledAmbientAgent,
-        scheduled_ambient_agent_id: SyncId,
-        revision_ts: Option<Revision>,
-        ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = anyhow::Result<()>> {
-        self.update_object_online(
-            CloudScheduledAmbientAgentModel::new(scheduled_ambient_agent),
-            scheduled_ambient_agent_id,
-            revision_ts,
             ctx,
         )
     }
