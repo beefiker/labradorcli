@@ -3166,7 +3166,7 @@ impl UpdateManager {
         );
     }
 
-    #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    #[allow(dead_code)]
     pub fn create_ambient_agent_environment(
         &mut self,
         ambient_agent_environment: AmbientAgentEnvironment,
