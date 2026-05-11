@@ -3593,7 +3593,7 @@ impl UpdateManager {
     /// The cloud model and SQLite are only updated on success. This is to prevent the
     /// sync queue from clashing with caller-managed retries and potentially creating
     /// duplicates of the object.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, dead_code)]
     fn create_object_online<K, M>(
         &mut self,
         model: M,
@@ -3722,6 +3722,7 @@ impl UpdateManager {
     ///
     /// The cloud model and SQLite are only updated on success. This is to prevent the
     /// sync queue from clashing with caller-managed retries.
+    #[allow(dead_code)]
     pub fn update_object_online<K, M>(
         &mut self,
         model: M,

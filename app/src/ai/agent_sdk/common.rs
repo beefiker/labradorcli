@@ -280,6 +280,7 @@ Without an environment, the agent will not be able to access private repositorie
     /// Resolve the environment to use when updating an agent integration. If the user did not
     /// request any changes to the environment, this returns `Ok(None)`.
     /// Dwarf Drive *must* have been synced first.
+    #[allow(dead_code)]
     pub fn resolve_for_update(
         args: EnvironmentUpdateArgs,
         ctx: &AppContext,
