@@ -191,6 +191,7 @@ pub fn format_owner(owner: &Owner) -> &'static str {
 }
 
 /// An error resolving an agent option, which we may have prompted the user for.
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum ResolveConfigurationError {
     /// The user canceled the operation, and we should exit.
@@ -215,6 +216,7 @@ pub enum EnvironmentChoice {
 impl EnvironmentChoice {
     /// Resolve the environment to use when creating an agent integration.
     /// Dwarf Drive *must* have been synced first.
+    #[allow(dead_code)]
     pub fn resolve_for_create(
         args: EnvironmentCreateArgs,
         ctx: &AppContext,
