@@ -71,7 +71,6 @@ use warp_cli::OZ_HARNESS_ENV;
 
 mod admin;
 mod agent_config;
-mod artifact;
 pub(crate) mod artifact_upload;
 mod common;
 mod config_file;
@@ -156,12 +155,9 @@ fn dispatch_command(
         CliCommand::HarnessSupport(_) => Err(anyhow::anyhow!(
             "Harness-support CLI is not supported in this build"
         )),
-        CliCommand::Artifact(artifact_cmd) => {
-            if !FeatureFlag::ArtifactCommand.is_enabled() {
-                return Err(anyhow::anyhow!("invalid value 'artifact'"));
-            }
-            artifact::run(ctx, global_options, artifact_cmd)
-        }
+        CliCommand::Artifact(_) => Err(anyhow::anyhow!(
+            "Cloud artifact CLI commands are not supported in this build"
+        )),
     }
 }
 

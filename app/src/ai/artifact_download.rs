@@ -43,6 +43,7 @@ pub(crate) fn default_download_filename(artifact: &ArtifactDownloadResponse) -> 
 }
 
 #[cfg(feature = "local_fs")]
+#[allow(dead_code)]
 pub(crate) fn download_destination(
     artifact: &ArtifactDownloadResponse,
     explicit_path: Option<PathBuf>,
