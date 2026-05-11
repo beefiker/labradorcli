@@ -39,7 +39,6 @@ pub use request_usage_model::*;
 use warpui::AppContext;
 #[cfg(not(target_family = "wasm"))]
 pub mod agent_sdk;
-pub mod cloud_agent_config;
 pub mod cloud_agent_settings;
 pub mod cloud_environments;
 pub mod execution_profiles;

@@ -27,7 +27,7 @@ use crate::{
         NumInFlightRequests, ObjectDeleteResult, ObjectIdType, ObjectMetadataUpdateResult,
         ObjectPermissionsUpdateData, ObjectType, Owner, Revision, RevisionAndLastEditor,
         ServerAIExecutionProfile, ServerAIFact, ServerAmbientAgentEnvironment,
-        ServerCloudAgentConfig, ServerCloudObject, ServerEnvVarCollection, ServerFolder,
+        ServerCloudObject, ServerEnvVarCollection, ServerFolder,
         ServerMCPServer, ServerMetadata, ServerNotebook, ServerObject, ServerPermissions,
         ServerPreference, ServerScheduledAmbientAgent, ServerTemplatableMCPServer, ServerWorkflow,
         ServerWorkflowEnum, Space, UpdateCloudObjectResult,
@@ -1007,21 +1007,8 @@ impl UpdateManager {
                         ctx,
                     ));
                 }
-                GenericStringObjectFormat::Json(JsonObjectType::CloudAgentConfig) => {
-                    let typed_objects = objects
-                        .iter()
-                        .filter_map(|obj| {
-                            let server_obj: Option<&ServerCloudAgentConfig> = obj.into();
-                            server_obj.cloned()
-                        })
-                        .collect::<Vec<_>>();
-                    sqlite_events.push(Self::handle_object_updates(
-                        typed_objects,
-                        force_refresh,
-                        !is_first_load,
-                        ctx,
-                    ));
-                }
+                // Server-side cloud-agent-config sync was Oz-only and removed.
+                GenericStringObjectFormat::Json(JsonObjectType::CloudAgentConfig) => {}
             }
         }
 
@@ -1860,8 +1847,7 @@ impl UpdateManager {
             | ServerCloudObject::MCPServer(_)
             | ServerCloudObject::TemplatableMCPServer(_)
             | ServerCloudObject::AmbientAgentEnvironment(_)
-            | ServerCloudObject::ScheduledAmbientAgent(_)
-            | ServerCloudObject::CloudAgentConfig(_) => {}
+            | ServerCloudObject::ScheduledAmbientAgent(_) => {}
         }
     }
 

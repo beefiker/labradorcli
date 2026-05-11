@@ -3073,7 +3073,7 @@ fn read_sqlite_data(
                                     boxed
                                 })
                             }
-                            // TODO: Implement CloudAgentConfig model when full sync support is added
+                            // Server-side cloud-agent-config sync was Oz-only and removed.
                             JsonObjectType::CloudAgentConfig => None,
                         })
                     })
