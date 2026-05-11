@@ -91,24 +91,6 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
                 PlatformErrorCode::ResourceNotFound,
             ),
         ),
-        AgentDriverError::EnvironmentNotFound(id) => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                format!(
-                    "Environment '{id}' not found. Verify the environment ID and ensure it exists in your team settings."
-                ),
-                PlatformErrorCode::ResourceNotFound,
-            ),
-        ),
-        AgentDriverError::EnvironmentSetupFailed(msg) => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                format!(
-                    "Environment setup failed: {msg}. Check your repository URLs and setup commands."
-                ),
-                PlatformErrorCode::EnvironmentSetupFailed,
-            ),
-        ),
         AgentDriverError::InvalidWorkingDirectory { path, .. } => (
             AgentTaskState::Failed,
             TaskStatusUpdate::with_error_code(

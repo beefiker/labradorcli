@@ -26,10 +26,8 @@ use crate::terminal::cli_agent_sessions::{
 use crate::{
     ai::{
         ambient_agents::AmbientAgentTaskId,
-        cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironment},
     },
     auth::AuthStateProvider,
-    cloud_object::CloudObject,
     server::server_api::{
         ai::AIClient,
         harness_support::{
@@ -51,23 +49,18 @@ use warp_core::{
 };
 use warp_graphql::ai::AgentTaskState;
 use warp_managed_secrets::ManagedSecretValue;
-use warpui::{
-    AppContext, Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity,
-};
+use warpui::{Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity};
 
 pub(crate) mod attachments;
-pub(crate) mod environment;
 mod error_classification;
 pub(crate) mod harness;
 pub(super) mod output;
 pub(crate) mod terminal;
 
-use environment::PrepareEnvironmentError;
 use terminal::TerminalDriverEvent;
 
 const HARNESS_SAVE_INTERVAL: Duration = Duration::from_secs(30);
 pub(crate) const WARP_DRIVE_SYNC_TIMEOUT: Duration = Duration::from_secs(60);
-const SETUP_FAILED_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 /// Signals to Claude child-harness hooks that Warp already owns the background
 /// message-listener lifecycle, so the plugin should reuse the shared state
 /// files instead of spawning and cleaning up its own listener.
@@ -183,8 +176,6 @@ pub struct AgentDriverOptions {
     /// determines which harness-specific path is taken (Oz transcript restore vs.
     /// third-party-harness payload rehydration).
     pub resume: Option<ResumeOptions>,
-    /// Resolved environment configuration, if any.
-    pub environment: Option<AmbientAgentEnvironment>,
     /// Selected execution harness for this run.
     pub selected_harness: Harness,
 }
@@ -215,9 +206,6 @@ pub struct AgentDriver {
     // Optional idle timeout after completion. If set, the process will stay alive for follow-ups
     // and exit after this period of inactivity.
     idle_on_complete: Option<Duration>,
-
-    /// Resolved environment configuration.
-    environment: Option<AmbientAgentEnvironment>,
 
     /// If set, a third-party-harness conversation to resume. Consumed by `prepare_harness`
     /// when building the runner and taken back to `None` after use so subsequent runs start
@@ -271,10 +259,6 @@ pub enum AgentDriverError {
     },
     #[error("Error syncing Dwarf Drive")]
     WarpDriveSyncFailed,
-    #[error("Requested environment not found: {0}")]
-    EnvironmentNotFound(String),
-    #[error("Environment setup failed: {0}")]
-    EnvironmentSetupFailed(String),
     #[error("Could not resolve working directory {}", path.display())]
     InvalidWorkingDirectory {
         path: PathBuf,
@@ -339,16 +323,6 @@ impl From<warpui::ModelDropped> for AgentDriverError {
     }
 }
 
-impl From<PrepareEnvironmentError> for AgentDriverError {
-    fn from(error: PrepareEnvironmentError) -> Self {
-        match error {
-            PrepareEnvironmentError::InvalidRuntimeState => AgentDriverError::InvalidRuntimeState,
-            PrepareEnvironmentError::TerminalDriver { source } => source,
-            error => AgentDriverError::EnvironmentSetupFailed(error.to_string()),
-        }
-    }
-}
-
 impl AgentDriver {
     pub fn new(
         options: AgentDriverOptions,
@@ -362,7 +336,6 @@ impl AgentDriver {
             idle_on_complete,
             secrets,
             resume,
-            environment,
             selected_harness,
         } = options;
 
@@ -499,7 +472,6 @@ impl AgentDriver {
             task_id,
             harness: None,
             idle_on_complete,
-            environment,
             resume_payload,
         })
     }
@@ -527,7 +499,6 @@ impl AgentDriver {
         let foreground = ctx.spawner();
         let server_api = ServerApiProvider::as_ref(ctx).get_ai_client();
         let task_id = self.task_id;
-        let idle_on_complete = self.idle_on_complete;
 
         ctx.spawn(
             async move {
@@ -575,38 +546,14 @@ impl AgentDriver {
             };
 
             // Report driver-level errors directly to the server. These errors
-            // occur before or outside a conversation (e.g. bootstrap, MCP startup,
-            // environment setup) so TaskStatusSyncModel never fires for them.
+            // occur before or outside a conversation (e.g. bootstrap, MCP startup)
+            // so TaskStatusSyncModel never fires for them.
             // Success/blocked/cancelled are handled by TaskStatusSyncModel.
             if let (Some(task_id), Err(err)) = (task_id, &result) {
                 report_driver_error(task_id, err, &server_api_for_error).await;
-
-                // Keep the session alive after environment setup failures so
-                // the viewer can connect, receive scrollback, and see the error.
-                if let (Some(idle_timeout), true) = (
-                    idle_on_complete,
-                    matches!(err, AgentDriverError::EnvironmentSetupFailed(_)),
-                ) {
-                    let timeout = idle_timeout.min(SETUP_FAILED_IDLE_TIMEOUT);
-                    log::info!("Environment setup failed; keeping session alive for {timeout:?}");
-                    warpui::r#async::Timer::after(timeout).await;
-                }
             }
 
             result
-        }
-    }
-
-    /// Log all valid environment IDs for the user.
-    pub(super) fn log_valid_environments(app: &AppContext) {
-        let environments = CloudAmbientAgentEnvironment::get_all(app);
-        if environments.is_empty() {
-            log::error!("No environments available for this user.");
-        } else {
-            log::error!("Valid environment IDs:");
-            for env in environments {
-                log::error!("  - {} ({})", env.sync_id(), env.model().string_model.name);
-            }
         }
     }
 
@@ -669,7 +616,7 @@ impl AgentDriver {
             .await?
             .await?;
 
-        // For all harnesses: wait for the shared session and prepare the environment.
+        // For all harnesses: wait for the shared session before running.
         foreground
             .spawn(|me, ctx| {
                 me.terminal_driver
@@ -677,31 +624,6 @@ impl AgentDriver {
             })
             .await?
             .await?;
-
-        let environment_opt = foreground.spawn(|me, _| me.environment.clone()).await?;
-
-        if let Some(environment) = environment_opt {
-            log::info!("Loading environment...");
-
-            let harness = task.harness.harness();
-            foreground
-                .spawn(move |me, ctx| {
-                    let working_dir = me.working_dir.clone();
-                    me.terminal_driver.update(ctx, |_, ctx| {
-                        environment::prepare_environment(
-                            environment,
-                            working_dir,
-                            false, /* is_sandbox */
-                            harness,
-                            ctx,
-                        )
-                    })
-                })
-                .await?
-                .await
-                .map_err(AgentDriverError::from)?;
-
-        }
 
         // Run the harness with a prompt
         match task.harness {

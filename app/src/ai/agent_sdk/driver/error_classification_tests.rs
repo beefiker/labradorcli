@@ -61,26 +61,6 @@ fn warp_drive_sync_failed_is_error() {
     );
 }
 
-// --- Config/user errors → FAILED ---
-
-#[test]
-fn environment_setup_failed_is_failed() {
-    assert_state_and_code(
-        AgentDriverError::EnvironmentSetupFailed("bad repo".into()),
-        AgentTaskState::Failed,
-        Some(PlatformErrorCode::EnvironmentSetupFailed),
-    );
-}
-
-#[test]
-fn environment_not_found_is_failed_with_resource_not_found() {
-    assert_state_and_code(
-        AgentDriverError::EnvironmentNotFound("env-123".into()),
-        AgentTaskState::Failed,
-        Some(PlatformErrorCode::ResourceNotFound),
-    );
-}
-
 // --- ShareSessionFailed variants ---
 
 #[test]

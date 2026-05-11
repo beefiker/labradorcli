@@ -45,13 +45,9 @@ use warpui::{platform::TerminationMode, AppContext, SingletonEntity};
 
 use crate::{
     ai::ambient_agents::{task::HarnessConfig, AmbientAgentTaskId},
-    ai::cloud_environments::CloudAmbientAgentEnvironment,
     auth::AuthStateProvider,
     send_telemetry_sync_from_app_ctx,
-    server::{
-        ids::{ServerId, SyncId},
-        server_api::{ai::AgentConfigSnapshot, ServerApiProvider},
-    },
+    server::server_api::{ai::AgentConfigSnapshot, ServerApiProvider},
 };
 use driver::AgentDriverError;
 use warp_graphql::object_permissions::OwnerType;
@@ -197,7 +193,7 @@ fn run_agent(
 ) -> anyhow::Result<()> {
     match command {
         AgentCommand::Run(args) => {
-            if args.environment.is_some() && !FeatureFlag::CloudEnvironments.is_enabled() {
+            if args.environment.is_some() {
                 return Err(anyhow::anyhow!("unexpected argument '--environment' found"));
             }
             if args.conversation.is_some() && !FeatureFlag::CloudConversations.is_enabled() {
@@ -696,7 +692,6 @@ impl AgentDriverRunner {
                     idle_on_complete: args.idle_on_complete.map(|d| d.into()),
                     secrets: Default::default(),
                     resume: None,
-                    environment: None,
                     selected_harness: args.harness,
                 };
                 let _ = &args.snapshot;
@@ -705,8 +700,6 @@ impl AgentDriverRunner {
             })
             .await?
             .map_err(AgentDriverError::ConfigBuildFailed)?;
-
-        let environment_id = merged_config.environment_id.clone();
 
         // Handle secrets/attachments fetch (existing task) or task creation (new run).
         // The existing-task branch also surfaces the task's `conversation_id` (if any) so
@@ -742,9 +735,6 @@ impl AgentDriverRunner {
             .await?;
             None
         };
-
-        // Resolve environment and cloud providers.
-        Self::resolve_environment(foreground, environment_id, &mut driver_options).await?;
 
         Ok((driver_options, task, task_conversation_id))
     }
@@ -989,39 +979,6 @@ impl AgentDriverRunner {
                 ),
             }),
         }
-    }
-
-    /// Resolve the environment and store into `driver_options`.
-    async fn resolve_environment(
-        foreground: &ModelSpawner<Self>,
-        environment_id: Option<String>,
-        driver_options: &mut AgentDriverOptions,
-    ) -> Result<(), AgentDriverError> {
-        let Some(environment_id) = environment_id else {
-            return Ok(());
-        };
-
-        let environment = foreground
-            .spawn(move |_, ctx| -> Result<_, AgentDriverError> {
-                let server_id = ServerId::try_from(environment_id.as_str()).map_err(|_| {
-                    log::error!("Invalid environment ID: {environment_id}");
-                    AgentDriver::log_valid_environments(ctx);
-                    AgentDriverError::EnvironmentNotFound(environment_id.clone())
-                })?;
-                let sync_id = SyncId::ServerId(server_id);
-
-                CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx)
-                    .ok_or_else(|| {
-                        log::error!("Environment not found with ID: {environment_id}");
-                        AgentDriver::log_valid_environments(ctx);
-                        AgentDriverError::EnvironmentNotFound(environment_id)
-                    })
-                    .map(|env| env.model().string_model.clone())
-            })
-            .await??;
-
-        driver_options.environment = Some(environment);
-        Ok(())
     }
 
     /// Create the AgentDriver and start running the task.

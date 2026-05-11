@@ -13,16 +13,12 @@ use futures::channel::oneshot;
 use session_sharing_protocol::common::{Role, SessionId};
 use session_sharing_protocol::sharer::SessionSourceType;
 use warp_cli::share::{ShareAccessLevel, ShareRequest, ShareSubject};
-use warp_completer::completer::CommandOutput;
 use warp_core::command::ExitCode;
 use warp_core::features::FeatureFlag;
-use warp_util::path::ShellFamily;
 use warpui::{
     r#async::FutureExt, AppContext, Entity, ModelContext, ModelHandle, SingletonEntity as _,
     ViewHandle,
 };
-
-use crate::terminal::model::session::ExecuteCommandOptions;
 
 use crate::{
     ai::ambient_agents::AmbientAgentTaskId,
@@ -31,7 +27,6 @@ use crate::{
     terminal::{
         model::block::{BlockId, SerializedBlock},
         shared_session::{self, IsSharedSessionCreator},
-        shell::ShellType,
         view::ConversationRestorationInNewPaneType,
         TerminalView,
     },
@@ -169,18 +164,6 @@ impl TerminalDriver {
         let working_dir = options.working_dir.clone();
         let terminal_view = create_terminal_view(options, ctx)?;
         Ok(ctx.add_model(|ctx| Self::new(terminal_view, should_share, task_id, working_dir, ctx)))
-    }
-
-    /// Wrap an already-created terminal view in a new `TerminalDriver` model.
-    ///
-    /// Unlike [`Self::create`], this does not open a new window — it reuses an
-    /// existing view (e.g. a docker sandbox pane). Session sharing is disabled
-    /// and no task ID is associated.
-    pub(crate) fn create_from_existing_view(
-        terminal_view: ViewHandle<TerminalView>,
-        ctx: &mut AppContext,
-    ) -> ModelHandle<Self> {
-        ctx.add_model(|ctx| Self::new(terminal_view, false, None, PathBuf::default(), ctx))
     }
 
     /// Set up event subscriptions and session-sharing conditions for an
@@ -389,84 +372,6 @@ impl TerminalDriver {
     }
 
     /// Execute a command through the active session's in-band command
-    /// executor, without adding a block to the user-visible blocklist.
-    ///
-    /// Intended for silent probes (e.g. `test -d`) that the agent needs to
-    /// drive through the terminal session (so they run against the correct
-    /// filesystem, including inside a Docker sandbox) but should not clutter
-    /// the user's command history.
-    pub fn execute_silent_command(
-        &self,
-        command: String,
-        ctx: &ModelContext<Self>,
-    ) -> impl Future<Output = Result<CommandOutput, AgentDriverError>> {
-        let session = self.terminal_view.read(ctx, |terminal, app| {
-            terminal
-                .active_block_session_id()
-                .and_then(|id| terminal.sessions_model().as_ref(app).get(id))
-        });
-        async move {
-            let session = session.ok_or(AgentDriverError::InvalidRuntimeState)?;
-            session
-                .execute_command(&command, None, None, ExecuteCommandOptions::default())
-                .await
-                .map_err(|e| {
-                    log::warn!("silent command failed: {e:#}");
-                    AgentDriverError::InvalidRuntimeState
-                })
-        }
-    }
-
-    /// Returns the shell type of the active terminal session, if known.
-    pub fn active_session_shell_type(&self, ctx: &AppContext) -> Option<ShellType> {
-        self.terminal_view
-            .read(ctx, |terminal, app| terminal.active_session_shell_type(app))
-    }
-
-    /// Build the shell-aware `cd <escaped>` command for the active session.
-    ///
-    /// Shared between [`Self::cd`] and [`Self::cd_silent`] so both paths use
-    /// the same [`ShellFamily::shell_escape`] logic (posix single-quoting,
-    /// fish backslash, pwsh double-quote doubling) and don't drift.
-    fn build_cd_command(&self, target: &str, ctx: &AppContext) -> String {
-        let shell_family = self.terminal_view.read(ctx, |terminal, app| {
-            terminal
-                .active_session_shell_type(app)
-                .map(ShellFamily::from)
-                .unwrap_or(ShellFamily::Posix)
-        });
-        let escaped_target = shell_family.shell_escape(target);
-        format!("cd {escaped_target}")
-    }
-
-    /// Change directory within the active terminal session.
-    pub fn cd(
-        &mut self,
-        target: &str,
-        ctx: &mut ModelContext<Self>,
-    ) -> Result<impl Future<Output = Result<CommandHandle, AgentDriverError>>, AgentDriverError>
-    {
-        let cd_command = self.build_cd_command(target, ctx);
-        self.execute_command(&cd_command, ctx)
-    }
-
-    /// Change directory within the active terminal session, silently — no
-    /// visible block is added to the user-facing blocklist.
-    ///
-    /// Uses the same shell-aware escaping as [`Self::cd`] but dispatches
-    /// through [`Self::execute_silent_command`]. Intended for callers that
-    /// need to position the session's CWD as an implementation detail of a
-    /// larger setup step (e.g. positioning the session before running
-    /// silent probes).
-    pub fn cd_silent(
-        &self,
-        target: &str,
-        ctx: &ModelContext<Self>,
-    ) -> impl Future<Output = Result<CommandOutput, AgentDriverError>> {
-        let cd_command = self.build_cd_command(target, ctx);
-        self.execute_silent_command(cd_command, ctx)
-    }
-
     /// Returns a future that resolves when the session has bootstrapped.
     ///
     /// This only waits for the `SessionBootstrapped` terminal view event.
