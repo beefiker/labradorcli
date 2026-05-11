@@ -55,9 +55,6 @@ use super::{
 };
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::ai::cloud_environments::{
-    CloudAmbientAgentEnvironment, CloudAmbientAgentEnvironmentModel,
-};
 use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::ai::execution_profiles::{CloudAIExecutionProfile, CloudAIExecutionProfileModel};
 use crate::ai::facts::{CloudAIFact, CloudAIFactModel};
@@ -3040,21 +3037,8 @@ fn read_sqlite_data(
                                     boxed
                                 })
                             }
-                            JsonObjectType::CloudEnvironment => {
-                                let model = CloudAmbientAgentEnvironmentModel::deserialize_owned(
-                                    &object.data,
-                                );
-                                model.ok().map(|model| {
-                                    let boxed: Box<dyn CloudObject> =
-                                        Box::new(CloudAmbientAgentEnvironment::new(
-                                            server_id,
-                                            model,
-                                            to_cloud_object_metadata(metadata),
-                                            cloud_object_permissions,
-                                        ));
-                                    boxed
-                                })
-                            }
+                            // Server-side cloud-environment sync was Oz-only and removed.
+                            JsonObjectType::CloudEnvironment => None,
                             // Server-side scheduled-ambient-agent sync was Oz-only and removed.
                             JsonObjectType::ScheduledAmbientAgent => None,
                             // Server-side cloud-agent-config sync was Oz-only and removed.

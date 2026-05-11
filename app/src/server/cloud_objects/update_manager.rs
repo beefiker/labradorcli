@@ -1049,11 +1049,6 @@ impl UpdateManager {
             });
         }
 
-        // Fetch environment "last used" timestamps separately and merge them into the environments.
-        // This is done as a separate call because the timestamps come from GetCloudEnvironments query
-        // rather than the generic object sync.
-        self.fetch_and_merge_environment_timestamps(ctx);
-
         if !response.mcp_gallery.is_empty() {
             ctx.emit(UpdateManagerEvent::MCPGalleryUpdated {
                 templates: response.mcp_gallery,
@@ -1082,29 +1077,6 @@ impl UpdateManager {
         ctx: &mut ModelContext<UpdateManager>,
     ) {
         ctx.emit(UpdateManagerEvent::AmbientTaskUpdated { timestamp });
-    }
-
-    /// Fetches environment "last used" timestamps from the server and merges them
-    /// into the in-memory environment objects.
-    fn fetch_and_merge_environment_timestamps(&mut self, ctx: &mut ModelContext<UpdateManager>) {
-        let object_client = self.object_client.clone();
-        let future = ctx.spawn(
-            async move {
-                object_client
-                    .fetch_environment_last_task_run_timestamps()
-                    .await
-            },
-            |_update_manager, result, ctx| {
-                if let Ok(timestamps) = result {
-                    CloudModel::handle(ctx).update(ctx, |cloud_model, ctx| {
-                        cloud_model.update_environment_last_task_run_timestamps(timestamps, ctx);
-                    });
-                } else if let Err(e) = result {
-                    log::warn!("Failed to fetch environment last task run timestamps: {e:#}");
-                }
-            },
-        );
-        self.spawned_futures.push(future.future_id());
     }
 
     /// Generic handler updating all objects of a given model type from the server (e.g. all updated/deleted notebooks or workflows).

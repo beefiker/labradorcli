@@ -22,7 +22,6 @@ use super::{
 use crate::ai::mcp::templatable::CloudTemplatableMCPServerModel;
 use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::{
-    ai::cloud_environments::CloudAmbientAgentEnvironmentModel,
     ai::{
         execution_profiles::CloudAIExecutionProfileModel, facts::CloudAIFactModel,
         mcp::CloudMCPServerModel,
@@ -215,11 +214,6 @@ pub enum QueueItem {
     },
     UpdateTemplatableMCPServer {
         model: Arc<CloudTemplatableMCPServerModel>,
-        id: SyncId,
-        revision: Option<Revision>,
-    },
-    UpdateCloudEnvironment {
-        model: Arc<CloudAmbientAgentEnvironmentModel>,
         id: SyncId,
         revision: Option<Revision>,
     },
@@ -445,7 +439,6 @@ impl SyncQueue {
             QueueItem::UpdateCloudPreferences { id, .. } => self.get_update_dependencies(id),
             QueueItem::UpdateEnvVarCollection { id, .. } => self.get_update_dependencies(id),
             QueueItem::UpdateWorkflowEnum { id, .. } => self.get_update_dependencies(id),
-            QueueItem::UpdateCloudEnvironment { id, .. } => self.get_update_dependencies(id),
 
             // Update workflow requests should depend on existing requests to that object, as well as
             // any enums or env vars they reference.
@@ -547,7 +540,6 @@ impl SyncQueue {
                 QueueItem::UpdateMCPServer { id, .. } => id.uid() == item_id,
                 QueueItem::UpdateAIExecutionProfile { id, .. } => id.uid() == item_id,
                 QueueItem::UpdateTemplatableMCPServer { id, .. } => id.uid() == item_id,
-                QueueItem::UpdateCloudEnvironment { id, .. } => id.uid() == item_id,
                 // We don't depend on object actions, since they don't affect an object's own content or metadata
                 QueueItem::RecordObjectAction { .. } => false,
             })
@@ -803,20 +795,6 @@ impl SyncQueue {
                     );
                 }
                 QueueItem::UpdateTemplatableMCPServer {
-                    model,
-                    id,
-                    revision,
-                } => {
-                    self.update_object(
-                        model.clone(),
-                        id,
-                        revision,
-                        object_client,
-                        dequeued_item_id,
-                        ctx,
-                    );
-                }
-                QueueItem::UpdateCloudEnvironment {
                     model,
                     id,
                     revision,
@@ -1793,9 +1771,6 @@ impl SyncQueue {
                     self.handle_update_failure_response(id, item_id, ctx);
                 }
                 QueueItem::UpdateTemplatableMCPServer { id, .. } => {
-                    self.handle_update_failure_response(id, item_id, ctx);
-                }
-                QueueItem::UpdateCloudEnvironment { id, .. } => {
                     self.handle_update_failure_response(id, item_id, ctx);
                 }
                 QueueItem::RecordObjectAction {

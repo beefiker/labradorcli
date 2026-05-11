@@ -750,22 +750,6 @@ impl CloudModel {
         }
     }
 
-    /// Updates the per-environment "last used" timestamp.
-    ///
-    /// This timestamp is derived from `CloudEnvironment.lastTaskCreated.createdAt`.
-    pub fn update_environment_last_task_run_timestamps(
-        &mut self,
-        timestamps: HashMap<String, DateTime<Utc>>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        for (uid, timestamp) in timestamps {
-            if let Some(object) = self.objects_by_id.get_mut(&uid) {
-                object.metadata_mut().last_task_run_ts = Some(timestamp.into());
-            }
-        }
-        ctx.notify();
-    }
-
     pub fn update_object_metadata_last_updated_ts(
         &mut self,
         uid: &ObjectUid,

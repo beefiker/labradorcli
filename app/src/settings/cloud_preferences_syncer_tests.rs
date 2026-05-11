@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashSet, VecDeque},
     sync::Arc,
     sync::Mutex,
     time::Duration,
@@ -231,12 +231,7 @@ fn random_server_id() -> ServerId {
 
 /// Creates a MockObjectClient with base expectations needed for tests that call mock_initial_load.
 fn mock_object_client_with_base_expectations() -> MockObjectClient {
-    let mut server_api = MockObjectClient::new();
-    // Mock environment timestamps fetch - called during mock_initial_load
-    server_api
-        .expect_fetch_environment_last_task_run_timestamps()
-        .returning(|| Ok(HashMap::new()));
-    server_api
+    MockObjectClient::new()
 }
 
 /// Expects a bulk create request for the given number of settings and returns the client ids

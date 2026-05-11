@@ -136,10 +136,6 @@ use warp_graphql::{
     object::CloudObjectWithDescendants,
     object_permissions::AccessLevel,
     queries::{
-        get_cloud_environments::{
-            GetCloudEnvironmentsQuery, GetCloudEnvironmentsQueryVariables,
-            GetCloudEnvironmentsResult,
-        },
         get_cloud_object::{
             CloudObjectInput, CloudObjectResult, GetCloudObject, GetCloudObjectVariables,
         },
@@ -318,15 +314,6 @@ pub trait ObjectClient: 'static + Send + Sync {
         guest: GuestIdentifier,
     ) -> Result<ServerPermissions>;
 
-    /// Fetches the last-used timestamps for all cloud environments.
-    ///
-    /// This is derived from `CloudEnvironment.lastTaskCreated.createdAt` (not `lastTaskRunTimestamp`)
-    /// so that "Last used" reflects the most recently created task.
-    ///
-    /// Returns a map from environment UID to timestamp.
-    async fn fetch_environment_last_task_run_timestamps(
-        &self,
-    ) -> Result<HashMap<String, DateTime<Utc>>>;
 }
 
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
@@ -1584,34 +1571,6 @@ impl ObjectClient for ServerApi {
         }
     }
 
-    async fn fetch_environment_last_task_run_timestamps(
-        &self,
-    ) -> Result<HashMap<String, DateTime<Utc>>> {
-        let variables = GetCloudEnvironmentsQueryVariables {
-            request_context: get_request_context(),
-        };
-
-        let operation = GetCloudEnvironmentsQuery::build(variables);
-        let response = self.send_graphql_request(operation, None).await?;
-
-        match response.get_cloud_environments {
-            GetCloudEnvironmentsResult::GetCloudEnvironmentsOutput(output) => {
-                let mut timestamps = HashMap::new();
-                for env in output.cloud_environments {
-                    if let Some(task) = env.last_task_created {
-                        timestamps.insert(env.uid.into_inner(), task.created_at.utc());
-                    }
-                }
-                Ok(timestamps)
-            }
-            GetCloudEnvironmentsResult::UserFacingError(e) => {
-                Err(anyhow!(get_user_facing_error_message(e)))
-            }
-            GetCloudEnvironmentsResult::Unknown => Err(anyhow!(
-                "Failed to fetch cloud environments due to unknown variant"
-            )),
-        }
-    }
 }
 
 /// Parse the serialized model for a GSO and add it to the format-specific entry in `map`,

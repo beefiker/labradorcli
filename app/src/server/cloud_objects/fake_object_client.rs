@@ -277,12 +277,6 @@ impl ObjectClient for FakeObjectClient {
         Ok(self.snapshot_as_initial_load_response())
     }
 
-    async fn fetch_environment_last_task_run_timestamps(
-        &self,
-    ) -> Result<HashMap<String, DateTime<Utc>>> {
-        Ok(HashMap::new())
-    }
-
     // ───────────────────────────────────────────────────────────────
     // The methods below are not exercised by CloudPreferencesSyncer,
     // so they intentionally panic. If a future change to the syncer
