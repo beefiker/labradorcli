@@ -785,16 +785,8 @@ impl AgentDriverRunner {
                     resume: None,
                     environment: None,
                     selected_harness: args.harness,
-                    snapshot_disabled: args.snapshot.no_snapshot.then_some(true),
-                    snapshot_upload_timeout: args
-                        .snapshot
-                        .snapshot_upload_timeout
-                        .map(|duration| duration.into()),
-                    snapshot_script_timeout: args
-                        .snapshot
-                        .snapshot_script_timeout
-                        .map(|duration| duration.into()),
                 };
+                let _ = &args.snapshot;
 
                 Ok((merged_config, task, driver_options))
             })

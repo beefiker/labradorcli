@@ -22,31 +22,6 @@ pub struct UploadTarget {
     pub headers: HashMap<String, String>,
 }
 
-/// Request body for upload-snapshot upload targets.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct SnapshotUploadRequest {
-    pub files: Vec<SnapshotFileInfo>,
-}
-
-/// Describes a single file in a snapshot upload request.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct SnapshotFileInfo {
-    pub filename: String,
-    pub mime_type: String,
-}
-
-/// Response from the upload-snapshot endpoint.
-///
-/// The `uploads` list is aligned by index with the [`SnapshotUploadRequest::files`]
-/// list in the request, so callers match each upload target back to the filename
-/// they requested by position. The server does not include filenames on the
-/// response entries — see the `UploadSnapshotResponse` schema in
-/// `warp-server`'s `public_api/openapi.yaml`.
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct SnapshotUploadResponse {
-    pub uploads: Vec<UploadTarget>,
-}
-
 #[derive(serde::Serialize)]
 struct CreateExternalConversationRequest {
     format: String,
@@ -143,15 +118,6 @@ pub trait HarnessSupportClient: 'static + Send + Sync {
     /// artifacts already reported via `report_artifact`.
     async fn finish_task(&self, success: bool, summary: &str) -> Result<()>;
 
-    /// Get presigned upload targets for a workspace state snapshot.
-    ///
-    /// The returned list is aligned by index with `request.files`. See
-    /// [`SnapshotUploadResponse`] for details on the server contract.
-    async fn get_snapshot_upload_targets(
-        &self,
-        request: &SnapshotUploadRequest,
-    ) -> Result<Vec<UploadTarget>>;
-
     /// Download the raw third-party harness transcript bytes for the current task's
     /// conversation.
     ///
@@ -240,16 +206,6 @@ impl HarnessSupportClient for ServerApi {
             },
         )
         .await
-    }
-
-    async fn get_snapshot_upload_targets(
-        &self,
-        request: &SnapshotUploadRequest,
-    ) -> Result<Vec<UploadTarget>> {
-        let response: SnapshotUploadResponse = self
-            .post_public_api("harness-support/upload-snapshot", request)
-            .await?;
-        Ok(response.uploads)
     }
 
     async fn fetch_transcript(&self) -> Result<bytes::Bytes> {
