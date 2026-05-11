@@ -955,22 +955,14 @@ fn test_harness_filter_matches_only_selected_harness() {
         let mut model = create_test_model();
 
         let task_claude = task_with_harness(5100, "user-a", Some(Some(Harness::Claude)));
-        let task_gemini = task_with_harness(5101, "user-a", Some(Some(Harness::Codex)));
-        // Snapshot present but no harness set → Some(Oz), matches Dwarf Agent.
-        let task_oz_default = task_with_harness(5102, "user-a", Some(None));
+        let task_codex = task_with_harness(5101, "user-a", Some(Some(Harness::Codex)));
         // No snapshot at all → None, matches only `All`.
         let task_no_snapshot = task_with_harness(5103, "user-a", None);
 
-        for t in [
-            &task_claude,
-            &task_gemini,
-            &task_oz_default,
-            &task_no_snapshot,
-        ] {
+        for t in [&task_claude, &task_codex, &task_no_snapshot] {
             model.tasks.insert(t.task_id, t.clone());
         }
 
-        // Local conversation: effectively Dwarf Agent.
         let conv_id = AIConversationId::new();
         model.conversations.insert(
             conv_id,
@@ -997,32 +989,16 @@ fn test_harness_filter_matches_only_selected_harness() {
                     .collect()
             };
 
-            // All → everything (incl. the unknown-harness stub task).
-            assert_eq!(items_for(HarnessFilter::All).len(), 5);
+            // All → everything (incl. the unknown-harness stub task and local conv).
+            assert_eq!(items_for(HarnessFilter::All).len(), 4);
 
             // Claude → only the claude task.
             let claude_items = items_for(HarnessFilter::Specific(Harness::Claude));
             assert_eq!(claude_items, vec![format!("task:{}", task_claude.task_id)]);
 
-            // Gemini → only the gemini task.
-            let gemini_items = items_for(HarnessFilter::Specific(Harness::Codex));
-            assert_eq!(gemini_items, vec![format!("task:{}", task_gemini.task_id)]);
-
-            // Dwarf Agent / Oz → default-snapshot task and local conversation.
-            // The stub task with no snapshot resolves to `harness() == None` and
-            // is deliberately excluded from any specific-harness filter.
-            let oz_items = items_for(HarnessFilter::Specific(Harness::Oz));
-            assert_eq!(
-                oz_items.len(),
-                2,
-                "expected 2 Dwarf Agent matches, got {oz_items:?}"
-            );
-            assert!(oz_items.contains(&format!("task:{}", task_oz_default.task_id)));
-            assert!(oz_items.contains(&format!("conversation:{conv_id}")));
-            assert!(
-                !oz_items.contains(&format!("task:{}", task_no_snapshot.task_id)),
-                "stub task with no snapshot should not match the Dwarf Agent filter"
-            );
+            // Codex → only the codex task.
+            let codex_items = items_for(HarnessFilter::Specific(Harness::Codex));
+            assert_eq!(codex_items, vec![format!("task:{}", task_codex.task_id)]);
         });
     });
 }

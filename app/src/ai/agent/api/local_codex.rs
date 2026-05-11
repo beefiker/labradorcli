@@ -2102,7 +2102,7 @@ mod tests {
         AIAgentInput::ActionResult {
             result: crate::ai::agent::AIAgentActionResult {
                 id: "provider-question".to_string().into(),
-                task_id: "task".to_string(),
+                task_id: crate::ai::agent::task::TaskId::new("task".to_string()),
                 result: AIAgentActionResultType::AskUserQuestion(AskUserQuestionResult::Success {
                     answers: vec![AskUserQuestionAnswerItem::Answered {
                         question_id: LOCAL_AUTH_PROVIDER_QUESTION_ID.to_string(),

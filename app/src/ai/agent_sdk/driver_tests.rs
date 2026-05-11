@@ -1,4 +1,4 @@
-use std::{ffi::OsString, sync::Arc, time::Duration};
+use std::{ffi::OsString, time::Duration};
 
 use futures::channel::oneshot;
 use warp_cli::agent::Harness;
@@ -12,10 +12,6 @@ use super::{
     IdleTimeoutSender, LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV,
     LEGACY_OZ_PARENT_STATE_ROOT_ENV, OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
     OZ_MESSAGE_LISTENER_STATE_ROOT_ENV,
-};
-use crate::ai::agent::{
-    task::TaskId, AIAgentActionResult, AIAgentActionResultType, AIAgentInput, AIAgentOutput,
-    AIAgentOutputMessage, ArtifactCreatedData, MessageId, UploadArtifactResult,
 };
 use crate::ai::mcp::parsing::normalize_mcp_json;
 use crate::ai::{agent_sdk::task_env_vars, ambient_agents::AmbientAgentTaskId};
@@ -243,35 +239,6 @@ fn task_env_vars_include_parent_run_id_when_present() {
     } else {
         assert!(!env_vars.contains_key(&OsString::from(SESSION_SHARING_SERVER_URL_OVERRIDE_ENV)));
     }
-}
-
-#[test]
-fn task_env_vars_omit_parent_run_id_when_absent() {
-    let task_id: AmbientAgentTaskId = "550e8400-e29b-41d4-a716-446655440001".parse().unwrap();
-    let env_vars = task_env_vars(Some(&task_id), None, Harness::Oz);
-    let overrides_allowed = ChannelState::channel().allows_server_url_overrides();
-
-    assert_eq!(
-        env_vars.get(&OsString::from(OZ_RUN_ID_ENV)),
-        Some(&OsString::from(task_id.to_string()))
-    );
-    assert!(!env_vars.contains_key(&OsString::from(OZ_PARENT_RUN_ID_ENV)));
-    assert_eq!(
-        env_vars.get(&OsString::from(OZ_HARNESS_ENV)),
-        Some(&OsString::from("oz"))
-    );
-    assert!(!env_vars.contains_key(&OsString::from(OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV)));
-    assert!(!env_vars.contains_key(&OsString::from(
-        LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV
-    )));
-    assert_eq!(
-        env_vars.contains_key(&OsString::from(SERVER_ROOT_URL_OVERRIDE_ENV)),
-        overrides_allowed && !ChannelState::server_root_url().is_empty()
-    );
-    assert_eq!(
-        env_vars.contains_key(&OsString::from(WS_SERVER_URL_OVERRIDE_ENV)),
-        overrides_allowed && !ChannelState::ws_server_url().is_empty()
-    );
 }
 
 #[test]

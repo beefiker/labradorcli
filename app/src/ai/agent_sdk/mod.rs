@@ -85,8 +85,6 @@ mod provider;
 pub(crate) mod retry;
 mod secret;
 mod telemetry;
-#[cfg(test)]
-mod test_support;
 
 /// Prints a non-blocking warning to stderr when the CLI is invoked with a team-scoped API key.
 fn maybe_warn_team_api_key(ctx: &AppContext) {

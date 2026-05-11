@@ -166,24 +166,8 @@ fn task_without_snapshot_leaves_harness_unset() {
 }
 
 #[test]
-fn snapshot_without_explicit_harness_defaults_to_oz() {
-    let mut task = task_with_run_time_and_credits();
-    task.agent_config_snapshot = Some(AgentConfigSnapshot::default());
-    let mut data = TombstoneDisplayData::default();
-
-    data.enrich_from_task(task);
-
-    assert_eq!(data.harness, Some(Harness::Oz));
-}
-
-#[test]
 fn snapshot_with_explicit_harness_propagates() {
-    for harness in [
-        Harness::Oz,
-        Harness::Claude,
-        Harness::Codex,
-        Harness::Unknown,
-    ] {
+    for harness in [Harness::Claude, Harness::Codex, Harness::Unknown] {
         let mut task = task_with_run_time_and_credits();
         task.agent_config_snapshot = Some(AgentConfigSnapshot {
             harness: Some(HarnessConfig::from_harness_type(harness)),

@@ -158,7 +158,6 @@ fn test_from_task_includes_linked_directory_when_run_id_matches() {
 fn test_from_conversation_metadata_passes_harness_through() {
     for harness in [
         None,
-        Some(Harness::Oz),
         Some(Harness::Claude),
         Some(Harness::Codex),
         Some(Harness::Unknown),
@@ -198,19 +197,8 @@ fn test_from_task_resolves_harness() {
             let data = ConversationDetailsData::from_task(&base_task, None, None, ctx);
             assert_eq!(data.harness, None);
 
-            // Snapshot without an explicit harness → default to Dwarf Agent.
-            let mut task = base_task.clone();
-            task.agent_config_snapshot = Some(AgentConfigSnapshot::default());
-            let data = ConversationDetailsData::from_task(&task, None, None, ctx);
-            assert_eq!(data.harness, Some(Harness::Oz));
-
             // Snapshot with explicit harness_type.
-            for harness in [
-                Harness::Oz,
-                Harness::Claude,
-                Harness::Codex,
-                Harness::Unknown,
-            ] {
+            for harness in [Harness::Claude, Harness::Codex, Harness::Unknown] {
                 let mut task = base_task.clone();
                 task.agent_config_snapshot = Some(AgentConfigSnapshot {
                     harness: Some(HarnessConfig::from_harness_type(harness)),
