@@ -4,7 +4,6 @@ use warpui::{rendering::GPUPowerPreference, AppContext, SingletonEntity};
 use warpui_extras::user_preferences;
 
 use crate::{
-    ai::cloud_agent_settings::CloudAgentSettings,
     appearance,
     banner::BannerState,
     drive::settings::WarpDriveSettings,
@@ -74,7 +73,6 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     ChangelogSettings::register(ctx);
     GeneralSettings::register(ctx);
     AISettings::register_and_subscribe_to_events(ctx);
-    CloudAgentSettings::register(ctx);
     ScrollSettings::register(ctx);
     SelectionSettings::register(ctx);
     InputModeSettings::register(ctx);
