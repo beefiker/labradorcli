@@ -306,7 +306,6 @@ impl TemplatableMCPServerManager {
             spawner: Some(ctx.spawner()),
             pending_reconnections: Default::default(),
             pending_oauth_csrf: Default::default(),
-            cli_spawned_server_uuids: Default::default(),
         };
 
         me.fetch_cloud_servers(ctx);
@@ -642,17 +641,6 @@ impl TemplatableMCPServerManager {
             },
             ctx,
         );
-    }
-
-    /// Spawns an ephemeral MCP server started via the CLI (`oz agent run --mcp`).
-    #[allow(dead_code)] // only the deleted Oz dispatch path called this
-    pub fn spawn_cli_ephemeral_server(
-        &mut self,
-        installation: TemplatableMCPServerInstallation,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.cli_spawned_server_uuids.insert(installation.uuid());
-        self.spawn_ephemeral_server(installation, ctx);
     }
 
     /// Spawns a new MCP server from a given installation UUID.

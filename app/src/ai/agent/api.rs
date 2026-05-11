@@ -191,13 +191,6 @@ impl RequestParams {
                 );
             }
 
-            // Include any ephemeral MCP servers started via the Oz CLI.
-            active_servers.extend(
-                templatable_manager
-                    .get_active_cli_spawned_servers()
-                    .values(),
-            );
-
             let servers: Vec<MCPServer> = active_servers
                 .into_iter()
                 .map(|server| MCPServer {

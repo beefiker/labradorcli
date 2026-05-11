@@ -11,7 +11,7 @@ mod wasm;
 use diesel::SqliteConnection;
 #[cfg(not(target_family = "wasm"))]
 use parking_lot::Mutex;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 #[cfg(not(target_family = "wasm"))]
 use std::sync::Arc;
 
@@ -79,9 +79,6 @@ pub struct TemplatableMCPServerManager {
     /// is received or the spawn task terminates.
     #[cfg(not(target_family = "wasm"))]
     pending_oauth_csrf: HashMap<String, Uuid>,
-    /// UUIDs of MCP servers started via the Oz CLI. We track these so they can be distinguished from
-    /// file-based ephemeral MCP servers, which are directory-scoped.
-    cli_spawned_server_uuids: HashSet<Uuid>,
 }
 
 /// Information about a spawned server task.
@@ -331,13 +328,6 @@ impl TemplatableMCPServerManager {
             .collect()
     }
 
-    /// Returns CLI-spawned ephemeral servers (started via `oz agent run --mcp`) that are currently active.
-    pub fn get_active_cli_spawned_servers(&self) -> HashMap<Uuid, &TemplatableMCPServerInfo> {
-        self.cli_spawned_server_uuids
-            .iter()
-            .filter_map(|uuid| self.active_servers.get(uuid).map(|info| (*uuid, info)))
-            .collect()
-    }
 }
 
 #[derive(Debug)]
