@@ -182,7 +182,6 @@ impl TerminalView {
                 // Re-render to hide the loading screen now that the session is ready.
                 ctx.notify();
             }
-            AmbientAgentViewModelEvent::EnvironmentSelected => {}
             AmbientAgentViewModelEvent::ProgressUpdated => {
                 // Refresh the tip (respects 60s cooldown internally)
                 let tip_model = ambient_agent_view_model

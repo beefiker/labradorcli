@@ -18,12 +18,8 @@ use crate::ai::ambient_agents::{
     OUT_OF_CREDITS_TASK_FAILURE_MESSAGE, SERVER_OVERLOADED_TASK_FAILURE_MESSAGE,
 };
 use crate::ai::blocklist::BlocklistAIHistoryModel;
-use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::execution_profiles::{CloudAgentComputerUseState, ComputerUsePermission};
 use crate::ai::llms::{LLMId, LLMPreferences};
-use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::server::cloud_objects::update_manager::UpdateManager;
-use crate::server::ids::{ServerId, SyncId};
 use crate::server::server_api::ai::{
     AgentConfigSnapshot, AmbientAgentTaskState, AttachmentInput, SpawnAgentRequest,
 };
@@ -81,9 +77,6 @@ pub struct AmbientAgentViewModel {
     /// The terminal view this model is part of.
     terminal_view_id: EntityId,
 
-    /// Selected cloud environment to launch the ambient agent with.
-    environment_id: Option<SyncId>,
-
     /// Handle for the periodic timer that updates progress durations.
     progress_timer_handle: Option<SpawnedFutureHandle>,
 
@@ -113,25 +106,12 @@ pub struct AmbientAgentViewModel {
 
 impl AmbientAgentViewModel {
     pub fn new(terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) -> Self {
-        ctx.subscribe_to_model(&CloudModel::handle(ctx), |me, event, ctx| {
-            me.handle_cloud_model_event(event, ctx);
-        });
-
-        // Validate the default environment once Dwarf Drive sync completes.
-        // The environment ID may be restored from settings before environments are synced,
-        // so we need to validate it once the initial load is complete.
-        let initial_load_complete = UpdateManager::as_ref(ctx).initial_load_complete();
-        ctx.spawn(initial_load_complete, |me, _, ctx| {
-            me.validate_environment_after_initial_load(ctx);
-        });
-
         let ui_state = AmbientAgentProgressUIState::new(ctx);
 
         Self {
             status: Status::Composing,
             request: None,
             terminal_view_id,
-            environment_id: None,
             progress_timer_handle: None,
             ui_state,
             setup_commands_state: Default::default(),
@@ -166,51 +146,6 @@ impl AmbientAgentViewModel {
         }
     }
 
-    /// Handles CloudModel events to keep environment_id in sync.
-    fn handle_cloud_model_event(&mut self, event: &CloudModelEvent, ctx: &mut ModelContext<Self>) {
-        match event {
-            // If the selected environment is deleted, clear the selection.
-            CloudModelEvent::ObjectTrashed { type_and_id, .. }
-            | CloudModelEvent::ObjectDeleted { type_and_id, .. } => {
-                if type_and_id.as_generic_string_object_id() == self.environment_id
-                    && self.environment_id.is_some()
-                {
-                    self.environment_id = None;
-                    ctx.emit(AmbientAgentViewModelEvent::EnvironmentSelected);
-                }
-            }
-            // When an environment syncs and gets a ServerId, update our stored ID.
-            CloudModelEvent::ObjectSynced {
-                client_id,
-                server_id,
-                ..
-            } => {
-                if let Some(current_id) = &self.environment_id {
-                    // Check if this is our environment by comparing with the ClientId
-                    if current_id == &SyncId::ClientId(*client_id) {
-                        self.environment_id = Some(SyncId::ServerId(*server_id));
-                        ctx.emit(AmbientAgentViewModelEvent::EnvironmentSelected);
-                    }
-                }
-            }
-            _ => (),
-        }
-    }
-
-    /// Validates the environment ID after Dwarf Drive initial load completes.
-    /// If the environment no longer exists, clears the selection.
-    fn validate_environment_after_initial_load(&mut self, ctx: &mut ModelContext<Self>) {
-        if let Some(id) = &self.environment_id {
-            if CloudAmbientAgentEnvironment::get_by_id(id, ctx).is_none() {
-                log::warn!(
-                    "Environment {id:?} no longer exists after initial load, clearing selection"
-                );
-                self.environment_id = None;
-                ctx.emit(AmbientAgentViewModelEvent::EnvironmentSelected);
-            }
-        }
-    }
-
     /// Returns the agent progress for tracking spawn steps.
     /// Returns `None` if not in the `WaitingForSession`, `Failed`, `NeedsGithubAuth`, or `Cancelled` state.
     pub fn agent_progress(&self) -> Option<&AgentProgress> {
@@ -221,11 +156,6 @@ impl AmbientAgentViewModel {
             | Status::Cancelled { progress } => Some(progress),
             _ => None,
         }
-    }
-
-    /// Returns the currently selected environment ID.
-    pub fn selected_environment_id(&self) -> Option<&SyncId> {
-        self.environment_id.as_ref()
     }
 
     pub fn selected_harness(&self) -> Harness {
@@ -259,23 +189,6 @@ impl AmbientAgentViewModel {
         }
         self.harness_command_started = true;
         ctx.emit(AmbientAgentViewModelEvent::HarnessCommandStarted);
-    }
-
-    /// Sets the selected environment ID.
-    /// If the given ID does not exist in CloudModel, the environment ID is not changed.
-    pub fn set_environment_id(
-        &mut self,
-        environment_id: Option<SyncId>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if let Some(id) = &environment_id {
-            if CloudAmbientAgentEnvironment::get_by_id(id, ctx).is_none() {
-                log::warn!("Tried to select unknown environment {id:?}");
-                return;
-            }
-        }
-        self.environment_id = environment_id;
-        ctx.emit(AmbientAgentViewModelEvent::EnvironmentSelected);
     }
 
     /// Whether or not this terminal session is for an ambient agent.
@@ -401,22 +314,16 @@ impl AmbientAgentViewModel {
             async move { ai_client.get_ambient_agent_task(&task_id).await },
             |me, result, ctx| match result {
                 Ok(task) => {
-                    let snapshot = task.agent_config_snapshot.as_ref();
-                    let environment_id = snapshot
-                        .and_then(|s| s.environment_id.as_deref())
-                        .and_then(|id| ServerId::try_from(id).ok())
-                        .map(SyncId::ServerId);
-                    let harness = snapshot
+                    let harness = task
+                        .agent_config_snapshot
+                        .as_ref()
                         .and_then(|s| s.harness.as_ref())
                         .map(|h| h.harness_type)
                         .unwrap_or_default();
-
-                    me.set_environment_id(environment_id, ctx);
                     me.set_harness(harness, ctx);
                 }
                 Err(err) => {
                     log::warn!("Failed to fetch ambient agent task for shared session: {err}");
-                    me.set_environment_id(None, ctx);
                 }
             },
         );
@@ -437,7 +344,6 @@ impl AmbientAgentViewModel {
     /// Reset cloud-specific prompt state so a retained cloud view can compose a new task.
     pub fn reset_for_new_cloud_prompt(&mut self, ctx: &mut ModelContext<Self>) {
         self.status = Status::Composing;
-        self.environment_id = None;
         self.task_id = None;
         self.conversation_id = None;
         self.has_inserted_cloud_mode_user_query_block = false;
@@ -475,7 +381,6 @@ impl AmbientAgentViewModel {
         let harness_override = Some(HarnessConfig::from_harness_type(self.harness));
 
         let config = Some(AgentConfigSnapshot {
-            environment_id: self.environment_id.as_ref().map(|id| id.to_string()),
             model_id: Some(model_id),
             computer_use_enabled,
             worker_host: default_host,
@@ -507,12 +412,6 @@ impl AmbientAgentViewModel {
     ) {
         // Apply pane settings from the request.
         if let Some(config) = request.config.as_ref() {
-            self.environment_id = config
-                .environment_id
-                .as_deref()
-                .and_then(|id| ServerId::try_from(id).ok())
-                .map(SyncId::ServerId);
-
             if let Some(model_id) = config.model_id.as_deref() {
                 LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
                     prefs.update_preferred_agent_mode_llm(
@@ -912,8 +811,6 @@ pub enum AmbientAgentViewModelEvent {
     FollowupSessionReady {
         session_id: SessionId,
     },
-    /// An environment was selected.
-    EnvironmentSelected,
     /// The ambient agent failed.
     Failed {
         error_message: String,

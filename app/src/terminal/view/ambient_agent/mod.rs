@@ -89,7 +89,6 @@ pub fn create_cloud_mode_view(
                 | AmbientAgentViewModelEvent::EnteredComposingState
                 | AmbientAgentViewModelEvent::DispatchedAgent
                 | AmbientAgentViewModelEvent::ProgressUpdated
-                | AmbientAgentViewModelEvent::EnvironmentSelected
                 | AmbientAgentViewModelEvent::Failed { .. }
                 | AmbientAgentViewModelEvent::ShowCloudAgentCapacityModal
                 | AmbientAgentViewModelEvent::ShowAICreditModal
