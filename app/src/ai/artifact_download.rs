@@ -43,15 +43,6 @@ pub(crate) fn default_download_filename(artifact: &ArtifactDownloadResponse) -> 
 }
 
 #[cfg(feature = "local_fs")]
-#[allow(dead_code)]
-pub(crate) fn download_destination(
-    artifact: &ArtifactDownloadResponse,
-    explicit_path: Option<PathBuf>,
-) -> PathBuf {
-    explicit_path.unwrap_or_else(|| PathBuf::from(default_download_filename(artifact)))
-}
-
-#[cfg(feature = "local_fs")]
 pub(crate) fn default_download_directory() -> Option<PathBuf> {
     dirs::download_dir()
 }
@@ -195,15 +186,4 @@ mod tests {
         );
     }
 
-    #[test]
-    #[cfg(feature = "local_fs")]
-    fn download_destination_uses_explicit_path() {
-        assert_eq!(
-            download_destination(
-                &sample_file_download_response("report.txt", "outputs/report.txt"),
-                Some(PathBuf::from("downloads/report.txt"))
-            ),
-            PathBuf::from("downloads/report.txt")
-        );
-    }
 }
