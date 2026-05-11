@@ -71,7 +71,7 @@ fn ping(
                             println!("{json}");
                         }
                         OutputFormat::Pretty | OutputFormat::Text => {
-                            super::ambient::print_tasks(&[task]);
+                            println!("{task:?}");
                         }
                     }
                     ctx.terminate_app(TerminationMode::ForceTerminate, None);

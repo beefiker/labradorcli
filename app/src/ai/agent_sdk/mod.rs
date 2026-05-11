@@ -71,7 +71,6 @@ use warp_cli::OZ_HARNESS_ENV;
 
 mod admin;
 mod agent_config;
-mod ambient;
 mod artifact;
 pub(crate) mod artifact_upload;
 mod common;
@@ -269,27 +268,9 @@ fn run_agent(
 
             Ok(())
         }
-        AgentCommand::RunCloud(args) => {
-            if args.environment.environment.is_some()
-                && !FeatureFlag::CloudEnvironments.is_enabled()
-            {
-                return Err(anyhow::anyhow!("unexpected argument '--environment' found"));
-            }
-            if args.conversation.is_some() && !FeatureFlag::CloudConversations.is_enabled() {
-                return Err(anyhow::anyhow!(
-                    "unexpected argument '--conversation' found"
-                ));
-            }
-            if !FeatureFlag::AgentHarness.is_enabled() {
-                return Err(anyhow::anyhow!("unexpected argument '--harness' found"));
-            }
-            if args.claude_auth_secret.is_some() && args.harness != Harness::Claude {
-                return Err(anyhow::anyhow!(
-                    "--claude-auth-secret is only valid with --harness claude."
-                ));
-            }
-            ambient::run_ambient_agent(ctx, args)
-        }
+        AgentCommand::RunCloud(_) => Err(anyhow::anyhow!(
+            "Cloud-hosted agent runs are not supported in this build"
+        )),
         AgentCommand::Profile(sub) => profiles::run(ctx, global_options, sub),
         AgentCommand::List(args) => agent_config::list_agents(ctx, args),
     }
@@ -468,41 +449,10 @@ fn run_task(
     global_options: GlobalOptions,
     command: TaskCommand,
 ) -> anyhow::Result<()> {
-    match command {
-        TaskCommand::List(args) => ambient::list_ambient_agent_tasks(ctx, global_options, args),
-        TaskCommand::Get(args) => {
-            if args.conversation {
-                if !FeatureFlag::ConversationApi.is_enabled() {
-                    return Err(anyhow::anyhow!(
-                        "The --conversation flag is not available in this build"
-                    ));
-                }
-                ambient::get_run_conversation(ctx, args.task_id)
-            } else {
-                ambient::get_ambient_agent_task_status(ctx, global_options, args)
-            }
-        }
-        TaskCommand::Conversation(conv_cmd) => {
-            if !FeatureFlag::ConversationApi.is_enabled() {
-                return Err(anyhow::anyhow!(
-                    "The 'conversation' subcommand is not available in this build"
-                ));
-            }
-            match conv_cmd {
-                warp_cli::task::ConversationCommand::Get(args) => {
-                    ambient::get_conversation(ctx, args.conversation_id)
-                }
-            }
-        }
-        TaskCommand::Message(message_cmd) => {
-            if !FeatureFlag::OrchestrationV2.is_enabled() {
-                return Err(anyhow::anyhow!(
-                    "The 'message' subcommand is not available in this build"
-                ));
-            }
-            ambient::run_message(ctx, global_options, message_cmd)
-        }
-    }
+    let _ = (ctx, global_options, command);
+    Err(anyhow::anyhow!(
+        "Cloud-hosted task commands are not supported in this build"
+    ))
 }
 
 /// Singleton model that provides a ModelContext for spawning async operations
@@ -1240,14 +1190,6 @@ fn launch_command(
     });
 
     Ok(())
-}
-
-/// Check if we're running within Warp (for example, if this is an invocation of the Warp CLI
-/// within a Dwarf terminal session).
-pub fn is_running_in_warp() -> bool {
-    std::env::var("TERM_PROGRAM")
-        .map(|v| v == "WarpTerminal")
-        .unwrap_or(false)
 }
 
 /// Report a fatal error and terminate the app.

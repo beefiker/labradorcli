@@ -19,6 +19,7 @@ use crate::server::server_api::ServerApi;
 use crate::util::image::MIN_IMAGE_HEADER_SIZE;
 
 /// Maximum number of file attachments for a cloud agent task.
+#[allow(dead_code)]
 pub const MAX_ATTACHMENT_COUNT_FOR_CLOUD_QUERY: usize = 25;
 
 /// Fetches task attachments via GraphQL and downloads them to the filesystem.
@@ -166,6 +167,7 @@ async fn download_attachment(
 /// Process a file attachment for ambient agent upload.
 /// Returns AttachmentInput with base64-encoded data.
 /// All file types share the same 10MB size limit.
+#[allow(dead_code)]
 pub fn process_attachment(
     attachment_path: &PathBuf,
     index: usize,

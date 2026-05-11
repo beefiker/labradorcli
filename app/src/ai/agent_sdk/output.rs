@@ -43,6 +43,7 @@ where
 }
 
 /// Write a serializable value to `output` as pretty JSON.
+#[allow(dead_code)]
 pub fn write_json<T, W>(value: &T, mut output: W) -> anyhow::Result<()>
 where
     T: Serialize,
@@ -74,6 +75,7 @@ where
 ///
 /// Rather than reimplement backoff based on `EAGAIN` ourselves, we can ensure
 /// that writes will block for the lifetime of the guard.
+#[allow(dead_code)]
 struct StdoutBlockingGuard {
     /// Locked stdout handle. Declared first so that on drop, the `O_NONBLOCK`
     /// flag is restored (via `Drop for StdoutBlockingGuard`) before the lock
@@ -86,6 +88,7 @@ struct StdoutBlockingGuard {
 }
 
 impl StdoutBlockingGuard {
+    #[allow(dead_code)]
     fn new() -> Self {
         let lock = std::io::stdout().lock();
 
@@ -162,6 +165,7 @@ impl Drop for StdoutBlockingGuard {
 ///
 /// When `json_output.filter` is `Some`, the JSON value is instead passed
 /// through the given filter, each output of which is printed to stdout.
+#[allow(dead_code)]
 pub fn print_raw_json(value: serde_json::Value, json_output: &JsonOutput) -> anyhow::Result<()> {
     // Ensure that writes to stdout are blocking, to enforce backpressure as we
     // potentially write a large amount of data. Otherwise, writes may fail with
@@ -190,6 +194,7 @@ pub fn print_raw_json(value: serde_json::Value, json_output: &JsonOutput) -> any
 /// Top-level scalar outputs are written as raw text (see [`write_filter_output`]).
 /// Runtime errors from the filter are returned as `anyhow::Error`; any outputs
 /// produced before the error are still written to `out`, matching jq's behavior.
+#[allow(dead_code)]
 fn run_jq_filter<W: std::io::Write>(
     value: serde_json::Value,
     jq_filter: &JqFilter,
@@ -227,6 +232,7 @@ fn run_jq_filter<W: std::io::Write>(
 /// Pretty-printer configuration used for non-scalar filter output. Matches
 /// `serde_json`'s pretty printer: two-space indent, space after `:`, no
 /// trailing space after `,` (since commas sit at end-of-line).
+#[allow(dead_code)]
 fn pretty_pp() -> jaq_write::Pp {
     jaq_write::Pp {
         indent: Some("  ".to_string()),
@@ -245,6 +251,7 @@ fn pretty_pp() -> jaq_write::Pp {
 ///   formatting conventions as the non-filtered `--output-format json` path.
 ///
 /// Every output is followed by a newline.
+#[allow(dead_code)]
 fn write_filter_output<W: std::io::Write>(val: &Val, out: &mut W) -> anyhow::Result<()> {
     match val {
         Val::Null => writeln!(out, "null")?,
