@@ -24,7 +24,6 @@ use warp_cli::{
     agent::{AgentCommand, AgentProfileCommand, OutputFormat},
     artifact::ArtifactCommand,
     environment::{EnvironmentCommand, ImageCommand},
-    federate::FederateCommand,
     harness_support::{HarnessSupportCommand, ReportArtifactCommand, TaskStatus},
     integration::IntegrationCommand,
     mcp::MCPCommand,
@@ -79,7 +78,6 @@ mod common;
 mod config_file;
 pub(crate) mod driver;
 mod environment;
-mod federate;
 mod harness_support;
 #[cfg(not(target_family = "wasm"))]
 mod integration;
@@ -174,12 +172,6 @@ fn dispatch_command(
                 return Err(anyhow::anyhow!("invalid value 'secret'"));
             }
             secret::run(ctx, global_options, secret_cmd)
-        }
-        CliCommand::Federate(federate_cmd) => {
-            if !FeatureFlag::OzIdentityFederation.is_enabled() {
-                return Err(anyhow::anyhow!("invalid value 'federate'"));
-            }
-            federate::run(ctx, global_options, federate_cmd)
         }
         CliCommand::HarnessSupport(args) => {
             if !FeatureFlag::AgentHarness.is_enabled() {
@@ -1184,7 +1176,6 @@ fn command_requires_auth(command: &CliCommand) -> bool {
         CliCommand::Integration(_) => true,
         CliCommand::Schedule(_) => true,
         CliCommand::Secret(_) => true,
-        CliCommand::Federate(_) => true,
         CliCommand::HarnessSupport(_) => true,
         CliCommand::Artifact(_) => true,
     }
@@ -1380,10 +1371,6 @@ fn command_to_telemetry_event(command: &CliCommand) -> CliTelemetryEvent {
             SecretCommand::Delete(_) => CliTelemetryEvent::SecretDelete,
             SecretCommand::Update(_) => CliTelemetryEvent::SecretUpdate,
             SecretCommand::List(_) => CliTelemetryEvent::SecretList,
-        },
-        CliCommand::Federate(federate_cmd) => match federate_cmd {
-            FederateCommand::IssueToken(_) => CliTelemetryEvent::FederateIssueToken,
-            FederateCommand::IssueGcpToken(_) => CliTelemetryEvent::FederateIssueGcpToken,
         },
         CliCommand::HarnessSupport(args) => match &args.command {
             HarnessSupportCommand::Ping => CliTelemetryEvent::HarnessSupportPing,

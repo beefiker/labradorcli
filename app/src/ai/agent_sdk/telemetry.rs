@@ -100,10 +100,6 @@ pub(super) enum CliTelemetryEvent {
     SecretUpdate,
     /// Executing `warp secret list`
     SecretList,
-    /// Executing `warp federate issue-token`
-    FederateIssueToken,
-    /// Executing `warp federate issue-gcp-token`
-    FederateIssueGcpToken,
     /// Executing `warp harness-support ping`
     HarnessSupportPing,
     /// Executing `warp harness-support report-artifact`
@@ -178,8 +174,6 @@ impl TelemetryEvent for CliTelemetryEvent {
             CliTelemetryEvent::SecretDelete => None,
             CliTelemetryEvent::SecretUpdate => None,
             CliTelemetryEvent::SecretList => None,
-            CliTelemetryEvent::FederateIssueToken => None,
-            CliTelemetryEvent::FederateIssueGcpToken => None,
             CliTelemetryEvent::HarnessSupportPing => None,
             CliTelemetryEvent::HarnessSupportReportArtifact { artifact_type } => {
                 Some(json!({ "artifact_type": artifact_type }))
@@ -260,10 +254,6 @@ impl TelemetryEventDesc for CliTelemetryEventDiscriminants {
             CliTelemetryEventDiscriminants::SecretDelete => "CLI.Execute.Secret.Delete",
             CliTelemetryEventDiscriminants::SecretUpdate => "CLI.Execute.Secret.Update",
             CliTelemetryEventDiscriminants::SecretList => "CLI.Execute.Secret.List",
-            CliTelemetryEventDiscriminants::FederateIssueToken => "CLI.Execute.Federate.IssueToken",
-            CliTelemetryEventDiscriminants::FederateIssueGcpToken => {
-                "CLI.Execute.Federate.IssueGcpToken"
-            }
             CliTelemetryEventDiscriminants::HarnessSupportPing => "CLI.Execute.HarnessSupport.Ping",
             CliTelemetryEventDiscriminants::HarnessSupportReportArtifact => {
                 "CLI.Execute.HarnessSupport.ReportArtifact"
@@ -380,12 +370,6 @@ impl TelemetryEventDesc for CliTelemetryEventDiscriminants {
             CliTelemetryEventDiscriminants::SecretDelete => "Deleted a secret from the Dwarf CLI",
             CliTelemetryEventDiscriminants::SecretUpdate => "Updated a secret from the Dwarf CLI",
             CliTelemetryEventDiscriminants::SecretList => "Listed secrets from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::FederateIssueToken => {
-                "Issued a federated identity token from the Dwarf CLI"
-            }
-            CliTelemetryEventDiscriminants::FederateIssueGcpToken => {
-                "Issued a GCP federated identity token from the Dwarf CLI"
-            }
             CliTelemetryEventDiscriminants::HarnessSupportPing => {
                 "Pinged harness-support from the Dwarf CLI"
             }
@@ -403,9 +387,6 @@ impl TelemetryEventDesc for CliTelemetryEventDiscriminants {
 
     fn enablement_state(&self) -> EnablementState {
         match self {
-            Self::FederateIssueToken | Self::FederateIssueGcpToken => {
-                EnablementState::Flag(FeatureFlag::OzIdentityFederation)
-            }
             Self::HarnessSupportPing
             | Self::HarnessSupportReportArtifact
             | Self::HarnessSupportNotifyUser

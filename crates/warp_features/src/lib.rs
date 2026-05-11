@@ -657,8 +657,6 @@ pub enum FeatureFlag {
     /// Skills are loaded from `.agents/skills/`, `.warp/skills/`, `.claude/skills/`, and `.codex/skills/`
     /// directories to provide base prompts for agent runs.
     OzPlatformSkills,
-    /// Enables Oz identity federation commands.
-    OzIdentityFederation,
 
     /// Gates populating/reading oz updates from channel versions in the changelog model.
     OzChangelogUpdates,
@@ -898,7 +896,6 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::DirectoryTabColors,
     FeatureFlag::EditableMarkdownMermaid,
     FeatureFlag::CodeReviewScrollPreservation,
-    FeatureFlag::OzIdentityFederation,
     FeatureFlag::AgentHarness,
     FeatureFlag::ConversationApi,
     FeatureFlag::RememberFastForwardState,
@@ -921,7 +918,6 @@ pub const PREVIEW_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::BlocklistMarkdownTableRendering,
     FeatureFlag::BlocklistMarkdownImages,
     FeatureFlag::MarkdownTables,
-    FeatureFlag::OzIdentityFederation,
     FeatureFlag::GitOperationsInCodeReview,
 ];
 
@@ -1020,7 +1016,6 @@ impl FeatureFlag {
                 Some("Enables rendering markdown tables inline in AI block list responses.")
             }
             MarkdownTables => Some("Enables rendering and interaction support for markdown tables in notebooks."),
-            OzIdentityFederation => Some("Enables automatic authentication from Oz to AWS and GCP"),
             SettingsFile => Some("Enables configuring Warp via a user-editable `settings.toml` file, with hot reload and error reporting for invalid values."),
             GitOperationsInCodeReview => Some("Enables commit, push, and create-PR actions directly from the code review panel."),
             _ => None,
