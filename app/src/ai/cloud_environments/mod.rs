@@ -188,11 +188,7 @@ impl StringModel for AmbientAgentEnvironment {
         None
     }
 
-    fn new_from_server_update(&self, server_cloud_object: &ServerCloudObject) -> Option<Self> {
-        if let ServerCloudObject::AmbientAgentEnvironment(server_environment) = server_cloud_object
-        {
-            return Some(server_environment.model.clone().string_model);
-        }
+    fn new_from_server_update(&self, _server_cloud_object: &ServerCloudObject) -> Option<Self> {
         None
     }
 

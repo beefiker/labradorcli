@@ -527,9 +527,6 @@ impl CloudModel {
             ServerCloudObject::TemplatableMCPServer(templatable_mcp_server) => {
                 self.upsert_from_server_object(templatable_mcp_server, ctx);
             }
-            ServerCloudObject::AmbientAgentEnvironment(ambient_agent_environment) => {
-                self.upsert_from_server_object(ambient_agent_environment, ctx);
-            }
         }
     }
 

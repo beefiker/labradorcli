@@ -1217,16 +1217,10 @@ impl SyncQueue {
                                 )
                                 .await
                             }
-                            JsonObjectType::CloudEnvironment => {
-                                CloudAmbientAgentEnvironmentModel::send_create_request(
-                                    object_client_clone,
-                                    create_request,
-                                )
-                                .await
-                            }
                             // Server-side sync of these GSO variants was Oz-only and is no
                             // longer supported.
-                            JsonObjectType::ScheduledAmbientAgent
+                            JsonObjectType::CloudEnvironment
+                            | JsonObjectType::ScheduledAmbientAgent
                             | JsonObjectType::CloudAgentConfig => Err(anyhow::anyhow!(
                                 "{:?} sync is no longer supported",
                                 json_object_type

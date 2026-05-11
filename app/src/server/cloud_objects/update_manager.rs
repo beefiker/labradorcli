@@ -24,8 +24,8 @@ use crate::{
         GenericCloudObject, GenericServerObject, GenericStringObjectFormat, JsonObjectType,
         NumInFlightRequests, ObjectDeleteResult, ObjectIdType, ObjectMetadataUpdateResult,
         ObjectPermissionsUpdateData, ObjectType, Owner, Revision, RevisionAndLastEditor,
-        ServerAIExecutionProfile, ServerAIFact, ServerAmbientAgentEnvironment,
-        ServerCloudObject, ServerEnvVarCollection, ServerFolder,
+        ServerAIExecutionProfile, ServerAIFact, ServerCloudObject, ServerEnvVarCollection,
+        ServerFolder,
         ServerMCPServer, ServerMetadata, ServerNotebook, ServerObject, ServerPermissions,
         ServerPreference, ServerTemplatableMCPServer, ServerWorkflow,
         ServerWorkflowEnum, Space,
@@ -975,21 +975,8 @@ impl UpdateManager {
                         ctx,
                     ));
                 }
-                GenericStringObjectFormat::Json(JsonObjectType::CloudEnvironment) => {
-                    let typed_objects = objects
-                        .iter()
-                        .filter_map(|obj| {
-                            let server_obj: Option<&ServerAmbientAgentEnvironment> = obj.into();
-                            server_obj.cloned()
-                        })
-                        .collect::<Vec<_>>();
-                    sqlite_events.push(Self::handle_object_updates(
-                        typed_objects,
-                        force_refresh,
-                        !is_first_load,
-                        ctx,
-                    ));
-                }
+                // Server-side cloud-environment sync was Oz-only and removed.
+                GenericStringObjectFormat::Json(JsonObjectType::CloudEnvironment) => {}
                 // Server-side scheduled-ambient-agent sync was Oz-only and removed.
                 GenericStringObjectFormat::Json(JsonObjectType::ScheduledAmbientAgent) => {}
                 // Server-side cloud-agent-config sync was Oz-only and removed.
@@ -1830,8 +1817,7 @@ impl UpdateManager {
             | ServerCloudObject::Preference(_)
             | ServerCloudObject::AIFact(_)
             | ServerCloudObject::MCPServer(_)
-            | ServerCloudObject::TemplatableMCPServer(_)
-            | ServerCloudObject::AmbientAgentEnvironment(_) => {}
+            | ServerCloudObject::TemplatableMCPServer(_) => {}
         }
     }
 

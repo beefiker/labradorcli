@@ -10,7 +10,6 @@ use self::{
 };
 use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::{
-    ai::cloud_environments::CloudAmbientAgentEnvironmentModel,
     ai::{
         document::ai_document_model::AIDocumentId,
         execution_profiles::CloudAIExecutionProfileModel,
@@ -1182,7 +1181,6 @@ pub enum ServerCloudObject {
     MCPServer(ServerMCPServer),
     AIExecutionProfile(ServerAIExecutionProfile),
     TemplatableMCPServer(ServerTemplatableMCPServer),
-    AmbientAgentEnvironment(ServerAmbientAgentEnvironment),
 }
 
 impl ServerCloudObject {
@@ -1202,9 +1200,6 @@ impl ServerCloudObject {
             ServerCloudObject::AIExecutionProfile(ai_execution_profile) => {
                 &ai_execution_profile.metadata
             }
-            ServerCloudObject::AmbientAgentEnvironment(ambient_agent_environment) => {
-                &ambient_agent_environment.metadata
-            }
         }
     }
 
@@ -1223,9 +1218,6 @@ impl ServerCloudObject {
             }
             ServerCloudObject::TemplatableMCPServer(templatable_mcp_server) => {
                 templatable_mcp_server.id.uid()
-            }
-            ServerCloudObject::AmbientAgentEnvironment(ambient_agent_environment) => {
-                ambient_agent_environment.id.uid()
             }
         }
     }
@@ -1265,11 +1257,6 @@ where
             value.as_any().downcast_ref::<ServerTemplatableMCPServer>()
         {
             ServerCloudObject::TemplatableMCPServer(server_templatable_mcp_server.clone())
-        } else if let Some(server_ambient_agent_environment) = value
-            .as_any()
-            .downcast_ref::<ServerAmbientAgentEnvironment>(
-        ) {
-            ServerCloudObject::AmbientAgentEnvironment(server_ambient_agent_environment.clone())
         } else {
             panic!("Unknown server object type");
         }
@@ -1372,8 +1359,6 @@ pub type ServerAIExecutionProfile =
     GenericServerObject<GenericStringObjectId, CloudAIExecutionProfileModel>;
 pub type ServerTemplatableMCPServer =
     GenericServerObject<GenericStringObjectId, CloudTemplatableMCPServerModel>;
-pub type ServerAmbientAgentEnvironment =
-    GenericServerObject<GenericStringObjectId, CloudAmbientAgentEnvironmentModel>;
 
 impl<T, S> GenericServerObject<GenericStringObjectId, GenericStringModel<T, S>>
 where

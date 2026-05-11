@@ -1,6 +1,5 @@
 use crate::{
     ai::{
-        cloud_environments::AmbientAgentEnvironment,
         document::ai_document_model::AIDocumentId,
         execution_profiles::AIExecutionProfile,
         facts::AIFact,
@@ -1056,14 +1055,7 @@ impl ObjectClient for ServerApi {
                                 );
                             }
                             warp_graphql::generic_string_object::GenericStringObjectFormat::JsonCloudEnvironment => {
-                                parse_server_gso::<AmbientAgentEnvironment, JsonSerializer>(
-                                    &mut updated_generic_string_objects,
-                                    GenericStringObjectFormat::Json(JsonObjectType::CloudEnvironment),
-                                    server_id,
-                                    metadata,
-                                    permissions,
-                                    gso.serialized_model,
-                                );
+                                // Cloud environments are Oz-only and unsupported.
                             }
                             warp_graphql::generic_string_object::GenericStringObjectFormat::JsonScheduledAmbientAgent => {
                                 // Scheduled ambient agents are Oz-only and unsupported.
