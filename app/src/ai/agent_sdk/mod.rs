@@ -937,43 +937,21 @@ impl AgentDriverRunner {
             }
         };
 
-        // Handoff snapshot attachments for follow-up executions are written to
-        // {attachments_dir}/handoff/{uuid} so the server-side rehydration prompt
-        // references resolve to real files.
-        let handoff_snapshot_ai_client = ai_client.clone();
-        let handoff_snapshot_server_api = server_api.clone();
-        let handoff_snapshot_download_dir = attachments_download_dir.clone();
-        let handoff_snapshot = async move {
-            if !FeatureFlag::OzHandoff.is_enabled() {
-                return Ok(None);
-            }
-            let Some(task_id_parsed) = parsed_task_id else {
-                return Ok(None);
-            };
-            driver::attachments::fetch_and_download_handoff_snapshot_attachments(
-                handoff_snapshot_ai_client,
-                handoff_snapshot_server_api.http_client(),
-                task_id_parsed,
-                handoff_snapshot_download_dir,
-            )
-            .await
-        };
-        let (secrets_result, attachments_result, task_metadata_result, handoff_snapshot_result) =
-            futures::future::join4(
-                task_secrets,
-                driver::attachments::fetch_and_download_attachments(
-                    ai_client.clone(),
-                    server_api.clone(),
-                    task_id_str.clone(),
-                    attachments_download_dir.clone(),
-                ),
-                task_metadata,
-                handoff_snapshot,
-            )
-            .await;
+        let _ = parsed_task_id;
+        let (secrets_result, attachments_result, task_metadata_result) = futures::future::join3(
+            task_secrets,
+            driver::attachments::fetch_and_download_attachments(
+                ai_client.clone(),
+                server_api.clone(),
+                task_id_str.clone(),
+                attachments_download_dir.clone(),
+            ),
+            task_metadata,
+        )
+        .await;
 
         // Extract attachments_dir from successful result, log errors
-        let mut attachments_dir = match attachments_result {
+        let attachments_dir = match attachments_result {
             Ok(dir) => dir,
             Err(e) => {
                 log::warn!("Failed to fetch and download attachments: {e:#}");
@@ -981,17 +959,6 @@ impl AgentDriverRunner {
             }
         };
 
-        match handoff_snapshot_result {
-            Ok(Some(dir)) => {
-                // Ensure attachments_dir is set so it's passed to the server even when
-                // there were no regular task attachments.
-                attachments_dir.get_or_insert(dir);
-            }
-            Ok(None) => {}
-            Err(e) => {
-                log::warn!("Failed to fetch handoff snapshot attachments: {e:#}");
-            }
-        }
         let secrets = match secrets_result {
             Ok(secrets) => secrets,
             Err(err) => {
