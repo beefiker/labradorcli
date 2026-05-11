@@ -24,9 +24,8 @@ use crate::test_util::ai_agent_tasks::{create_api_task, create_message};
 
 use super::{
     AgentConversationsModel, AgentConversationsModelEvent, AgentManagementFilters,
-    AgentRunDisplayStatus, ArtifactFilter, ConversationMetadata, ConversationOrTask,
-    EnvironmentFilter, HarnessFilter, OwnerFilter, StatusFilter, TaskFetchState,
-    MAX_PERSONAL_TASKS, MAX_TEAM_TASKS,
+    AgentRunDisplayStatus, ArtifactFilter, ConversationMetadata, ConversationOrTask, HarnessFilter,
+    OwnerFilter, StatusFilter, TaskFetchState, MAX_PERSONAL_TASKS, MAX_TEAM_TASKS,
 };
 use crate::ai::ambient_agents::task::HarnessConfig;
 use warp_cli::agent::Harness;
@@ -601,93 +600,6 @@ fn test_eviction_noop_when_under_cap() {
         original_count,
         "no tasks should be evicted when under cap"
     );
-}
-
-#[test]
-fn test_environment_none_filter_includes_conversations() {
-    App::test((), |mut app| async move {
-        app.add_singleton_model(|_| AuthStateProvider::new_for_test());
-        app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], &[]));
-
-        let now = Utc::now();
-
-        let mut model = create_test_model();
-
-        // Task with no environment.
-        let task_no_env = create_test_task(&make_uuid(1), "user-a", now);
-        model.tasks.insert(task_no_env.task_id, task_no_env.clone());
-
-        // Task with an environment (should be excluded when filtering for None).
-        let mut task_with_env = create_test_task(&make_uuid(2), "user-b", now);
-        task_with_env.agent_config_snapshot = Some(AgentConfigSnapshot {
-            environment_id: Some("env_123".to_string()),
-            ..Default::default()
-        });
-        model
-            .tasks
-            .insert(task_with_env.task_id, task_with_env.clone());
-
-        // Local conversation (environment_id is always None) should be included.
-        let conversation_id = AIConversationId::new();
-        model.conversations.insert(
-            conversation_id,
-            ConversationMetadata {
-                nav_data: ConversationNavigationData {
-                    id: conversation_id,
-                    title: "Test conversation".to_string(),
-                    initial_query: None,
-                    last_updated: chrono::Local::now(),
-                    terminal_view_id: None,
-                    window_id: None,
-                    pane_view_locator: None,
-                    initial_working_directory: None,
-                    latest_working_directory: None,
-                    is_selected: false,
-                    is_in_active_pane: false,
-                    is_closed: false,
-                    server_conversation_token: None,
-                },
-            },
-        );
-
-        let filters = AgentManagementFilters {
-            owners: OwnerFilter::All,
-            environment: EnvironmentFilter::NoEnvironment,
-            ..Default::default()
-        };
-
-        app.update(|ctx| {
-            let mut saw_conversation = false;
-            let mut saw_task_no_env = false;
-            let mut saw_task_with_env = false;
-
-            for item in model.get_tasks_and_conversations(&filters, ctx) {
-                match item {
-                    ConversationOrTask::Conversation(_) => saw_conversation = true,
-                    ConversationOrTask::Task(task) if task.task_id == task_no_env.task_id => {
-                        saw_task_no_env = true
-                    }
-                    ConversationOrTask::Task(task) if task.task_id == task_with_env.task_id => {
-                        saw_task_with_env = true
-                    }
-                    ConversationOrTask::Task(_) => {}
-                }
-            }
-
-            assert!(
-                saw_conversation,
-                "expected Environment=None filter to include conversations"
-            );
-            assert!(
-                saw_task_no_env,
-                "expected Environment=None filter to include tasks without an environment"
-            );
-            assert!(
-                !saw_task_with_env,
-                "expected Environment=None filter to exclude tasks with an environment"
-            );
-        });
-    })
 }
 
 #[test]
