@@ -783,7 +783,6 @@ impl AgentDriverRunner {
                     idle_on_complete: args.idle_on_complete.map(|d| d.into()),
                     secrets: Default::default(),
                     resume: None,
-                    cloud_providers: Vec::new(),
                     environment: None,
                     selected_harness: args.harness,
                     snapshot_disabled: args.snapshot.no_snapshot.then_some(true),
@@ -1148,16 +1147,6 @@ impl AgentDriverRunner {
                     .map(|env| env.model().string_model.clone())
             })
             .await??;
-
-        if FeatureFlag::OzIdentityFederation.is_enabled() {
-            let run_id = driver_options
-                .task_id
-                .map(|id| id.to_string())
-                .unwrap_or_else(|| "local".to_string());
-            driver_options.cloud_providers =
-                driver::cloud_provider::load_providers(&environment.providers, &run_id)
-                    .map_err(AgentDriverError::CloudProviderSetupFailed)?;
-        }
 
         driver_options.environment = Some(environment);
         Ok(())

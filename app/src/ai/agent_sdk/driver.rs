@@ -59,7 +59,6 @@ use warpui::{
 };
 
 pub(crate) mod attachments;
-pub(crate) mod cloud_provider;
 pub(crate) mod environment;
 mod error_classification;
 pub(crate) mod harness;
@@ -188,8 +187,6 @@ pub struct AgentDriverOptions {
     /// determines which harness-specific path is taken (Oz transcript restore vs.
     /// third-party-harness payload rehydration).
     pub resume: Option<ResumeOptions>,
-    /// Cloud providers to configure within the agent's session.
-    pub cloud_providers: Vec<Box<dyn cloud_provider::CloudProvider>>,
     /// Resolved environment configuration, if any.
     pub environment: Option<AmbientAgentEnvironment>,
     /// Selected execution harness for this run.
@@ -228,9 +225,6 @@ pub struct AgentDriver {
     // Optional idle timeout after completion. If set, the process will stay alive for follow-ups
     // and exit after this period of inactivity.
     idle_on_complete: Option<Duration>,
-
-    /// Cloud providers set up within this driver session.
-    cloud_providers: Vec<Box<dyn cloud_provider::CloudProvider>>,
 
     /// Resolved environment configuration.
     environment: Option<AmbientAgentEnvironment>,
@@ -307,8 +301,6 @@ pub enum AgentDriverError {
     EnvironmentNotFound(String),
     #[error("Environment setup failed: {0}")]
     EnvironmentSetupFailed(String),
-    #[error("Cloud provider setup failed")]
-    CloudProviderSetupFailed(#[from] cloud_provider::CloudProviderSetupError),
     #[error("Could not resolve working directory {}", path.display())]
     InvalidWorkingDirectory {
         path: PathBuf,
@@ -402,7 +394,6 @@ impl AgentDriver {
             idle_on_complete,
             secrets,
             resume,
-            cloud_providers,
             environment,
             selected_harness,
             snapshot_disabled,
@@ -507,8 +498,6 @@ impl AgentDriver {
             env_vars.insert(OsString::from(env_name), OsString::from(env_value));
         }
 
-        // Inject cloud provider env vars.
-        cloud_provider::collect_env_vars(&cloud_providers, &mut env_vars)?;
         env_vars.extend(task_env_vars(
             task_id.as_ref(),
             parent_run_id.as_deref(),
@@ -545,7 +534,6 @@ impl AgentDriver {
             task_id,
             harness: None,
             idle_on_complete,
-            cloud_providers,
             environment,
             snapshot_disabled: snapshot_disabled.unwrap_or(false),
             snapshot_upload_timeout: snapshot_upload_timeout
@@ -728,10 +716,6 @@ impl AgentDriver {
             })
             .await?
             .await?;
-
-        // Once the terminal session is bootstrapped, perform cloud provider setup before spawning MCP servers.
-        // MCP servers *may* rely on cloud provider credentials.
-        Self::setup_cloud_providers(&foreground).await?;
 
         // For all harnesses: wait for the shared session and prepare the environment.
         foreground
@@ -1092,61 +1076,10 @@ impl AgentDriver {
         }
     }
 
-    /// Set up each cloud provider in sequence.
-    async fn setup_cloud_providers(spawner: &ModelSpawner<Self>) -> Result<(), AgentDriverError> {
-        let (mut providers, terminal_spawner) = spawner
-            .spawn(|me, ctx| {
-                let terminal_spawner = me.terminal_driver.update(ctx, |_, ctx| ctx.spawner());
-                // Temporarily take all cloud providers so we can move them onto the background thread.
-                //
-                // Since the Vec of cloud providers is owned by the AgentDriver model, which is
-                // itself owned by the UI framework, we can only mutate them in-place on the UI thread.
-                // So that `CloudProvider::setup` can be `async` _and_ take `&mut self`, the
-                // `setup_cloud_providers` future takes ownership of all the providers, and then moves
-                // them back to the UI thread. This is somewhat similar to how views and models are removed
-                // from the UI framework temporarily while being mutated.
-                let providers = std::mem::take(&mut me.cloud_providers);
-                (providers, terminal_spawner)
-            })
-            .await?;
-
-        let mut result = Ok(());
-
-        for provider in providers.iter_mut() {
-            let provider_result = provider.setup(terminal_spawner.clone()).await;
-            if provider_result.is_err() {
-                result = provider_result;
-                break;
-            }
-        }
-
-        // Restore the cloud providers.
-        spawner
-            .spawn(move |me, _| {
-                me.cloud_providers = providers;
-            })
-            .await?;
-
-        result?;
-        Ok(())
-    }
-
-    /// Perform cleanup after the agent has finished running.
-    async fn cleanup(spawner: ModelSpawner<Self>) {
-        let Ok(providers) = spawner
-            .spawn(|me, _| std::mem::take(&mut me.cloud_providers))
-            .await
-        else {
-            log::error!("Unable to retrieve cloud providers for cleanup");
-            return;
-        };
-
-        for provider in providers {
-            if let Err(err) = provider.cleanup().await {
-                report_error!(anyhow!(err).context("Unable to clean up cloud provider"));
-            }
-        }
-    }
+    /// Perform cleanup after the agent has finished running. Previously walked
+    /// per-CloudProvider cleanup hooks; the cloud-provider subsystem has been
+    /// removed (Oz-only), leaving this as a no-op.
+    async fn cleanup(_spawner: ModelSpawner<Self>) {}
 
     /// Invoke the end-of-run snapshot upload pipeline if the feature flag is enabled and this
     /// driver is associated with a cloud task. Errors are logged internally; this helper always
