@@ -55,6 +55,7 @@ impl<T: 'static> IntegrationsClientBounds for T {}
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
+#[allow(dead_code)] // some methods only called by deleted environment-management UI
 pub trait IntegrationsClient: 'static + IntegrationsClientBounds {
     /// Checks the user's GitHub authorization status for the given repositories.
     ///

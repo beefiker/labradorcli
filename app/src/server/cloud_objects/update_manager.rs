@@ -1962,6 +1962,7 @@ impl UpdateManager {
         );
     }
 
+    #[allow(dead_code)] // only the deleted environment management UI called this
     pub fn update_ambient_agent_environment(
         &mut self,
         environment: AmbientAgentEnvironment,

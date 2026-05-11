@@ -13925,9 +13925,6 @@ impl Workspace {
             pane_group::Event::OpenAgentProfileEditor { profile_id } => {
                 self.open_execution_profile_editor_pane(None, *profile_id, ctx);
             }
-            pane_group::Event::OpenEnvironmentManagementPane => {
-                self.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
-            }
             pane_group::Event::OpenLspLogs { log_path } => {
                 self.open_lsp_logs(log_path, ctx);
             }
@@ -20742,9 +20739,6 @@ impl TypedActionView for Workspace {
                     },
                     ctx
                 );
-            }
-            OpenEnvironmentManagementPane => {
-                self.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
             }
             ToggleAIDocumentPane {
                 document_id,

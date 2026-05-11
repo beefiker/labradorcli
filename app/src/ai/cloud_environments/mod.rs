@@ -1,3 +1,10 @@
+// Bucket-C subsystem retained for type-system reasons (cloud_object still has
+// concrete CloudAmbientAgentEnvironment variants referenced by sync_queue and
+// the GraphQL schema). All UI surfaces, callers, and the EnvironmentsPage have
+// been deleted; a future sweep can prune what remains once the sync layer
+// goes away.
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use warp_server_client::cloud_object::Owner;

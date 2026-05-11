@@ -11,7 +11,6 @@ use super::{
     appearance_page::AppearanceSettingsPageView,
     billing_and_usage_page::BillingAndUsagePageView,
     code_page::CodeSettingsPageView,
-    environments_page::EnvironmentsPageView,
     features_page::FeaturesPageView,
     keybindings::KeybindingsView,
     mcp_servers_page::MCPServersSettingsPageView,
@@ -114,7 +113,6 @@ pub enum SettingsPageViewHandle {
     Warpify(ViewHandle<WarpifyPageView>),
     Referrals(ViewHandle<ReferralsPageView>),
     AI(ViewHandle<AISettingsPageView>),
-    CloudEnvironments(ViewHandle<EnvironmentsPageView>),
     BillingAndUsage(ViewHandle<BillingAndUsagePageView>),
     MCPServers(ViewHandle<MCPServersSettingsPageView>),
     WarpDrive(ViewHandle<WarpDriveSettingsPageView>),
@@ -136,7 +134,6 @@ impl SettingsPageViewHandle {
             Warpify(view_handle) => ChildView::new(view_handle).finish(),
             Referrals(view_handle) => ChildView::new(view_handle).finish(),
             AI(view_handle) => ChildView::new(view_handle).finish(),
-            CloudEnvironments(view_handle) => ChildView::new(view_handle).finish(),
             BillingAndUsage(view_handle) => ChildView::new(view_handle).finish(),
             MCPServers(view_handle) => ChildView::new(view_handle).finish(),
             WarpDrive(view_handle) => ChildView::new(view_handle).finish(),
@@ -191,6 +188,7 @@ impl SettingsPage {
 }
 
 #[derive(PartialEq, Eq)]
+#[allow(dead_code)] // bucket-C cascade: variants only emitted by deleted environments_page
 pub enum SettingsPageEvent {
     FocusModal,
     Pane(PaneEventWrapper),
@@ -201,6 +199,7 @@ pub enum SettingsPageEvent {
 /// Wrapper for pane events to avoid circular dependency with pane module.
 /// The actual handling converts this to the real PaneEvent.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum PaneEventWrapper {
     Close,
 }
@@ -1436,6 +1435,7 @@ impl<V: warpui::View> PageType<V> {
     }
 
     /// Set the minimum page width for narrow panes.
+    #[allow(dead_code)] // only the deleted environments_page set this
     pub fn set_min_page_width(&mut self, width: f32) {
         match self {
             Self::Monolith { min_page_width, .. }

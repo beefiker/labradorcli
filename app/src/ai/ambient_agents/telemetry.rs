@@ -23,6 +23,7 @@ pub enum CloudModeEntryPoint {
 /// Telemetry events for client interactions with cloud agents.
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
+#[allow(dead_code)] // bucket-C cascade: some event variants only fire from deleted environment selector / management UI
 pub enum CloudAgentTelemetryEvent {
     /// User entered Cloud Mode.
     EnteredCloudMode { entry_point: CloudModeEntryPoint },

@@ -51,6 +51,7 @@ pub struct OpenMCPSettingsArgs {
 
 /// Source query parameter value indicating auth was initiated from cloud agent setup.
 /// Used to skip opening settings page after GitHub auth completes.
+#[allow(dead_code)] // only the deleted first-time cloud-agent setup view used this
 pub const CLOUD_SETUP_SOURCE: &str = "cloud_setup";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1214,13 +1215,6 @@ fn find_cloud_mode_terminal_in_workspace(
         let Some(ambient_terminal_id) = ambient_terminal_id else {
             continue;
         };
-
-        let has_environment_management_pane = pane_group
-            .pane_ids()
-            .any(|pane_id| pane_id.is_environment_management_pane());
-        if has_environment_management_pane {
-            return Some(ambient_terminal_id);
-        }
 
         if fallback_ambient_terminal_id.is_none() {
             fallback_ambient_terminal_id = Some(ambient_terminal_id);

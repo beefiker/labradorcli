@@ -1005,9 +1005,6 @@ fn handle_terminal_view_event(
                     initial_content: initial_content.clone(),
                 });
             }
-            Event::OpenEnvironmentManagementPane => {
-                ctx.emit(crate::pane_group::Event::OpenEnvironmentManagementPane);
-            }
             #[cfg(feature = "local_fs")]
             Event::FileRenamed { old_path, new_path } => {
                 ctx.emit(pane_group::Event::FileRenamed {
