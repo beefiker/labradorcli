@@ -70,7 +70,6 @@ use warp_cli::agent::{Harness, Prompt, RunAgentArgs};
 use warp_cli::OZ_HARNESS_ENV;
 
 mod admin;
-mod agent_config;
 pub(crate) mod artifact_upload;
 mod common;
 mod config_file;
@@ -80,7 +79,6 @@ pub(crate) mod driver;
 mod mcp;
 mod mcp_config;
 mod model;
-mod oauth_flow;
 pub mod output;
 mod profiles;
 mod provider;
@@ -89,7 +87,6 @@ mod secret;
 mod telemetry;
 #[cfg(test)]
 mod test_support;
-mod text_layout;
 
 /// Prints a non-blocking warning to stderr when the CLI is invoked with a team-scoped API key.
 fn maybe_warn_team_api_key(ctx: &AppContext) {
@@ -250,7 +247,9 @@ fn run_agent(
             "Cloud-hosted agent runs are not supported in this build"
         )),
         AgentCommand::Profile(sub) => profiles::run(ctx, global_options, sub),
-        AgentCommand::List(args) => agent_config::list_agents(ctx, args),
+        AgentCommand::List(_) => Err(anyhow::anyhow!(
+            "Cloud agent listing is not supported in this build"
+        )),
     }
 }
 

@@ -1409,6 +1409,7 @@ impl ServerApiProvider {
         self.server_api.clone()
     }
 
+    #[allow(dead_code)]
     pub fn get_integrations_client(&self) -> Arc<dyn integrations::IntegrationsClient> {
         self.server_api.clone()
     }
