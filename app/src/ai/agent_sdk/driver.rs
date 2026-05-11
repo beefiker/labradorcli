@@ -25,7 +25,6 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::{
     ai::{
-        agent::{CancellationReason, RenderableAIError},
         ambient_agents::AmbientAgentTaskId,
         cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironment},
     },
@@ -252,22 +251,11 @@ pub enum AgentRunPrompt {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[allow(dead_code)] // some MCP* / cloud-env-related variants are only constructed by deleted Oz paths
 pub enum AgentDriverError {
     #[error("Terminal session is not available.")]
     TerminalUnavailable,
     #[error("Invalid runtime state - please file a bug report.")]
     InvalidRuntimeState,
-    #[error("Requested MCP server not found: {0}")]
-    MCPServerNotFound(uuid::Uuid),
-    #[error("Failed to start MCP servers")]
-    MCPStartupFailed,
-    #[error("Failed to parse MCP server JSON: {0}")]
-    MCPJsonParseError(String),
-    #[error("MCP server configuration is missing required variables")]
-    MCPMissingVariables,
-    #[error("Agent profile \"{0}\" not found")]
-    ProfileError(String),
     #[error(
         "Failed to authenticate with server - please log in via 'oz login', provide an API key via '--api-key <key>', or set the WARP_API_KEY environment variable"
     )]
@@ -293,12 +281,6 @@ pub enum AgentDriverError {
         #[source]
         source: io::Error,
     },
-    #[error("{error}")]
-    ConversationError { error: RenderableAIError },
-    #[error("Conversation was canceled: {reason}")]
-    ConversationCancelled { reason: CancellationReason },
-    #[error("The agent got stuck waiting for user confirmation on the action: {blocked_action}")]
-    ConversationBlocked { blocked_action: String },
     #[error("Timed out refreshing team metadata")]
     TeamMetadataRefreshTimeout,
     #[error("{0}")]

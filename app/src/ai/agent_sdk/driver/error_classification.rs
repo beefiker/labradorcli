@@ -1,4 +1,3 @@
-use crate::ai::blocklist::task_status_sync_model::classify_renderable_error;
 use crate::server::server_api::ai::TaskStatusUpdate;
 use warp_graphql::ai::{AgentTaskState, PlatformErrorCode};
 
@@ -83,45 +82,6 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
             )
         }
         // --- User-side errors (task → FAILED) ---
-        AgentDriverError::MCPServerNotFound(uuid) => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                format!(
-                    "MCP server {uuid} was not found. Verify the server exists in your Dwarf Drive and the UUID is correct."
-                ),
-                PlatformErrorCode::EnvironmentSetupFailed,
-            ),
-        ),
-        AgentDriverError::MCPStartupFailed => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                "One or more MCP servers failed to start. Check that your MCP server configuration is valid and the server process is runnable.",
-                PlatformErrorCode::EnvironmentSetupFailed,
-            ),
-        ),
-        AgentDriverError::MCPJsonParseError(msg) => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                format!("Failed to parse MCP server JSON configuration: {msg}"),
-                PlatformErrorCode::EnvironmentSetupFailed,
-            ),
-        ),
-        AgentDriverError::MCPMissingVariables => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                "MCP server configuration is missing required variables. Provide all required environment variables or template values.",
-                PlatformErrorCode::EnvironmentSetupFailed,
-            ),
-        ),
-        AgentDriverError::ProfileError(name) => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                format!(
-                    "Agent profile \"{name}\" not found. Check the profile ID and ensure it exists in your team's Dwarf Drive."
-                ),
-                PlatformErrorCode::ResourceNotFound,
-            ),
-        ),
         AgentDriverError::AIWorkflowNotFound(id) => (
             AgentTaskState::Failed,
             TaskStatusUpdate::with_error_code(
@@ -158,36 +118,6 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
                 ),
                 PlatformErrorCode::EnvironmentSetupFailed,
             ),
-        ),
-
-        // --- Conversation errors ---
-        // Delegate to classify_renderable_error for proper ERROR vs FAILED
-        // distinction and PlatformErrorCode. This is a belt-and-suspenders
-        // fallback — TaskStatusSyncModel handles most conversation errors,
-        // but the driver catches them too if the conversation ends with an error.
-        AgentDriverError::ConversationError { error } => {
-            let (state, update) = classify_renderable_error(error);
-            (
-                state,
-                update.unwrap_or_else(|| {
-                    TaskStatusUpdate::with_error_code(
-                        error.to_string(),
-                        PlatformErrorCode::InternalError,
-                    )
-                }),
-            )
-        }
-
-        // --- Cancellation / Blocked (no error code) ---
-        AgentDriverError::ConversationCancelled { .. } => (
-            AgentTaskState::Cancelled,
-            TaskStatusUpdate::message("Task cancelled."),
-        ),
-        AgentDriverError::ConversationBlocked { blocked_action } => (
-            AgentTaskState::Blocked,
-            TaskStatusUpdate::message(format!(
-                "The agent got stuck waiting for user confirmation on the action: {blocked_action}"
-            )),
         ),
 
         // --- Setup errors ---

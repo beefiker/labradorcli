@@ -191,7 +191,6 @@ pub enum ObjectActionSubtype {
 /// true when the server doesn't know about it and is false anytime after the action is successfully
 /// synced.
 pub struct ObjectActions {
-    #[allow(dead_code)]
     object_actions_by_id: HashMap<ObjectUid, Vec<ObjectAction>>,
 }
 

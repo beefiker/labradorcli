@@ -467,15 +467,6 @@ impl TerminalDriver {
         self.execute_silent_command(cd_command, ctx)
     }
 
-    /// The current working directory of the active terminal session, if known.
-    #[allow(dead_code)]
-    pub fn current_directory(&self, ctx: &AppContext) -> Option<PathBuf> {
-        // TODO(ben): This should handle non-local paths.
-        self.terminal_view
-            .as_ref(ctx)
-            .active_session_path_if_local(ctx)
-    }
-
     /// Returns a future that resolves when the session has bootstrapped.
     ///
     /// This only waits for the `SessionBootstrapped` terminal view event.

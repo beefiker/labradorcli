@@ -64,29 +64,11 @@ fn warp_drive_sync_failed_is_error() {
 // --- Config/user errors → FAILED ---
 
 #[test]
-fn mcp_server_not_found_is_failed_with_env_setup() {
-    assert_state_and_code(
-        AgentDriverError::MCPServerNotFound(uuid::Uuid::nil()),
-        AgentTaskState::Failed,
-        Some(PlatformErrorCode::EnvironmentSetupFailed),
-    );
-}
-
-#[test]
 fn environment_setup_failed_is_failed() {
     assert_state_and_code(
         AgentDriverError::EnvironmentSetupFailed("bad repo".into()),
         AgentTaskState::Failed,
         Some(PlatformErrorCode::EnvironmentSetupFailed),
-    );
-}
-
-#[test]
-fn profile_error_is_failed_with_resource_not_found() {
-    assert_state_and_code(
-        AgentDriverError::ProfileError("my-profile".into()),
-        AgentTaskState::Failed,
-        Some(PlatformErrorCode::ResourceNotFound),
     );
 }
 
@@ -134,22 +116,3 @@ fn share_session_failed_includes_reason() {
     assert!(update.message.contains("server rejected"));
 }
 
-// --- Conversation-level outcomes ---
-
-#[test]
-fn conversation_cancelled_is_cancelled() {
-    let (state, update) = classify_driver_error(&AgentDriverError::ConversationCancelled {
-        reason: crate::ai::agent::CancellationReason::ManuallyCancelled,
-    });
-    assert_eq!(state, AgentTaskState::Cancelled);
-    assert!(update.error_code.is_none());
-}
-
-#[test]
-fn conversation_blocked_is_blocked() {
-    let (state, update) = classify_driver_error(&AgentDriverError::ConversationBlocked {
-        blocked_action: "rm -rf /".into(),
-    });
-    assert_eq!(state, AgentTaskState::Blocked);
-    assert!(update.message.contains("rm -rf /"));
-}
