@@ -77,7 +77,6 @@ mod common;
 mod config_file;
 pub(crate) mod driver;
 mod environment;
-mod harness_support;
 #[cfg(not(target_family = "wasm"))]
 mod integration;
 #[cfg(not(target_family = "wasm"))]
@@ -168,12 +167,9 @@ fn dispatch_command(
             }
             secret::run(ctx, global_options, secret_cmd)
         }
-        CliCommand::HarnessSupport(args) => {
-            if !FeatureFlag::AgentHarness.is_enabled() {
-                return Err(anyhow::anyhow!("invalid value 'harness-support'"));
-            }
-            harness_support::run(ctx, global_options, args)
-        }
+        CliCommand::HarnessSupport(_) => Err(anyhow::anyhow!(
+            "Harness-support CLI is not supported in this build"
+        )),
         CliCommand::Artifact(artifact_cmd) => {
             if !FeatureFlag::ArtifactCommand.is_enabled() {
                 return Err(anyhow::anyhow!("invalid value 'artifact'"));

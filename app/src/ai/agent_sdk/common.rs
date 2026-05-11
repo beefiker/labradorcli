@@ -64,6 +64,7 @@ pub(super) fn parse_ambient_task_id(
         .map_err(|err| anyhow::anyhow!("{error_prefix} '{run_id}': {err}"))
 }
 
+#[allow(dead_code)]
 pub(super) fn set_ambient_task_context_from_run_id(
     ctx: &AppContext,
     run_id: &str,

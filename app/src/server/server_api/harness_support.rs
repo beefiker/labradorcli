@@ -69,16 +69,19 @@ pub struct ResolvedHarnessPrompt {
     pub resumption_prompt: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct ReportArtifactResponse {
     pub artifact_uid: String,
 }
 
+#[allow(dead_code)]
 #[derive(serde::Serialize)]
 struct NotifyUserRequest {
     message: String,
 }
 
+#[allow(dead_code)]
 #[derive(serde::Serialize)]
 struct FinishTaskRequest {
     success: bool,
@@ -86,6 +89,7 @@ struct FinishTaskRequest {
 }
 
 /// Trait for API endpoints used to support third-party agent harnesses in Oz.
+#[allow(dead_code)]
 #[cfg_attr(test, automock)]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
