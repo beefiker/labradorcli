@@ -10,7 +10,6 @@ use warpui::{Entity, ModelContext, SingletonEntity as _};
 
 use crate::{
     ai::persisted_workspace::PersistedWorkspace,
-    features::FeatureFlag,
     settings::CodeSettings,
     terminal::view::init_project::{
         lsp_server_selector::LSPServerInfo, CodebaseIndexingResult, CreateEnvironmentResult,
@@ -161,17 +160,6 @@ impl InitProjectModel {
             self.compute_language_servers_step(&pwd_path, ctx);
         }
         self.compute_project_scoped_rules_step(&pwd_path, ctx);
-
-        if FeatureFlag::CloudEnvironments.is_enabled() {
-            // CreateEnvironment step is always Ready (no async computation)
-            self.set_step(
-                InitStepKind::CreateEnvironment,
-                Some(InitStep::new_ready(
-                    InitStepKind::CreateEnvironment,
-                    InitStepData::CreateEnvironment,
-                )),
-            );
-        }
 
         // Emit welcome step immediately, then progress to next
         ctx.emit(InitProjectModelEvent::InsertStep(InitStepKind::Welcome));
