@@ -1,6 +1,6 @@
 use crate::{
-    banner::BannerState, persistence::ModelEvent, referral_theme_status::ReferralThemeStatus,
-    resource_center::TipsCompleted, settings::SettingsFileError,
+    banner::BannerState, persistence::ModelEvent, resource_center::TipsCompleted,
+    settings::SettingsFileError,
 };
 use std::sync::mpsc::SyncSender;
 use warpui::{Entity, ModelHandle, SingletonEntity};
@@ -49,7 +49,6 @@ use warpui::{Entity, ModelHandle, SingletonEntity};
 pub struct GlobalResourceHandles {
     pub model_event_sender: Option<SyncSender<ModelEvent>>,
     pub tips_completed: ModelHandle<TipsCompleted>,
-    pub referral_theme_status: ModelHandle<ReferralThemeStatus>,
     pub user_default_shell_unsupported_banner_model_handle: ModelHandle<BannerState>,
     pub settings_file_error: Option<SettingsFileError>,
 }
@@ -57,7 +56,6 @@ pub struct GlobalResourceHandles {
 impl GlobalResourceHandles {
     #[cfg(any(test, feature = "integration_tests"))]
     pub fn mock(app: &mut warpui::App) -> Self {
-        let referral_theme_status = app.add_model(ReferralThemeStatus::new);
         let user_default_shell_unsupported_banner_model_handle =
             app.add_model(|_| BannerState::default());
         let tips_completed = app.add_model(|_| TipsCompleted::default());
@@ -65,7 +63,6 @@ impl GlobalResourceHandles {
         GlobalResourceHandles {
             model_event_sender: None,
             tips_completed,
-            referral_theme_status,
             user_default_shell_unsupported_banner_model_handle,
             settings_file_error: None,
         }
