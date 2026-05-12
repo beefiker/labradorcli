@@ -6,7 +6,6 @@ use warp_cli::agent::Harness;
 use warp_terminal::model::BlockId;
 
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
-use crate::ai::AIRequestUsageModel;
 use warp_core::features::FeatureFlag;
 use warp_core::send_telemetry_from_ctx;
 use warpui::prelude::{Empty, Vector2F};
@@ -70,14 +69,6 @@ impl TerminalView {
                 error_message,
                 ctx,
             );
-        });
-    }
-
-    pub(in crate::terminal::view) fn show_out_of_credits_modal(&self, ctx: &mut ViewContext<Self>) {
-        // Capacity-modal flow has been removed (server-only feature). Just
-        // refresh request usage in case the local state is stale.
-        AIRequestUsageModel::handle(ctx).update(ctx, |model, ctx| {
-            model.refresh_request_usage_async(ctx);
         });
     }
 
@@ -207,20 +198,6 @@ impl TerminalView {
                     self.fetch_and_update_cloud_mode_details_panel(ctx);
                 }
                 // Re-render to show the error state in the footer.
-                ctx.notify();
-            }
-            AmbientAgentViewModelEvent::ShowCloudAgentCapacityModal => {
-                // Capacity-modal flow has been removed (server-only feature).
-                ctx.notify();
-            }
-            AmbientAgentViewModelEvent::ShowAICreditModal => {
-                if FeatureFlag::CloudMode.is_enabled()
-                    && ambient_agent_view_model.as_ref(ctx).is_ambient_agent()
-                    && !self.model.lock().is_shared_ambient_agent_session()
-                {
-                    self.show_out_of_credits_modal(ctx);
-                }
-
                 ctx.notify();
             }
             AmbientAgentViewModelEvent::NeedsGithubAuth => {
