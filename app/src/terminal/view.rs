@@ -19894,7 +19894,6 @@ impl TerminalView {
                     section,
                     SettingsSection::BillingAndUsage
                         | SettingsSection::CloudEnvironments
-                        | SettingsSection::Teams
                         | SettingsSection::WarpDrive
                 ) {
                     ctx.emit(Event::OpenSettings(*section));
@@ -24246,7 +24245,6 @@ impl TypedActionView for TerminalView {
             | StartFileDropTarget
             | StopFileDropTarget
             | RunNativeShellCompletions { .. }
-            | OpenTeamSettingsPage
             | SelectAgenticSuggestion(_)
             | HideTelemetryBannerPermanently
             | GenerateCodebaseIndex
@@ -24910,9 +24908,6 @@ impl TypedActionView for TerminalView {
                     buffer_text: buffer_text.clone(),
                     results_tx: results_tx.clone(),
                 });
-            }
-            OpenTeamSettingsPage => {
-                ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent));
             }
             SetMarkedText {
                 marked_text,

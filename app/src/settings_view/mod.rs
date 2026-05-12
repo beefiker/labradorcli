@@ -44,7 +44,6 @@ use settings_page::{
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
-use teams_page::{TeamsPageView, TeamsPageViewEvent};
 use warp_core::send_telemetry_from_ctx;
 use warp_core::{
     channel::ChannelState, context_flag::ContextFlag, features::FeatureFlag,
@@ -88,10 +87,7 @@ mod privacy;
 mod privacy_page;
 mod settings_file_footer;
 pub(crate) mod settings_page;
-mod tab_menu;
-mod teams_page;
 mod telemetry;
-mod transfer_ownership_confirmation_modal;
 mod warp_drive_page;
 mod warpify_page;
 
@@ -105,8 +101,6 @@ pub use settings_page::{
     render_body_item_label, render_info_icon, render_input_list, render_separator, AdditionalInfo,
     InputListItem, LocalOnlyIconState, ToggleState,
 };
-pub use teams_page::{OpenTeamsSettingsModalArgs, TeamsInviteOption};
-
 /// Original sidebar width used when the settings-file footer is not
 /// enabled. Preserved for Preview/Stable until `FeatureFlag::SettingsFile`
 /// is promoted.
@@ -184,7 +178,6 @@ pub enum SettingsSection {
     Features,
     Keybindings,
     Privacy,
-    Teams,
     WarpDrive,
     Warpify,
     /// Internal backing-page identifier for AISettingsPageView. Multiple subpages
@@ -319,7 +312,6 @@ impl FromStr for SettingsSection {
             "Features" => Ok(Self::Features),
             "Keyboard shortcuts" => Ok(Self::Keybindings),
             "Privacy" => Ok(Self::Privacy),
-            "Teams" => Ok(Self::Teams),
             "Warpify" | "Dwarfify" => Ok(Self::Warpify),
             "WarpDrive" | "Warp Drive" | "Dwarf Drive" => Ok(Self::WarpDrive),
             "Warp Agent" | "Dwarf Agent" => Ok(Self::WarpAgent),
@@ -944,7 +936,6 @@ macro_rules! update_page {
             SettingsPageViewHandle::Appearance(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Features(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Keybindings(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::Teams(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Warpify(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Privacy(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::AI(handle) => $ctx.update_view(handle, $update),
@@ -1033,20 +1024,6 @@ impl SettingsView {
         let code_page_handle_for_nav = code_page_handle.clone();
         ctx.subscribe_to_view(&code_page_handle, |me, _, event, ctx| {
             me.handle_code_page_event(event, ctx);
-        });
-
-        // Teams page, adding unconditionally, as `should_render` later on decides whether it
-        // should be shown to the user or not
-        let teams_page_handle = ctx.add_typed_action_view(TeamsPageView::new);
-        ctx.subscribe_to_view(&teams_page_handle, |_, _, event, ctx| match event {
-            TeamsPageViewEvent::TeamsChanged => ctx.notify(),
-            TeamsPageViewEvent::OpenWarpDrive => ctx.emit(SettingsViewEvent::OpenWarpDrive),
-            TeamsPageViewEvent::ShowToast { message, flavor } => {
-                ctx.emit(SettingsViewEvent::ShowToast {
-                    message: message.clone(),
-                    flavor: *flavor,
-                })
-            }
         });
 
         let warpify_page_handle = ctx.add_typed_action_view(WarpifyPageView::new);
@@ -1810,7 +1787,6 @@ impl SettingsView {
 
     fn should_render_page(&self, settings_page: &SettingsPage, app: &AppContext) -> bool {
         match &settings_page.view_handle {
-            SettingsPageViewHandle::Teams(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Keybindings(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Features(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Appearance(v) => v.as_ref(app).should_render(app),
@@ -1822,21 +1798,6 @@ impl SettingsView {
             SettingsPageViewHandle::MCPServers(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Code(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::WarpDrive(v) => v.as_ref(app).should_render(app),
-        }
-    }
-
-    /// Open the invite section of the teams page, optionally with an email to invite.
-    pub fn open_teams_page_email_invite(
-        &mut self,
-        email: Option<&String>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if let Some(team_page) = self.settings_page(SettingsSection::Teams) {
-            if let SettingsPageViewHandle::Teams(view) = &team_page.view_handle {
-                view.update(ctx, |view, ctx| {
-                    view.open_team_members(email, ctx);
-                })
-            }
         }
     }
 
@@ -1970,9 +1931,6 @@ impl SettingsView {
         if let Some(current_page) = self.current_settings_page() {
             match &current_page.view_handle {
                 SettingsPageViewHandle::Keybindings(view_handle) => {
-                    view_handle.update(ctx, |view, ctx| view.on_tab_pressed(ctx));
-                }
-                SettingsPageViewHandle::Teams(view_handle) => {
                     view_handle.update(ctx, |view, ctx| view.on_tab_pressed(ctx));
                 }
                 _ => (),

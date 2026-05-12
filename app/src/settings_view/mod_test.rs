@@ -628,7 +628,6 @@ fn realistic_nav_items() -> Vec<SettingsNavItem> {
             "Cloud platform",
             SettingsSection::cloud_platform_subpages().to_vec(),
         )),
-        SettingsNavItem::Page(SettingsSection::Teams),
     ]
 }
 
@@ -682,7 +681,6 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
             last_subpage: SettingsSection::CloudEnvironments,
         }
     ));
-    assert!(matches!(stops[5], NavStop::Section(SettingsSection::Teams)));
 }
 
 #[test]
@@ -784,13 +782,13 @@ fn umbrella_with_no_visible_subpages_is_skipped_entirely() {
 fn filtered_out_top_level_page_is_skipped() {
     let nav_items = realistic_nav_items();
 
-    let stops = build_nav_stops(&nav_items, |section| section != SettingsSection::Teams);
+    let stops = build_nav_stops(&nav_items, |section| section != SettingsSection::Privacy);
 
     assert!(
         !stops
             .iter()
-            .any(|s| matches!(s, NavStop::Section(SettingsSection::Teams))),
-        "Teams should be filtered out entirely"
+            .any(|s| matches!(s, NavStop::Section(SettingsSection::Privacy))),
+        "Privacy should be filtered out entirely"
     );
     // But other pages remain.
     assert!(stops

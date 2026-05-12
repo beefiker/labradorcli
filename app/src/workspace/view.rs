@@ -2932,12 +2932,6 @@ impl Workspace {
                         .is_shared_objects_creation_denied_modal_open = false;
                     ctx.notify();
                 }
-                SharedObjectsCreationDeniedModalEvent::TeamSettings => {
-                    me.show_settings_with_section(Some(SettingsSection::Teams), ctx);
-                    me.current_workspace_state
-                        .is_shared_objects_creation_denied_modal_open = false;
-                    ctx.notify();
-                }
             },
         );
 
@@ -14196,9 +14190,6 @@ impl Workspace {
                     ctx,
                 );
             }
-            DrivePanelEvent::OpenTeamSettingsPage => {
-                self.show_settings_with_section(Some(SettingsSection::Teams), ctx);
-            }
             DrivePanelEvent::OpenImportModal {
                 owner,
                 initial_folder_id,
@@ -15220,20 +15211,6 @@ impl Workspace {
     ) {
         self.close_all_overlays(ctx);
         self.open_settings_pane(section, Some(search_query), ctx);
-    }
-
-    /// Opens the team settings page and fills the invite field with the given email. This is used when linking directing to
-    /// settings with the intent of inviting a user.
-    pub fn show_team_settings_page_with_email_invite(
-        &mut self,
-        email_invite: Option<&String>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.show_settings_with_section(Some(SettingsSection::Teams), ctx);
-
-        self.settings_pane.update(ctx, |view, ctx| {
-            view.open_teams_page_email_invite(email_invite, ctx);
-        });
     }
 
     /// Opens the MCP servers settings page, optionally triggering auto-install of a gallery MCP.

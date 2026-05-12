@@ -308,7 +308,6 @@ pub enum DriveIndexAction {
     },
     ClearDropTarget,
     ToggleSectionCollapsed(DriveIndexSection),
-    OpenTeamSettingsPage,
     RunObject(CloudObjectTypeAndId),
     OpenWorkflowModalWithNew {
         space: Space,
@@ -404,10 +403,7 @@ impl DriveIndexAction {
 
     pub fn blocked_for_anonymous_user(&self) -> bool {
         use DriveIndexAction::*;
-        matches!(
-            self,
-            OpenTeamSettingsPage | ViewPlans { .. } | ManageBilling { .. }
-        )
+        matches!(self, ViewPlans { .. } | ManageBilling { .. })
     }
 }
 
@@ -415,7 +411,6 @@ impl From<&DriveIndexAction> for LoginGatedFeature {
     fn from(val: &DriveIndexAction) -> LoginGatedFeature {
         use DriveIndexAction::*;
         match val {
-            OpenTeamSettingsPage => "Open Team Settings",
             ViewPlans { .. } => "View Plans",
             ManageBilling { .. } => "Manage Billing",
             _ => "Unknown reason",
@@ -461,7 +456,6 @@ pub enum DriveIndexEvent {
     },
     DuplicateObject(CloudObjectTypeAndId),
     ExportObject(CloudObjectTypeAndId),
-    OpenTeamSettingsPage,
     OpenImportModal {
         space: Space,
         initial_folder_id: Option<SyncId>,
@@ -2160,9 +2154,6 @@ impl DriveIndex {
                 .with_centered_text_label(button_text)
                 .build()
                 .with_cursor(Cursor::PointingHand)
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(DriveIndexAction::OpenTeamSettingsPage)
-                })
                 .finish()
         } else {
             appearance
@@ -2182,9 +2173,6 @@ impl DriveIndex {
                 .with_centered_text_label(button_text)
                 .build()
                 .with_cursor(Cursor::PointingHand)
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(DriveIndexAction::OpenTeamSettingsPage)
-                })
                 .finish()
         };
 
@@ -2231,9 +2219,6 @@ impl DriveIndex {
                 .with_centered_text_label(text.to_owned())
                 .build()
                 .with_cursor(Cursor::PointingHand)
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(DriveIndexAction::OpenTeamSettingsPage)
-                })
                 .finish(),
         )
         .with_margin_top(16.)
@@ -3161,19 +3146,9 @@ impl DriveIndex {
                 .set_border_color(appearance.theme().surface_3().into()),
         );
 
-        Container::new(
-            Align::new(
-                button
-                    .build()
-                    .on_click(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(DriveIndexAction::OpenTeamSettingsPage)
-                    })
-                    .finish(),
-            )
-            .finish(),
-        )
-        .with_margin_right(2.) // These icons at the end of a row are spaced apart with 2 pixels between them
-        .finish()
+        Container::new(Align::new(button.build().finish()).finish())
+            .with_margin_right(2.) // These icons at the end of a row are spaced apart with 2 pixels between them
+            .finish()
     }
 
     fn font_color_based_on_focused_state(
@@ -5445,9 +5420,6 @@ impl TypedActionView for DriveIndex {
             DriveIndexAction::ClearDropTarget => self.clear_drop_target(ctx),
             DriveIndexAction::ToggleSectionCollapsed(section) => {
                 self.toggle_section_collapse(section, ctx);
-            }
-            DriveIndexAction::OpenTeamSettingsPage => {
-                ctx.emit(DriveIndexEvent::OpenTeamSettingsPage);
             }
             DriveIndexAction::RunObject(id) => {
                 if !matches!(self.index_variant, DriveIndexVariant::Trash) {

@@ -1350,15 +1350,6 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
         .with_context_predicate(id!("Workspace"))
         .with_custom_action(CustomAction::ShowAboutWarp),
         EditableBinding::new(
-            "workspace:show_settings_teams_page",
-            BindingDescription::new("Open Settings"),
-            WorkspaceAction::ShowSettingsPage(SettingsSection::Teams),
-        )
-        .with_group(bindings::BindingGroup::Settings.as_str())
-        .with_custom_action(CustomAction::OpenTeamSettings)
-        .with_context_predicate(id!("Workspace"))
-        .with_enabled(|| false),
-        EditableBinding::new(
             "workspace:show_settings_privacy_page",
             BindingDescription::new("Open Settings: Privacy"),
             WorkspaceAction::ShowSettingsPage(SettingsSection::Privacy),
