@@ -1236,7 +1236,6 @@ fn initialize_app(
 
     ctx.add_singleton_model(|ctx| {
         UserWorkspaces::new(
-            server_api_provider.as_ref(ctx).get_team_client(),
             server_api_provider.as_ref(ctx).get_workspace_client(),
             cached_workspaces,
             current_workspace_uid,

@@ -420,9 +420,7 @@ fn test_detect_aifx_agent_run_claude_on_uber_team() {
     App::test((), |mut app| async move {
         let uber_workspace = workspace_with_team_uid(UBER_TEAM_UID);
         app.add_singleton_model(|ctx| {
-            UserWorkspaces::mock(
-                Arc::new(MockTeamClient::new()),
-                Arc::new(MockWorkspaceClient::new()),
+            UserWorkspaces::mock(Arc::new(MockWorkspaceClient::new()),
                 vec![uber_workspace],
                 ctx,
             )
@@ -447,9 +445,7 @@ fn test_detect_aifx_agent_run_claude_via_alias_on_uber_team() {
     App::test((), |mut app| async move {
         let uber_workspace = workspace_with_team_uid(UBER_TEAM_UID);
         app.add_singleton_model(|ctx| {
-            UserWorkspaces::mock(
-                Arc::new(MockTeamClient::new()),
-                Arc::new(MockWorkspaceClient::new()),
+            UserWorkspaces::mock(Arc::new(MockWorkspaceClient::new()),
                 vec![uber_workspace],
                 ctx,
             )
@@ -515,9 +511,7 @@ fn test_detect_aifx_agent_run_claude_wrong_team() {
     App::test((), |mut app| async move {
         let other_workspace = workspace_with_team_uid("some-other-team-uid-01");
         app.add_singleton_model(|ctx| {
-            UserWorkspaces::mock(
-                Arc::new(MockTeamClient::new()),
-                Arc::new(MockWorkspaceClient::new()),
+            UserWorkspaces::mock(Arc::new(MockWorkspaceClient::new()),
                 vec![other_workspace],
                 ctx,
             )

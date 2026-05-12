@@ -48,9 +48,7 @@ fn initialize_app(
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            team_client.clone(),
-            workspace_client.clone(),
+        UserWorkspaces::mock(workspace_client.clone(),
             resources.workspaces,
             ctx,
         )

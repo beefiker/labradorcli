@@ -57,12 +57,9 @@ fn initialize_code_editor_app(app: &mut App) {
     app.add_singleton_model(NotebookKeybindings::new);
 
     // Add UserWorkspaces mock (required by CodeEditorView)
-    let team_client_mock = Arc::new(MockTeamClient::new());
     let workspace_client_mock = Arc::new(MockWorkspaceClient::new());
     app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            team_client_mock.clone(),
-            workspace_client_mock.clone(),
+        UserWorkspaces::mock(workspace_client_mock.clone(),
             vec![],
             ctx,
         )

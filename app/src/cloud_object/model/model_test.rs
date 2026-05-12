@@ -95,7 +95,6 @@ fn initialize_app(
     cached_objects: Vec<Box<dyn CloudObject>>,
     cloud_object_server_api_mock: Arc<impl ObjectClient>,
 ) {
-    let team_client_mock = Arc::new(MockTeamClient::new());
     let workspace_client_mock = Arc::new(MockWorkspaceClient::new());
 
     // Add the necessary singleton models to the App
@@ -106,9 +105,7 @@ fn initialize_app(
     app.add_singleton_model(AppTelemetryContextProvider::new_context_provider);
     app.add_singleton_model(AuthManager::new_for_test);
     app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            team_client_mock.clone(),
-            workspace_client_mock.clone(),
+        UserWorkspaces::mock(workspace_client_mock.clone(),
             vec![TEST_WORKSPACE.clone()],
             ctx,
         )

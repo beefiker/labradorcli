@@ -78,9 +78,7 @@ fn initialize_test_app(app: &mut App) {
     app.add_singleton_model(PersistedWorkspace::new_for_test);
     app.add_singleton_model(|_| GlobalCodeReviewModel);
     app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            Arc::new(MockTeamClient::new()),
-            Arc::new(MockWorkspaceClient::new()),
+        UserWorkspaces::mock(Arc::new(MockWorkspaceClient::new()),
             vec![],
             ctx,
         )

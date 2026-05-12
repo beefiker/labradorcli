@@ -28,9 +28,7 @@ fn create_test_workspace() -> (WorkspaceUid, Workspace) {
 
 fn add_user_workspaces_with_workspace(app: &mut App, workspace: Workspace) {
     app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            Arc::new(MockTeamClient::new()),
-            Arc::new(MockWorkspaceClient::new()),
+        UserWorkspaces::mock(Arc::new(MockWorkspaceClient::new()),
             vec![workspace],
             ctx,
         )

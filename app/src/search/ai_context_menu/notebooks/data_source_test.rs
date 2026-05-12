@@ -66,12 +66,9 @@ mod tests {
     fn initialize_app(app: &mut App) {
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(|_| SystemStats::new());
-        let mock_team_client = Arc::new(MockTeamClient::new());
         let mock_workspace_client = Arc::new(MockWorkspaceClient::new());
         app.add_singleton_model(|ctx| {
-            UserWorkspaces::mock(
-                mock_team_client.clone(),
-                mock_workspace_client.clone(),
+            UserWorkspaces::mock(mock_workspace_client.clone(),
                 vec![],
                 ctx,
             )
