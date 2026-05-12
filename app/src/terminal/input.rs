@@ -2223,10 +2223,6 @@ impl Input {
                 AgentInputFooterEvent::OpenRichInput | AgentInputFooterEvent::HideRichInput => {
                     ctx.emit(Event::Escape);
                 }
-                AgentInputFooterEvent::StartRemoteControl
-                | AgentInputFooterEvent::StopRemoteControl => {
-                    // Handled by UseAgentToolbar's subscription, not here.
-                }
                 // WriteToPty, InsertIntoCLIRichInput, ToggleCodeReviewPane, and ToggleFileExplorer
                 // are handled by UseAgentToolbar's subscription, not here.
                 AgentInputFooterEvent::WriteToPty(_)

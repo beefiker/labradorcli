@@ -2057,8 +2057,6 @@ pub enum AgentInputFooterAction {
     OpenPluginInstallInstructionsPane,
     OpenPluginUpdateInstructionsPane,
     DismissPluginChip,
-    StartRemoteControl,
-    StopRemoteControl,
     OpenCodingAgentSettings,
     ShowContextMenu {
         position: Vector2F,
@@ -2243,12 +2241,6 @@ impl TypedActionView for AgentInputFooter {
                 }
                 ctx.notify();
             }
-            AgentInputFooterAction::StartRemoteControl => {
-                ctx.emit(AgentInputFooterEvent::StartRemoteControl);
-            }
-            AgentInputFooterAction::StopRemoteControl => {
-                ctx.emit(AgentInputFooterEvent::StopRemoteControl);
-            }
             AgentInputFooterAction::OpenCodingAgentSettings => {
                 #[cfg(not(target_family = "wasm"))]
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ScrollToSettingsWidget {
@@ -2274,8 +2266,6 @@ pub enum AgentInputFooterEvent {
     InsertIntoCLIRichInput(String),
     ToggleCodeReviewPane(CLIAgent),
     ToggleFileExplorer(CLIAgent),
-    StartRemoteControl,
-    StopRemoteControl,
     OpenRichInput,
     HideRichInput,
     ToggledChipMenu {
