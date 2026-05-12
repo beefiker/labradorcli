@@ -574,16 +574,6 @@ pub fn init(app: &mut AppContext) {
             id!("Terminal") & id!("TerminalView_NonEmptyBlockList") & !id!("AltScreen"),
         ),
         EditableBinding::new(
-            "terminal:open_share_block_modal",
-            "Disabled hosted action",
-            TerminalAction::OpenShareModal,
-        )
-        .with_custom_action(CustomAction::CreateBlockPermalink)
-        .with_context_predicate(
-            id!("Terminal") & eq!("TerminalView_BlockSelectionCardinality", "One"),
-        )
-        .with_enabled(|| false),
-        EditableBinding::new(
             "terminal:bookmark_selected_block",
             "Bookmark selected block",
             TerminalAction::BookmarkSelectedBlock,
