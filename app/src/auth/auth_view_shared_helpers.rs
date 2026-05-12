@@ -321,7 +321,6 @@ pub fn render_overlay(overlay_body: Box<dyn Element>, appearance: &Appearance) -
 pub struct PrivacySettingsHandles {
     pub telemetry_switch: SwitchStateHandle,
     pub crash_reporting_switch: SwitchStateHandle,
-    pub cloud_conversation_storage_switch: SwitchStateHandle,
     pub close_button_mouse: MouseStateHandle,
     pub telemetry_docs_mouse: MouseStateHandle,
 }
@@ -330,7 +329,6 @@ pub struct PrivacySettingsHandles {
 pub struct PrivacySettingsActions<A: Action + Clone> {
     pub toggle_telemetry: A,
     pub toggle_crash_reporting: A,
-    pub toggle_cloud_conversation_storage: A,
     pub hide_overlay: A,
 }
 
@@ -523,44 +521,6 @@ pub fn render_privacy_settings_toggles<A: Action + Clone + 'static>(
         "Crash reporting helps Dwarf's engineering team understand stability and improve performance.".into(),
     );
 
-    let toggle_cloud = actions.toggle_cloud_conversation_storage.clone();
-    let cloud_conversation_storage_toggle = Flex::row()
-        .with_main_axis_size(MainAxisSize::Max)
-        .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-        .with_child(
-            Shrinkable::new(
-                1.,
-                render_privacy_settings_section_header(
-                    "Store AI conversations in the cloud",
-                    appearance,
-                )
-                .finish(),
-            )
-            .finish(),
-        )
-        .with_child(
-            appearance
-                .ui_builder()
-                .switch(handles.cloud_conversation_storage_switch.clone())
-                .check(PrivacySettings::as_ref(app).is_cloud_conversation_storage_enabled)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(toggle_cloud.clone());
-                })
-                .finish(),
-        )
-        .finish();
-
-    let cloud_conversation_storage_description = render_description(
-        appearance,
-        if PrivacySettings::as_ref(app).is_cloud_conversation_storage_enabled {
-            "Agent conversations can be shared with others and are retained when you log in on different devices. This data is only stored for product functionality, and Dwarf will not use it for analytics."
-        } else {
-            "Agent conversations are only stored locally on your machine, are lost upon logout, and cannot be shared. Note: conversation data for ambient agents are still stored in the cloud."
-        }
-        .into(),
-    );
-
     let mut col = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
     // Builds without a telemetry/crash reporting config (e.g. OpenWarp) cannot
@@ -592,18 +552,6 @@ pub fn render_privacy_settings_toggles<A: Action + Clone + 'static>(
         ]);
     }
 
-    // Hide the cloud conversation storage toggle entirely when AI is disabled:
-    // the setting has no effect without AI, and showing it is confusing.
-    if FeatureFlag::CloudConversations.is_enabled() && is_ai_enabled {
-        col.add_children(vec![
-            Container::new(cloud_conversation_storage_toggle)
-                .with_margin_bottom(AUTH_MODAL_GAP)
-                .finish(),
-            Container::new(cloud_conversation_storage_description)
-                .with_margin_bottom(20.)
-                .finish(),
-        ]);
-    }
-
+    let _ = is_ai_enabled;
     col.finish()
 }
