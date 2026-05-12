@@ -215,7 +215,6 @@ use crate::autoupdate::{
     is_incoming_version_past_current, AutoupdateState, AutoupdateStateEvent, RelaunchModel,
 };
 use crate::banner::BannerState;
-use crate::changelog_model::{ChangelogModel, ChangelogRequestType, Event as ChangelogEvent};
 use crate::channel::Channel;
 use crate::cloud_object::toast_message::CloudObjectToastMessage;
 use crate::cloud_object::{
@@ -259,8 +258,7 @@ use crate::resource_center::{
 };
 use crate::reward_view::{RewardEvent, RewardView};
 use crate::root_view::{
-    quake_mode_window_id, DwarfConfettiPreset, NewWorkspaceSource, OpenLaunchConfigArg,
-    RootViewAction,
+    DwarfConfettiPreset, NewWorkspaceSource, OpenLaunchConfigArg, RootViewAction,
 };
 use crate::search::command_search::searcher::{
     AcceptedHistoryItem, AcceptedWorkflow, CommandSearchItemAction,
@@ -280,9 +278,9 @@ use crate::server::telemetry::{
 use crate::session_management::{SessionNavigationData, SessionSource};
 use crate::settings::{
     active_theme_kind, respect_system_theme, AccessibilitySettings, AliasExpansionSettings,
-    AppEditorSettings, BlockVisibilitySettings, ChangelogSettings, CursorBlink, DebugSettings,
+    AppEditorSettings, BlockVisibilitySettings, CursorBlink, DebugSettings,
     FontSettings, GPUSettings, InputSettings, MonospaceFontSize, PaneSettings, PrivacySettings,
-    SelectionSettings, Settings, SshSettings, ThemeSettings,
+    SelectionSettings, SshSettings, ThemeSettings,
 };
 use crate::settings_view::flags;
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
@@ -334,9 +332,7 @@ use crate::user_config::{
     tab_configs_dir,
 };
 use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
-use crate::util::bindings::{
-    keybinding_name_to_display_string, keybinding_name_to_keystroke, trigger_to_keystroke,
-};
+use crate::util::bindings::{keybinding_name_to_display_string, keybinding_name_to_keystroke};
 use crate::util::links;
 use crate::util::traffic_lights::{traffic_light_data, TrafficLightMouseStates, TrafficLightSide};
 use crate::util::truncation::truncate_from_end;
@@ -911,7 +907,6 @@ pub struct Workspace {
     // Same applies to "show_new_session_dropdown_menu"
     new_session_dropdown_menu: ViewHandle<Menu<WorkspaceAction>>,
     show_new_session_dropdown_menu: Option<Vector2F>,
-    changelog_model: ModelHandle<ChangelogModel>,
     palette: ViewHandle<CommandPalette>,
     ctrl_tab_palette: ViewHandle<CommandPalette>,
     mouse_states: WorkspaceMouseStates,
@@ -1501,10 +1496,9 @@ impl Workspace {
     fn build_resource_center_view(
         ctx: &mut ViewContext<Self>,
         tips_completed: ModelHandle<TipsCompleted>,
-        changelog_model_handle: ModelHandle<ChangelogModel>,
     ) -> ViewHandle<ResourceCenterView> {
         let resource_center_view = ctx.add_typed_action_view(|ctx| {
-            ResourceCenterView::new(ctx, tips_completed.clone(), changelog_model_handle)
+            ResourceCenterView::new(ctx, tips_completed.clone())
         });
 
         ctx.subscribe_to_view(&resource_center_view, |me, _, event, ctx| {
@@ -2582,11 +2576,6 @@ impl Workspace {
             ctx.notify();
         });
 
-        let changelog_model = ChangelogModel::handle(ctx);
-        ctx.subscribe_to_model(&changelog_model, |me, _, event, ctx| {
-            me.handle_changelog_event(event, ctx);
-        });
-
         let reward_modal = Self::build_reward_modal(ctx);
         let (welcome_tips_view, welcome_tips_view_state) =
             Self::build_welcome_tips(tips_completed.clone(), ctx);
@@ -2594,7 +2583,7 @@ impl Workspace {
             Self::build_settings_views(tips_completed.clone(), ctx);
 
         let resource_center_view =
-            Self::build_resource_center_view(ctx, tips_completed.clone(), changelog_model.clone());
+            Self::build_resource_center_view(ctx, tips_completed.clone());
 
         let enable_auto_reload_modal = ctx.add_typed_action_view(EnableAutoReloadModal::new);
         ctx.subscribe_to_view(&enable_auto_reload_modal, |me, _, event, ctx| {
@@ -3026,7 +3015,6 @@ impl Workspace {
             show_tab_right_click_menu: None,
             new_session_dropdown_menu,
             show_new_session_dropdown_menu: None,
-            changelog_model,
             welcome_tips_view_state,
             welcome_tips_view,
             palette,
@@ -4257,16 +4245,6 @@ impl Workspace {
         None
     }
 
-    pub fn check_for_changelog(
-        &self,
-        request_type: ChangelogRequestType,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.changelog_model.update(ctx, |changelog_model, ctx| {
-            changelog_model.check_for_changelog(request_type, ctx);
-            ctx.notify();
-        });
-    }
 
     fn dismiss_ai_assistant_warm_welcome(&mut self, ctx: &mut ViewContext<Self>) {
         self.should_show_ai_assistant_warm_welcome = false;
@@ -5888,21 +5866,6 @@ impl Workspace {
 
     fn view_user_docs(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.open_url(links::USER_DOCS_URL);
-    }
-
-    fn view_latest_changelog(&mut self, ctx: &mut ViewContext<Self>) {
-        self.update_toast_stack.update(ctx, |stack, ctx| {
-            stack.clear_toasts(ctx);
-        });
-        self.tips_completed.update(ctx, |tips_completed, ctx| {
-            mark_feature_used_and_write_to_user_defaults(
-                Tip::Action(TipAction::Changelog),
-                tips_completed,
-                ctx,
-            );
-            ctx.notify();
-        });
-        self.check_for_changelog(ChangelogRequestType::UserAction, ctx);
     }
 
     fn view_privacy_policy(&mut self, ctx: &mut ViewContext<Self>) {
@@ -8253,9 +8216,6 @@ impl Workspace {
         }
 
         items.extend([
-            MenuItemFields::new("What's new")
-                .with_on_select_action(WorkspaceAction::ViewLatestChangelog)
-                .into_item(),
             MenuItemFields::new("Settings")
                 .with_on_select_action(WorkspaceAction::ShowSettings)
                 .into_item(),
@@ -12495,99 +12455,6 @@ impl Workspace {
             warp_drive.set_focused_index(index, ctx);
         });
         ctx.notify();
-    }
-
-    fn handle_changelog_event(&mut self, event: &ChangelogEvent, ctx: &mut ViewContext<Self>) {
-        // For certain contexts, like shared sessions, we do not want to force open the side panel
-        // or display the reward modal.
-        if !ContextFlag::ForceSidePanelOpen.is_enabled() {
-            return;
-        }
-        // Don't show changelog if user has disabled it in settings.
-        let show_changelog_setting = *ChangelogSettings::as_ref(ctx).show_changelog_after_update;
-
-        let mut request_type = None;
-        let should_show_changelog = match event {
-            ChangelogEvent::ChangelogRequestFailed {
-                request_type: ChangelogRequestType::UserAction,
-            }
-            | ChangelogEvent::ChangelogRequestComplete {
-                request_type: ChangelogRequestType::UserAction,
-                ..
-            } => {
-                request_type = Some(ChangelogRequestType::UserAction);
-                true
-            }
-            ChangelogEvent::ChangelogRequestComplete {
-                request_type: ChangelogRequestType::WindowLaunch,
-                ..
-            } => match ChannelState::app_version() {
-                Some(version) => {
-                    let opening_warp_drive_on_start_up = OPENING_WARP_DRIVE_ON_START_UP
-                        .lock()
-                        .expect("Should be able to access OPENING_WARP_DRIVE_ON_START_UP");
-
-                    request_type = Some(ChangelogRequestType::WindowLaunch);
-                    // Do not show changelog on quake mode window or if it has already been shown
-                    // or if we are opening Dwarf Drive on start up
-                    quake_mode_window_id() != Some(ctx.window_id())
-                        && !Settings::has_changelog_been_shown(version, ctx)
-                        && !*opening_warp_drive_on_start_up
-                }
-                None => false,
-            },
-            ChangelogEvent::ChangelogRequestFailed {
-                request_type: ChangelogRequestType::WindowLaunch,
-            } => false,
-            ChangelogEvent::ImageRequestComplete => false,
-        } && show_changelog_setting;
-
-        match (should_show_changelog, request_type) {
-            (true, Some(ChangelogRequestType::WindowLaunch)) => {
-                if let Some(version) = ChannelState::app_version() {
-                    Settings::mark_changelog_shown(version, ctx);
-                    if FeatureFlag::AvatarInTabBar.is_enabled() {
-                        self.update_toast_stack.update(ctx, |stack, ctx| {
-                            // Get keybinding for view changelog action
-                            let keystroke = ctx
-                                .editable_bindings()
-                                .find(|binding| binding.name == "workspace:view_changelog")
-                                .and_then(|binding| trigger_to_keystroke(binding.trigger));
-
-                            let mut link = ToastLink::new("View changelog".to_owned())
-                                .with_onclick_action(WorkspaceAction::ViewLatestChangelog);
-                            if let Some(keystroke) = keystroke {
-                                link = link.with_keystroke(keystroke);
-                            }
-
-                            let toast = DismissibleToast::default(String::from("Dwarf updated!"))
-                                .with_link(link);
-
-                            stack.add_ephemeral_toast(toast, ctx);
-                        });
-                    } else {
-                        // If resource center isn't already open and Dwarf AI isn't open, then open resource center
-                        if !self.current_workspace_state.is_resource_center_open
-                            && !self.current_workspace_state.is_ai_assistant_panel_open
-                        {
-                            self.open_resource_center_main_page(ctx);
-                            self.update_resource_center_action_target(ctx);
-                            ctx.notify();
-                        }
-                    }
-                }
-            }
-            (_, Some(ChangelogRequestType::UserAction)) => {
-                if !self.current_workspace_state.is_resource_center_open
-                    && !self.current_workspace_state.is_ai_assistant_panel_open
-                {
-                    self.open_resource_center_main_page(ctx);
-                    self.update_resource_center_action_target(ctx);
-                    ctx.notify();
-                }
-            }
-            _ => {}
-        }
     }
 
     fn manual_check_for_update(&self, ctx: &mut ViewContext<Self>) {
@@ -19088,12 +18955,6 @@ impl Workspace {
                 .insert(flags::SHARED_BLOCK_TITLE_GENERATION_FLAG);
         }
 
-        if *ai_settings.should_show_oz_updates_in_zero_state.value() {
-            context
-                .set
-                .insert(flags::SHOW_OZ_UPDATES_IN_ZERO_STATE_FLAG);
-        }
-
         if *ai_settings
             .should_render_use_agent_footer_for_user_commands
             .value()
@@ -19789,7 +19650,6 @@ impl TypedActionView for Workspace {
             }
             JoinSlack => self.join_slack(ctx),
             ViewUserDocs => self.view_user_docs(ctx),
-            ViewLatestChangelog => self.view_latest_changelog(ctx),
             ShowConfetti => ctx.dispatch_typed_action(&RootViewAction::ShowConfetti(
                 DwarfConfettiPreset::Celebration,
             )),

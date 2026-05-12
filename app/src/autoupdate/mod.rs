@@ -1,4 +1,3 @@
-mod changelog;
 mod channel_versions;
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -34,7 +33,6 @@ use warpui::{
 };
 use warpui::{Entity, ModelContext, SingletonEntity, ViewContext};
 
-pub use self::changelog::get_current_changelog;
 use self::channel_versions::fetch_channel_versions;
 
 /// A successfully downloaded and unpacked target update.

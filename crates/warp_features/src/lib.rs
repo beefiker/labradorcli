@@ -7,7 +7,6 @@ pub use overrides::{get_overrides, set_overrides};
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Sequence)]
 pub enum FeatureFlag {
-    Changelog,
     CocoaSentry,
     CrashReporting,
     DebugMode,
@@ -658,9 +657,6 @@ pub enum FeatureFlag {
     /// directories to provide base prompts for agent runs.
     OzPlatformSkills,
 
-    /// Gates populating/reading oz updates from channel versions in the changelog model.
-    OzChangelogUpdates,
-
     /// Enables image upload for ambient agents.
     AmbientAgentsImageUpload,
 
@@ -883,7 +879,6 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::OzPlatformSkills,
     FeatureFlag::AgentViewBlockContext,
     FeatureFlag::OzLaunchModal,
-    FeatureFlag::OzChangelogUpdates,
     FeatureFlag::PendingUserQueryIndicator,
     FeatureFlag::QueueSlashCommand,
     // These are enabled via 100% experiment on prod warp-server,
@@ -926,7 +921,6 @@ pub const PREVIEW_FLAGS: &[FeatureFlag] = &[
 /// want to enable the feature by default in app/Cargo.toml, rather than add it to RELEASE_FLAGS.
 pub const RELEASE_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::Autoupdate,
-    FeatureFlag::Changelog,
     FeatureFlag::CrashReporting,
     // Promoted from PREVIEW_FLAGS for dwarf: the in-pane commit / push / Create-PR
     // actions are dwarf's primary surface for the local-LLM PR/commit-message

@@ -15,7 +15,7 @@ pub use main_page::{ResourceCenterMainEvent, ResourceCenterMainView};
 mod keybindings_page;
 pub use keybindings_page::KeybindingsView;
 mod section_views;
-pub use section_views::{ChangelogSectionView, ContentSectionView, FeatureSectionView};
+pub use section_views::{ContentSectionView, FeatureSectionView};
 pub mod sections;
 mod view;
 use serde::{Deserialize, Serialize};
@@ -181,7 +181,6 @@ pub struct ContentItem {
 pub enum Section {
     Feature(FeatureSectionData),
     Content(ContentSectionData),
-    Changelog(),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

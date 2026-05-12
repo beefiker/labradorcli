@@ -229,15 +229,6 @@ pub const OPEN_SETTINGS_FILE: StaticCommand = StaticCommand {
     argument: None,
 };
 
-pub const CHANGELOG: StaticCommand = StaticCommand {
-    name: "/changelog",
-    description: "Open the latest changelog",
-    icon_path: "bundled/svg/book-open.svg",
-    availability: Availability::ALWAYS,
-    auto_enter_ai_mode: false,
-    argument: None,
-};
-
 // Accepts an optional argument so that buffers like `/feedback some text` still parse to
 // this command (the trailing text is ignored on execution). Without this, typing any
 // argument after `/feedback` would fall through and be treated as plain input.
@@ -586,10 +577,6 @@ fn all_commands() -> Vec<StaticCommand> {
 
     if FeatureFlag::LocalDockerSandbox.is_enabled() {
         commands.push(CREATE_DOCKER_SANDBOX);
-    }
-
-    if FeatureFlag::Changelog.is_enabled() {
-        commands.push(CHANGELOG);
     }
 
     if FeatureFlag::AgentView.is_enabled() {

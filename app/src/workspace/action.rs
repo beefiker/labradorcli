@@ -199,7 +199,6 @@ pub enum WorkspaceAction {
     ShowReferralSettingsPage,
     JoinSlack,
     ViewUserDocs,
-    ViewLatestChangelog,
     ShowConfetti,
     ShowFireworksConfetti,
     ShowSnowConfetti,
@@ -783,7 +782,6 @@ impl WorkspaceAction {
             | ShowReferralSettingsPage
             | JoinSlack
             | ViewUserDocs
-            | ViewLatestChangelog
             | ShowConfetti
             | ShowFireworksConfetti
             | ShowSnowConfetti
