@@ -534,9 +534,6 @@ impl Input {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(CLOUD_MODE_V2_TOP_ROW_INNER_GAP);
 
-        if let Some(host) = self.host_selector() {
-            row.add_child(ChildView::new(host).finish());
-        }
         if let Some(harness_selector) = self.harness_selector() {
             row.add_child(ChildView::new(harness_selector).finish());
         }

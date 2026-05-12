@@ -346,7 +346,7 @@ use super::{
 use crate::ai::blocklist::agent_view::{
     AgentInputFooter, AgentInputFooterEvent, AgentViewController,
 };
-use crate::terminal::view::ambient_agent::{HarnessSelector, HostSelector, NakedHeaderButtonTheme};
+use crate::terminal::view::ambient_agent::HarnessSelector;
 use async_channel::Sender;
 use futures::stream::AbortHandle;
 use parking_lot::FairMutex;
@@ -1679,7 +1679,6 @@ struct AmbientAgentViewState {
     view_model: ModelHandle<AmbientAgentViewModel>,
     #[allow(dead_code)]
     harness_selector: ViewHandle<HarnessSelector>,
-    host_selector: Option<ViewHandle<HostSelector>>,
 }
 
 impl AmbientAgentViewState {
@@ -2188,28 +2187,13 @@ impl Input {
                 .as_ref()
                 .map(|view_model| AmbientAgentViewState {
                     view_model: view_model.clone(),
-                    harness_selector: {
-                        let harness_selector = ctx.add_typed_action_view(|ctx| {
-                            HarnessSelector::new(
-                                menu_positioning_provider.clone(),
-                                view_model.clone(),
-                                ctx,
-                            )
-                        });
-                        if FeatureFlag::CloudModeInputV2.is_enabled() {
-                            harness_selector.update(ctx, |selector, ctx| {
-                                selector.set_button_theme(NakedHeaderButtonTheme, ctx);
-                            });
-                        }
-                        harness_selector
-                    },
-                    host_selector: if FeatureFlag::CloudModeInputV2.is_enabled() {
-                        Some(ctx.add_typed_action_view(|ctx| {
-                            HostSelector::new(menu_positioning_provider.clone(), ctx)
-                        }))
-                    } else {
-                        None
-                    },
+                    harness_selector: ctx.add_typed_action_view(|ctx| {
+                        HarnessSelector::new(
+                            menu_positioning_provider.clone(),
+                            view_model.clone(),
+                            ctx,
+                        )
+                    }),
                 });
         ctx.subscribe_to_view(&agent_input_footer, |me, _, event, ctx| {
             match event {
@@ -3393,12 +3377,6 @@ impl Input {
         self.ambient_agent_view_state
             .as_ref()
             .map(|state| &state.harness_selector)
-    }
-
-    fn host_selector(&self) -> Option<&ViewHandle<HostSelector>> {
-        self.ambient_agent_view_state
-            .as_ref()
-            .and_then(|state| state.host_selector.as_ref())
     }
 
     /// Update the at button's disabled state based on whether AI context menu should render
