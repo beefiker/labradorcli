@@ -1,6 +1,5 @@
 pub mod ai;
 pub mod auth;
-pub mod block;
 pub mod harness_support;
 pub mod managed_secrets;
 pub mod object;
@@ -25,7 +24,6 @@ use ai::AIClient;
 use auth::{AuthClient, AMBIENT_WORKLOAD_TOKEN_HEADER, CLOUD_AGENT_ID_HEADER};
 use base64::prelude::BASE64_URL_SAFE;
 use base64::Engine;
-use block::BlockClient;
 use channel_versions::ChannelVersions;
 use futures::StreamExt;
 use object::ObjectClient;
@@ -1385,10 +1383,6 @@ impl ServerApiProvider {
     }
 
     pub fn get_referrals_client(&self) -> Arc<dyn ReferralsClient> {
-        self.server_api.clone()
-    }
-
-    pub fn get_block_client(&self) -> Arc<dyn BlockClient> {
         self.server_api.clone()
     }
 

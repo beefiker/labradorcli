@@ -16,7 +16,6 @@ use super::{
     mcp_servers_page::MCPServersSettingsPageView,
     privacy_page::PrivacyPageView,
     referrals_page::ReferralsPageView,
-    show_blocks_view::ShowBlocksView,
     teams_page::TeamsPageView,
     warp_drive_page::WarpDriveSettingsPageView,
     warpify_page::WarpifyPageView,
@@ -103,7 +102,6 @@ pub trait SettingsPageMeta {
 pub enum SettingsPageViewHandle {
     Appearance(ViewHandle<AppearanceSettingsPageView>),
     Features(ViewHandle<FeaturesPageView>),
-    SharedBlocks(ViewHandle<ShowBlocksView>),
     Keybindings(ViewHandle<KeybindingsView>),
     About(ViewHandle<AboutPageView>),
     Code(ViewHandle<CodeSettingsPageView>),
@@ -124,7 +122,6 @@ impl SettingsPageViewHandle {
         match self {
             Appearance(view_handle) => ChildView::new(view_handle).finish(),
             Features(view_handle) => ChildView::new(view_handle).finish(),
-            SharedBlocks(view_handle) => ChildView::new(view_handle).finish(),
             Keybindings(view_handle) => ChildView::new(view_handle).finish(),
             About(view_handle) => ChildView::new(view_handle).finish(),
             Code(view_handle) => ChildView::new(view_handle).finish(),

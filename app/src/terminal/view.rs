@@ -19895,7 +19895,6 @@ impl TerminalView {
                     SettingsSection::BillingAndUsage
                         | SettingsSection::CloudEnvironments
                         | SettingsSection::Referrals
-                        | SettingsSection::SharedBlocks
                         | SettingsSection::Teams
                         | SettingsSection::WarpDrive
                 ) {
