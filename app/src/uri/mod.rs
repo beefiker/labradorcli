@@ -382,15 +382,6 @@ impl UriHost {
                                 ctx,
                             );
                         }
-                        "platform" => {
-                            dispatch_action_in_new_or_existing_window(
-                                primary_window_id,
-                                "root_view:open_settings_page_in_existing_window",
-                                "root_view:open_settings_page_in_new_window",
-                                &SettingsSection::OzCloudAPIKeys,
-                                ctx,
-                            );
-                        }
                         "appearance" => {
                             dispatch_action_in_new_or_existing_window(
                                 primary_window_id,

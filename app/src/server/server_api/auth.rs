@@ -12,9 +12,6 @@ use oauth2::TokenResponse;
 use thiserror::Error;
 use warp_core::errors::{AnyhowErrorExt, ErrorExt};
 use warp_graphql::client::Operation;
-use warp_graphql::mutations::expire_api_key::{
-    ExpireApiKey, ExpireApiKeyResult, ExpireApiKeyVariables,
-};
 use warp_graphql::queries::get_conversation_usage::{
     ConversationUsage, GetConversationUsage, GetConversationUsageVariables, UserResult,
 };
@@ -31,22 +28,15 @@ use warp_graphql::mutations::{
         AnonymousUserType, CreateAnonymousUser, CreateAnonymousUserResult,
         CreateAnonymousUserVariables,
     },
-    generate_api_key::{
-        GenerateApiKey, GenerateApiKeyInput, GenerateApiKeyResult, GenerateApiKeyVariables,
-    },
     mint_custom_token::{MintCustomTokenResult, MintCustomTokenVariables},
 };
 use warp_graphql::object_permissions::OwnerType;
-use warp_graphql::queries::api_keys::{
-    ApiKeyProperties, ApiKeyPropertiesResult, ApiKeys, ApiKeysVariables,
-};
 use warp_graphql::queries::get_user::{GetUser, GetUserVariables, UserOutput as GqlUserOutput};
 use warp_graphql::queries::get_user_settings::{GetUserSettings, GetUserSettingsVariables};
 use warpui::r#async::BoxFuture;
 
 use crate::auth::UserUid;
 use crate::server::graphql::{default_request_options, get_user_facing_error_message};
-use crate::server::ids::ApiKeyUid;
 use crate::server::server_api::register_error;
 use crate::server::server_api::EXPERIMENT_ID_HEADER;
 use crate::settings::PrivacySettingsSnapshot;
@@ -194,18 +184,6 @@ pub trait AuthClient: 'static + Send + Sync {
         details: &oauth2::StandardDeviceAuthorizationResponse,
         timeout: Duration,
     ) -> StdResult<FirebaseToken, UserAuthenticationError>;
-    // API Keys
-    async fn list_api_keys(&self) -> Result<Vec<ApiKeyProperties>>;
-
-    async fn create_api_key(
-        &self,
-        name: String,
-        team_id: Option<cynic::Id>,
-        expires_at: Option<warp_graphql::scalars::Time>,
-    ) -> Result<GenerateApiKeyResult>;
-
-    async fn expire_api_key(&self, key_uid: &ApiKeyUid) -> Result<ExpireApiKeyResult>;
-
     /// Returns a cached ambient workload token, or issues a new one if not present or expired.
     ///
     /// Returns `Ok(None)` if not running in an isolation platform (e.g., Namespace) or on WASM.
@@ -584,50 +562,6 @@ impl AuthClient for ServerApi {
         Ok(FirebaseToken::Custom(
             result.access_token().secret().to_string(),
         ))
-    }
-
-    // API Keys
-    async fn list_api_keys(&self) -> Result<Vec<ApiKeyProperties>> {
-        let variables = ApiKeysVariables {
-            request_context: get_request_context(),
-        };
-        let operation = ApiKeys::build(variables);
-        let response = self.send_graphql_request(operation, None).await?;
-        match response.api_keys {
-            ApiKeyPropertiesResult::ApiKeyPropertiesOutput(output) => Ok(output.api_keys),
-            ApiKeyPropertiesResult::UserFacingError(e) => {
-                Err(anyhow!(get_user_facing_error_message(e)))
-            }
-            ApiKeyPropertiesResult::Unknown => Err(anyhow!("failed to fetch API keys")),
-        }
-    }
-
-    async fn create_api_key(
-        &self,
-        name: String,
-        team_id: Option<cynic::Id>,
-        expires_at: Option<warp_graphql::scalars::Time>,
-    ) -> Result<GenerateApiKeyResult> {
-        let variables = GenerateApiKeyVariables {
-            input: GenerateApiKeyInput {
-                name,
-                team_id,
-                expires_at,
-            },
-            request_context: get_request_context(),
-        };
-        let operation = GenerateApiKey::build(variables);
-        let response = self.send_graphql_request(operation, None).await?;
-        Ok(response.generate_api_key)
-    }
-    async fn expire_api_key(&self, key_uid: &ApiKeyUid) -> Result<ExpireApiKeyResult> {
-        let variables = ExpireApiKeyVariables {
-            key_uid: key_uid.into(),
-            request_context: get_request_context(),
-        };
-        let op = ExpireApiKey::build(variables);
-        let res = self.send_graphql_request(op, None).await?;
-        Ok(res.expire_api_key)
     }
 
     async fn get_or_create_ambient_workload_token(&self) -> Result<Option<String>> {
