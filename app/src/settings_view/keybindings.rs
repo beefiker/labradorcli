@@ -614,12 +614,6 @@ impl KeybindingsView {
             update_binding_list(&row.binding.name, None, &mut self.bindings);
             row.binding.trigger = None;
 
-            send_telemetry_from_ctx!(
-                TelemetryEvent::KeybindingRemoved {
-                    action: row.binding.name.clone(),
-                },
-                ctx
-            );
             self.modifying_row = None;
             row.editor_open = false;
             ctx.enable_key_bindings_dispatching();
@@ -638,13 +632,6 @@ impl KeybindingsView {
                 &mut self.bindings,
             );
             row.binding.trigger = default_trigger;
-
-            send_telemetry_from_ctx!(
-                TelemetryEvent::KeybindingResetToDefault {
-                    action: row.binding.name.clone(),
-                },
-                ctx
-            );
 
             self.modifying_row = None;
             row.editor_open = false;
@@ -691,13 +678,6 @@ impl KeybindingsView {
                             &mut self.bindings,
                         );
                         row.binding.trigger = Some(key.clone());
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::KeybindingChanged {
-                                action: row.binding.name.clone(),
-                                keystroke: key,
-                            },
-                            ctx
-                        );
                     }
 
                     row.editor_open = false;

@@ -429,13 +429,6 @@ impl<T: Action + Clone> SearchMixer<T> {
                         }
                         let error_payload =
                             new_results.as_ref().err().map(|e| e.telemetry_payload());
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::CommandSearchAsyncQueryCompleted {
-                                filters,
-                                error_payload,
-                            },
-                            ctx
-                        );
                         mixer.add_new_results(data_source_id, new_results, ctx);
                         source.on_query_finished(ctx);
                     },

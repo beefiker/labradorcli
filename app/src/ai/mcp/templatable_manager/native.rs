@@ -581,7 +581,7 @@ impl TemplatableMCPServerManager {
                 me.spawned_servers.remove(&installation_uuid);
                 me.pending_oauth_csrf.retain(|_, v| *v != installation_uuid);
 
-                let error = match server_info {
+                match server_info {
                     Ok(info) => {
                         let peer = info.service.clone();
                         me.active_servers.insert(installation_uuid, info);
@@ -598,7 +598,6 @@ impl TemplatableMCPServerManager {
                         if is_reconnect {
                             me.notify_reconnect_waiters(installation_uuid, Ok(peer));
                         }
-                        None
                     }
                     Err(e) => {
                         logger_clone
@@ -623,25 +622,7 @@ impl TemplatableMCPServerManager {
                         if is_reconnect {
                             me.notify_reconnect_waiters(installation_uuid, Err(error_message));
                         }
-
-                        Some(e.into())
                     }
-                };
-
-                if should_send_telemetry {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::MCPServerSpawned {
-                            transport_type: match server.transport_type {
-                                TransportType::CLIServer { .. } =>
-                                    MCPServerTelemetryTransportType::CLIServer,
-                                TransportType::ServerSentEvents { .. } =>
-                                    MCPServerTelemetryTransportType::ServerSentEvents,
-                            },
-                            server_model: MCPServerModel::Templatable,
-                            error
-                        },
-                        ctx
-                    );
                 }
             },
         );

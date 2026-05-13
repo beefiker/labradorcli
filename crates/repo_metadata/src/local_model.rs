@@ -943,7 +943,6 @@ impl LocalRepoMetadataModel {
                             safe: ("Failed to build file tree for repository: {e:?}"),
                             full: ("Failed to build file tree for repository {repo_path_str}: {e:?}")
                         );
-                        send_telemetry_from_ctx!(RepoMetadataTelemetryEvent::BuildTreeFailed { error: format!("{e:#}") }, ctx);
                         ctx.emit(RepositoryMetadataEvent::UpdatingRepositoryFailed { path: std_repo_path.clone() });
                         model.repositories.insert(
                             std_repo_path,

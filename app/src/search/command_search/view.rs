@@ -357,13 +357,6 @@ impl CommandSearchView {
 
     fn blur(&self, ctx: &mut ViewContext<Self>) {
         let buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
-        send_telemetry_from_ctx!(
-            TelemetryEvent::CommandSearchExited {
-                query_filter: self.active_query_filter(ctx),
-                buffer_length
-            },
-            ctx
-        );
         ctx.emit(CommandSearchEvent::Blur);
     }
 
@@ -376,24 +369,10 @@ impl CommandSearchView {
         match event {
             SearchBarEvent::Close => {
                 let buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::CommandSearchExited {
-                        query_filter: self.active_query_filter(ctx),
-                        buffer_length
-                    },
-                    ctx
-                );
                 self.close(ctx);
             }
             // ctrl-c should close the command search view
             SearchBarEvent::BufferCleared { buffer_len } => {
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::CommandSearchExited {
-                        query_filter: self.active_query_filter(ctx),
-                        buffer_length: *buffer_len
-                    },
-                    ctx
-                );
                 self.close(ctx);
             }
             SearchBarEvent::ResultAccepted { index, action } => {
@@ -404,12 +383,6 @@ impl CommandSearchView {
                 ctx.notify();
             }
             SearchBarEvent::QueryFilterChanged { new_filter } => {
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::CommandSearchFilterChanged {
-                        new_filter: *new_filter
-                    },
-                    ctx
-                );
             }
             SearchBarEvent::SelectionUpdateInZeroState { .. } => {}
             SearchBarEvent::EnterInZeroState { .. } => {}
@@ -481,19 +454,6 @@ impl CommandSearchView {
                 None => result_index,
             };
 
-            send_telemetry_from_ctx!(
-                TelemetryEvent::CommandSearchResultAccepted {
-                    result_index,
-                    result_type: (&result_action).into(),
-                    query_filter: self
-                        .search_bar_state
-                        .as_ref(ctx)
-                        .active_visible_query_filter(),
-                    buffer_length: self.search_bar.as_ref(ctx).query(ctx).len(),
-                    was_immediately_executed,
-                },
-                ctx
-            );
         }
 
         let query = self.search_bar.as_ref(ctx).query(ctx);

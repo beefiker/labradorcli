@@ -63,13 +63,6 @@ impl RequestComputerUseExecutor {
 
         // If we're executing, that implies that computer use has been approved.
         let is_autoexecuted = self.autoexecuted_actions.remove(&action.id);
-        send_telemetry_from_ctx!(
-            TelemetryEvent::ComputerUseApproved {
-                conversation_id,
-                is_autoexecuted,
-            },
-            ctx
-        );
 
         let screenshot_params = request.screenshot_params;
         let mut actor = computer_use::create_actor();

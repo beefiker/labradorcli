@@ -206,7 +206,6 @@ impl AgentMessageBar {
             );
         }
 
-
         Self {
             agent_view_controller,
             ephemeral_message_model,

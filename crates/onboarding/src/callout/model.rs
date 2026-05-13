@@ -151,7 +151,6 @@ impl OnboardingCalloutModel {
     }
 
     pub fn next(&mut self, ctx: &mut ModelContext<Self>) {
-        send_telemetry_from_ctx!(OnboardingEvent::CalloutNext, ctx);
         match &self.state {
             OnboardingCalloutState::UniversalInput(universal_input_state) => {
                 self.next_universal_input(*universal_input_state, ctx);
@@ -357,12 +356,6 @@ impl OnboardingCalloutModel {
             _ => None,
         };
         if let Some(callout) = callout_name {
-            send_telemetry_from_ctx!(
-                OnboardingEvent::CalloutDisplayed {
-                    callout: callout.to_string(),
-                },
-                ctx
-            );
         }
     }
 
@@ -384,12 +377,6 @@ impl OnboardingCalloutModel {
             };
 
             if let Some(final_state) = final_state {
-                send_telemetry_from_ctx!(
-                    OnboardingEvent::CalloutCompleted {
-                        completion_type: final_state.to_string(),
-                    },
-                    ctx
-                );
                 ctx.emit(OnboardingCalloutModelEvent::Completed(final_state));
             }
         }

@@ -418,12 +418,6 @@ impl AgentNotificationsModel {
             artifacts,
             branch,
         );
-        send_telemetry_from_ctx!(
-            TelemetryEvent::AgentNotificationShown {
-                agent_variant: agent.into(),
-            },
-            ctx
-        );
 
         let id = item.id;
         self.notifications.push(item);

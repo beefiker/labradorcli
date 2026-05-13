@@ -207,13 +207,6 @@ impl TypedActionView for WorkingDirectoryView {
                     ));
                 });
 
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::InitialWorkingDirectoryConfigurationChanged {
-                        advanced_mode_enabled: mode.is_none()
-                    },
-                    ctx
-                );
-
                 // Redraw settings in case we switched in or out of advanced mode.
                 ctx.notify();
             }

@@ -155,7 +155,6 @@ pub fn run(
     global_options: GlobalOptions,
 ) -> anyhow::Result<()> {
     let event = command_to_telemetry_event(&command);
-    send_telemetry_sync_from_app_ctx!(event, ctx);
 
     launch_command(ctx, command, global_options)
 }

@@ -940,7 +940,6 @@ type InitialLayoutCallback = Box<
     ) -> (PaneData, InitialFocus),
 >;
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AIDocumentPaneVisibilityAction {
     /// Ensure the requested AI document pane is visible.
@@ -2090,7 +2089,6 @@ impl PaneGroup {
                 }
                 ctx.notify();
 
-                send_telemetry_from_ctx!(TelemetryEvent::SharedSessionModalUpgradePressed, ctx);
             }
         }
     }
@@ -2322,12 +2320,6 @@ impl PaneGroup {
                     RoleChangeCloseSource::SharerGrant,
                     ctx,
                 );
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::SharerCancelledGrantRole {
-                        role: Role::Executor
-                    },
-                    ctx
-                );
             }
             RoleChangeModalEvent::GrantRole {
                 terminal_pane_id,
@@ -2344,7 +2336,6 @@ impl PaneGroup {
                             "Failed to set should_confirm_shared_session_edit_access setting to false: {e}"
                         );
                     }
-                    send_telemetry_from_ctx!(TelemetryEvent::SharerGrantModalDontShowAgain, ctx);
                 }
 
                 let Some(terminal_view) = self.terminal_view_from_pane_id(*terminal_pane_id, ctx)
@@ -5334,7 +5325,6 @@ impl PaneGroup {
     ) -> Option<PaneId> {
         if self.pane_count() == 1 {
             // Only sending telemetry event the first time a user enters split pane in a session.
-            send_telemetry_from_ctx!(TelemetryEvent::SplitPane, ctx);
         }
 
         self.tips_completed.update(ctx, |tips_completed, ctx| {

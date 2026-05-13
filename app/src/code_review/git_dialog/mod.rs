@@ -815,14 +815,6 @@ impl TypedActionView for GitDialog {
                         }
                         GitDialogMode::CreatePr(_) => GitOperationKind::CreatePr,
                     };
-                    send_telemetry_from_ctx!(
-                        CodeReviewTelemetryEvent::GitDialogCompleted {
-                            operation,
-                            status: GitDialogStatus::Cancelled,
-                            error: None,
-                        },
-                        ctx
-                    );
                     ctx.emit(GitDialogEvent::Cancelled);
                 }
             }

@@ -252,12 +252,6 @@ impl UndoCloseStack {
 
         match closed_item {
             ClosedItem::Window(data) => {
-                send_telemetry_from_app_ctx!(
-                    TelemetryEvent::UndoClose {
-                        item_type: UndoCloseItemType::Window,
-                    },
-                    ctx
-                );
 
                 let window_id = data.window_id;
                 ctx.reopen_closed_window(*data);
@@ -278,12 +272,6 @@ impl UndoCloseStack {
                 data,
             } => {
                 if let Some(workspace) = workspace.upgrade(ctx) {
-                    send_telemetry_from_app_ctx!(
-                        TelemetryEvent::UndoClose {
-                            item_type: UndoCloseItemType::Tab,
-                        },
-                        ctx
-                    );
                     workspace.update(ctx, |workspace, ctx| {
                         workspace.restore_closed_tab(tab_index, data, ctx);
                     });
@@ -304,12 +292,6 @@ impl UndoCloseStack {
                     });
 
                     if restored {
-                        send_telemetry_from_app_ctx!(
-                            TelemetryEvent::UndoClose {
-                                item_type: UndoCloseItemType::Pane,
-                            },
-                            ctx
-                        );
 
                         // Focus the window first
                         ctx.windows().show_window_and_focus_app(window_id);

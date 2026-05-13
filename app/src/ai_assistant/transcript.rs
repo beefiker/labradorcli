@@ -153,12 +153,6 @@ impl TypedActionView for Transcript {
                 if let Some(answer) = answer {
                     ctx.clipboard().write(ClipboardContent::plain_text(answer));
                 }
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::WarpAIAction {
-                        action_type: WarpAIActionType::CopyAnswer
-                    },
-                    ctx
-                );
             }
             CopyCodeToClipboard { code_block_index } => {
                 self.copy_code_to_clipboard(*code_block_index, ctx);
@@ -210,12 +204,6 @@ impl Transcript {
             ctx.clipboard().write(ClipboardContent::plain_text(code));
         }
 
-        send_telemetry_from_ctx!(
-            TelemetryEvent::WarpAIAction {
-                action_type: WarpAIActionType::CopyCode
-            },
-            ctx
-        );
     }
 
     fn paste_in_terminal_input(
@@ -224,12 +212,6 @@ impl Transcript {
         ctx: &mut ViewContext<Self>,
     ) {
         ctx.emit(TranscriptEvent::PasteInTerminalInput { code_block_index });
-        send_telemetry_from_ctx!(
-            TelemetryEvent::WarpAIAction {
-                action_type: WarpAIActionType::InsertIntoInput
-            },
-            ctx
-        );
     }
 
     fn open_workflow_modal(
@@ -241,12 +223,6 @@ impl Transcript {
             ctx.emit(TranscriptEvent::OpenWorkflowModalWithCommand(code));
         }
 
-        send_telemetry_from_ctx!(
-            TelemetryEvent::SaveAsWorkflowModal {
-                source: SaveAsWorkflowModalSource::WarpAIPanel
-            },
-            ctx
-        );
     }
 
     fn handle_keydown(&mut self, keystroke: &Keystroke, ctx: &mut ViewContext<Self>) {

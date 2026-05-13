@@ -495,7 +495,6 @@ impl AutoupdateState {
                 })
             }
             Ok(DownloadReady::NeedsAuthorization) => {
-                send_telemetry_from_ctx!(TelemetryEvent::UnableToAutoUpdateToNewVersion, ctx);
                 self.stage = AutoupdateStage::UnableToUpdateToNewVersion { new_version };
                 Ok(UpdateReady::No)
             }
@@ -880,10 +879,6 @@ pub fn initiate_relaunch_for_update(app: &mut AppContext) {
                 // Report that we're attempting to relaunch for an update, so that we can track failed
                 // relaunches (e.g. if the update got corrupted). This is sent synchronously because
                 // the app is about to quit.
-                let event = TelemetryEvent::AutoupdateRelaunchAttempt {
-                    new_version: new_version_string,
-                };
-                send_telemetry_sync_from_app_ctx!(event, app);
 
                 // Request termination of the app.
                 app.terminate_app(TerminationMode::Cancellable, None);

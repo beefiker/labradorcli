@@ -156,14 +156,6 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
                     show_toast(user_facing_git_error(&err.to_string()), ctx);
                 }
             }
-            send_telemetry_from_ctx!(
-                CodeReviewTelemetryEvent::GitDialogCompleted {
-                    operation: GitOperationKind::CreatePr,
-                    status,
-                    error,
-                },
-                ctx
-            );
             ctx.emit(GitDialogEvent::Completed);
         },
     );

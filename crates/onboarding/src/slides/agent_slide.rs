@@ -1599,7 +1599,6 @@ impl TypedActionView for AgentSlide {
                 self.next(ctx);
             }
             AgentSlideAction::UpgradeClicked => {
-                send_telemetry_from_ctx!(OnboardingEvent::AgentSlideUpgradeClicked, ctx);
                 if !matches!(
                     self.onboarding_state.as_ref(ctx).auth_state(),
                     OnboardingAuthState::PayingUser,

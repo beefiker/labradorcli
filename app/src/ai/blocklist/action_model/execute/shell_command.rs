@@ -134,10 +134,6 @@ impl ShellCommandExecutor {
                     ctx,
                 );
                 if let CommandExecutionPermission::Allowed(reason) = autoexecution_permission {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::AutoexecutedAgentModeRequestedCommand { reason },
-                        ctx
-                    );
                 } else if let CommandExecutionPermission::Denied(reason) = autoexecution_permission
                 {
                     if AppExecutionMode::as_ref(ctx).is_autonomous() {
@@ -171,14 +167,6 @@ impl ShellCommandExecutor {
                     };
 
                     if should_autoexecute {
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::CLISubagentActionExecuted {
-                                conversation_id: input.conversation_id,
-                                block_id: block_id.clone(),
-                                is_autoexecuted: true,
-                            },
-                            ctx
-                        );
                     }
 
                     should_autoexecute

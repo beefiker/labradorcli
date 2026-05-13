@@ -269,6 +269,5 @@ impl TypedActionView for StartupShellView {
                 });
             }
         }
-        send_telemetry_from_ctx!(action.telemetry_event(), ctx);
     }
 }

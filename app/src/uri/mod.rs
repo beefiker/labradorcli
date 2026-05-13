@@ -135,7 +135,6 @@ impl UriHost {
                         );
                     }
                 };
-                send_telemetry_from_app_ctx!(TelemetryEvent::OpenTeamFromURI, ctx);
             }
             UriHost::Action => {
                 match Action::parse(url) {
@@ -966,7 +965,6 @@ fn open_file(window_id: Option<WindowId>, path: PathBuf, ctx: &mut AppContext) {
             }
         }
 
-        send_telemetry_from_app_ctx!(TelemetryEvent::OpenNewSessionFromFilePath, ctx);
     }
 }
 
@@ -978,7 +976,6 @@ fn execute_file(window_id: WindowId, path_str: &str, ctx: &mut AppContext) {
         })
     });
 
-    send_telemetry_from_app_ctx!(TelemetryEvent::CommandFileRun, ctx);
 }
 
 fn open_window_with_action(active_window_id: Option<WindowId>, action: &str, ctx: &mut AppContext) {

@@ -896,14 +896,6 @@ impl TypedActionView for MCPServersEditPageView {
                                 }
                             },
                         );
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::MCPTemplateCreated {
-                                source: MCPTemplateCreationSource::Json,
-                                variables: parsed_server.templatable_mcp_server.template.variables,
-                                name: parsed_server.templatable_mcp_server.name,
-                            },
-                            ctx
-                        );
                     }
 
                     ctx.emit(MCPServersEditPageViewEvent::Back);

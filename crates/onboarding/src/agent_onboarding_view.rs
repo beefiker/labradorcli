@@ -327,13 +327,6 @@ impl AgentOnboardingView {
             Self::preload_onboarding_images(ctx);
         }
 
-        send_telemetry_from_ctx!(OnboardingEvent::OnboardingStarted, ctx);
-        send_telemetry_from_ctx!(
-            OnboardingEvent::SlideViewed {
-                slide_name: "intro".to_string(),
-            },
-            ctx
-        );
     }
 
     /// Eagerly loads all onboarding slide images into the asset cache

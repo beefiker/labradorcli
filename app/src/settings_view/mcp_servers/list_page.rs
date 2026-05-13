@@ -659,10 +659,6 @@ impl MCPServersListPageView {
                             true => MCPTemplateInstallationSource::Shared,
                             false => MCPTemplateInstallationSource::Local,
                         };
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::MCPTemplateInstalled { source },
-                            ctx
-                        );
                     }
                 }
                 ServerCardItemId::TemplatableMCPInstallation(_) => {
@@ -910,12 +906,6 @@ impl MCPServersListPageView {
                     instructions_in_markdown: instructions,
                     origin: InstallOrigin::InApp,
                 });
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::MCPTemplateInstalled {
-                        source: MCPTemplateInstallationSource::Gallery
-                    },
-                    ctx
-                );
             }
             Err(e) => {
                 log::warn!("Could not install gallery item {gallery_uuid}: {e}");

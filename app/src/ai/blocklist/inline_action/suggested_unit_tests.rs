@@ -415,13 +415,6 @@ impl TypedActionView for SuggestedUnitTestsView {
                 ctx.notify();
 
                 if let Ok(checked) = checked {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::ToggleCodeSuggestionsSetting {
-                            source: ToggleCodeSuggestionsSettingSource::Speedbump,
-                            is_code_suggestions_enabled: checked,
-                        },
-                        ctx
-                    );
                 }
             }
             SuggestedUnitTestsAction::OpenSettings => {

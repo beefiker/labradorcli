@@ -55,12 +55,6 @@ impl AgentShortcutViewModel {
         ctx.emit(AgentShortcutEvent::ToggledViewVisibility {
             is_visible: is_open,
         });
-        send_telemetry_from_ctx!(
-            TelemetryEvent::AgentShortcutsViewToggled {
-                is_visible: is_open,
-            },
-            ctx
-        );
     }
 }
 

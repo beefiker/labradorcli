@@ -1327,13 +1327,6 @@ fn initialize_app(
                 timer.mark_interval_end("FIRST_FRAME_DRAWN");
                 timer.compute_stats()
             });
-            let event = TelemetryEvent::AppStartup(AppStartupInfo {
-                is_session_restoration_on: user_defaults_on_startup.should_restore_session,
-                is_screen_reader_enabled,
-                from_relaunch,
-                is_crash_reporting_enabled,
-                timing_data,
-            });
 
             GPUState::handle(ctx).update(ctx, |gpu_state, ctx| {
                 gpu_state
@@ -1348,7 +1341,6 @@ fn initialize_app(
                     })
             }
 
-            send_telemetry_from_app_ctx!(event, ctx);
         });
 
         #[cfg(enable_crash_recovery)]
@@ -1360,7 +1352,6 @@ fn initialize_app(
     } else {
         // If the app was opened while logged out, record an event for measuring new users.
         // This is sent immediately in case they quit the app on the signup screen.
-        send_telemetry_sync_from_app_ctx!(TelemetryEvent::LoggedOutStartup, ctx);
         download_method::determine_and_report(
             auth_state.clone(),
             ctx.background_executor().clone(),
@@ -1832,13 +1823,6 @@ fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppCallbacks {
 
             let summary = UnsavedStateSummary::for_window(window_id, ctx);
 
-            send_telemetry_from_app_ctx!(
-                TelemetryEvent::UserInitiatedClose {
-                    initiated_on: CloseTarget::Window,
-                },
-                ctx
-            );
-
             // Don't show dialog on integration test. Machine can't press buttons.
             if !is_integration_test && summary.should_display_warning(ctx) {
                 let shown = summary
@@ -1864,12 +1848,6 @@ fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppCallbacks {
             }
         })),
         on_should_terminate_app: Some(Box::new(move |ctx| {
-            send_telemetry_from_app_ctx!(
-                TelemetryEvent::UserInitiatedClose {
-                    initiated_on: CloseTarget::App,
-                },
-                ctx
-            );
 
             // If there's a pending autoupdate, apply that before showing the unsaved changes
             // dialog. We apply the update first so that the dialog can force-terminate.
@@ -1905,7 +1883,6 @@ fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppCallbacks {
                     .show_warning_before_quitting
                     .toggle_and_save_value(ctx));
             });
-            send_telemetry_from_app_ctx!(TelemetryEvent::QuitModalDisabled, ctx);
         })),
         on_notification_clicked: Some(Box::new(move |notification_response, ctx| {
             if let Some(notification_data) = notification_response.data() {
@@ -2032,14 +2009,6 @@ fn focus_running_window_and_show_native_modal(
 fn on_close_app_cancelled(open_navigation_palette: bool, ctx: &mut AppContext) {
     autoupdate::cancel_relaunch(ctx);
 
-    send_telemetry_from_app_ctx!(
-        TelemetryEvent::QuitModalCancel {
-            nav_palette: open_navigation_palette,
-            modal_for: CloseTarget::App,
-        },
-        ctx
-    );
-
     let sessions = SessionNavigationData::all_sessions(ctx).collect_vec();
     let sessions_summary = RunningSessionSummary::new(&sessions);
 
@@ -2086,13 +2055,6 @@ fn on_close_window_cancelled(
     open_navigation_palette: bool,
     ctx: &mut AppContext,
 ) {
-    send_telemetry_from_app_ctx!(
-        TelemetryEvent::QuitModalCancel {
-            nav_palette: open_navigation_palette,
-            modal_for: CloseTarget::Window,
-        },
-        ctx
-    );
 
     let sessions = SessionNavigationData::all_sessions(ctx).collect_vec();
     let sessions_summary = RunningSessionSummary::new(&sessions);

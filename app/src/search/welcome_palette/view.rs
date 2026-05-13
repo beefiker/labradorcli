@@ -553,20 +553,6 @@ impl WelcomePalette {
     fn close(&mut self, ctx: &mut ViewContext<Self>, accepted_action_type: Option<&'static str>) {
         let buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
         let filter = self.active_query_filter(ctx);
-        let event = if let Some(result_type) = accepted_action_type {
-            TelemetryEvent::PaletteSearchResultAccepted {
-                result_type,
-                filter,
-                buffer_length,
-            }
-        } else {
-            TelemetryEvent::PaletteSearchExited {
-                filter,
-                buffer_length,
-            }
-        };
-
-        send_telemetry_from_ctx!(event, ctx);
 
         self.state_handles.clipped_scroll_state = Default::default();
         self.reset(ctx);
@@ -795,10 +781,6 @@ impl WelcomePalette {
         action: &dyn warpui::Action,
         ctx: &mut ViewContext<Self>,
     ) {
-        send_telemetry_from_ctx!(
-            TelemetryEvent::SelectCommandPaletteOption(format!("{action:?}")),
-            ctx
-        );
 
         let (window_id, view_id) = match self.binding_source.as_ref(ctx) {
             BindingSource::View {

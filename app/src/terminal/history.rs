@@ -204,7 +204,6 @@ pub struct History {
     session_id_to_shell_host: HashMap<SessionId, ShellHost>,
 }
 
-
 /// For history entries coming from the shell history file, only the command is populated.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HistoryEntry {

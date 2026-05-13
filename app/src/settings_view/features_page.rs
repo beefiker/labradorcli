@@ -1893,7 +1893,6 @@ impl TypedActionView for FeaturesPageView {
             }
         }
 
-        send_telemetry_from_ctx!(action.telemetry_event(ctx), ctx);
     }
 }
 

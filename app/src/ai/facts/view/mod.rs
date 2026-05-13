@@ -18,7 +18,6 @@ use crate::ui_components::icons::Icon;
 use warpui::elements::ChildView;
 use warpui::{SingletonEntity, ViewHandle};
 
-
 pub mod rule;
 pub mod rule_editor;
 mod style;

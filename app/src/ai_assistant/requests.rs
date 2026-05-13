@@ -160,12 +160,7 @@ impl Requests {
                             // it will remain so until it's reset.
                             model.current_transcript_summarized |= transcript_summarized;
 
-
                             let req_latency = end_time.signed_duration_since(start_time).num_milliseconds();
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::WarpAIRequestIssued { result: WarpAIRequestResult::Succeeded { latency_ms: req_latency, truncated }},
-                                ctx
-                            );
                         }
                         _ => {
                             let response = "We're experiencing technical difficulties right now. Please try again later.".to_owned();
@@ -186,10 +181,6 @@ impl Requests {
                                 },
                             });
 
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::WarpAIRequestIssued { result: WarpAIRequestResult::Failed},
-                                ctx
-                            );
                         }
                     }
                 }

@@ -303,7 +303,6 @@ impl CodeView {
                 self.set_title_after_content_update(ctx);
                 self.update_tab_bar_state(ctx);
                 self.focus_contents(ctx);
-                send_telemetry_from_ctx!(TelemetryEvent::PreviewPanePromoted, ctx);
                 ctx.notify();
             }
         }
@@ -945,21 +944,11 @@ impl CodeView {
                     CliAgentRouting::RichInput => CodeContextDestination::RichInput,
                     CliAgentRouting::Pty => CodeContextDestination::Pty,
                 };
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::CodeSelectionAddedAsContext { destination },
-                    ctx
-                );
                 return;
             }
         }
 
         // Otherwise insert the location snippet into the input buffer (original behavior).
-        send_telemetry_from_ctx!(
-            TelemetryEvent::CodeSelectionAddedAsContext {
-                destination: CodeContextDestination::AgentInput,
-            },
-            ctx
-        );
         ctx.dispatch_typed_action(&WorkspaceAction::InsertInInput {
             content: format!("{file_path}:{start_line}-{end_line} "),
             replace_buffer: false,

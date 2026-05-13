@@ -542,7 +542,6 @@ impl TypedActionView for FreeUserNoAiSlide {
                     .update(ctx, |model, ctx| model.complete(ctx));
             }
             FreeUserNoAiSlideAction::UpgradeClicked => {
-                send_telemetry_from_ctx!(OnboardingEvent::FreeUserNoAiUpgradeClicked, ctx);
                 self.onboarding_state
                     .update(ctx, |model, ctx| model.request_upgrade(ctx));
             }

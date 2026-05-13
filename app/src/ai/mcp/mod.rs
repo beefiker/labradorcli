@@ -246,7 +246,6 @@ pub struct ServerSentEvents {
     pub headers: Vec<StaticHeader>,
 }
 
-
 /// Trait for types that have a name and value field.
 /// Used for shared operations on `StaticEnvVar` and `StaticHeader`.
 #[cfg(not(target_family = "wasm"))]

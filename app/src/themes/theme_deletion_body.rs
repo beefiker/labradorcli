@@ -99,7 +99,6 @@ impl ThemeDeletionBody {
                             ctx.emit(ThemeDeletionBodyEvent::DeleteCurrentTheme)
                         }
                         errored = false;
-                        send_telemetry_from_ctx!(TelemetryEvent::DeleteCustomTheme, ctx);
                         self.close(ctx);
                         ctx.notify();
                     }

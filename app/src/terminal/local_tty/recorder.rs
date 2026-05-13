@@ -75,13 +75,6 @@ pub fn record_pty_throughput(
                     >= PTY_THROUGHPUT_METRIC_INTERVAL
                 {
                     if *max_throughput > 0 {
-                        send_telemetry_on_executor!(
-                            auth_state,
-                            TelemetryEvent::PtyThroughput {
-                                max_bytes_per_second: *max_throughput,
-                            },
-                            executor_clone
-                        );
                     }
                     *max_throughput = 0;
                     *last_emitted_event_time = Instant::now();

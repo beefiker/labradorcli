@@ -271,14 +271,6 @@ impl TerminalView {
             }
         }
 
-        send_telemetry_from_ctx!(
-            TelemetryEvent::AgentViewEntered {
-                origin: TelemetryAgentViewEntryOrigin::from(origin),
-                did_auto_trigger_request,
-            },
-            ctx
-        );
-
         // Mark all AgentViewEntry rich content as dirty so their heights get
         // re-measured. When the agent view is active, AgentViewEntryBlock renders
         // as Empty (0 height). When exiting, we need to force a re-layout so the

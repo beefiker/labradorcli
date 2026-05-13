@@ -108,11 +108,6 @@ pub fn open_docker_container(url: &Url, ctx: &mut AppContext) -> Result<()> {
         },
     );
 
-    send_telemetry_from_app_ctx!(
-        TelemetryEvent::OpenAndWarpifyDockerSubshell { shell_type },
-        ctx
-    );
-
     Ok(())
 }
 

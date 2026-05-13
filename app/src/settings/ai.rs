@@ -1174,7 +1174,6 @@ define_settings_group!(AISettings, settings: [
         private: true,
     }
 
-
     // Whether or not the user has enabled the ability to use Dwarf credits even when providing
     // their own LLM provider API key.
     can_use_warp_credits_with_byok: CanUseWarpCreditsWithByok {
@@ -1394,7 +1393,6 @@ define_settings_group!(AISettings, settings: [
         toml_path: "agents.warp_agent.other.show_conversation_history",
         description: "Whether conversation history appears in the tools panel.",
     }
-
 
     // Controls whether agent notifications (mailbox button, toasts, notification items) are shown.
     show_agent_notifications: ShowAgentNotifications {

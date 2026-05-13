@@ -47,16 +47,6 @@ pub struct EnableAutoReloadModal {
 
 /// Called when user clicks the 'x' OR cancel button
 fn send_auto_reload_dismissed_telemetry<V: View>(ctx: &mut ViewContext<V>) {
-    send_telemetry_from_ctx!(
-        TelemetryEvent::AutoReloadModalClosed {
-            action: AutoReloadModalAction::Dismissed,
-            selected_credits: None,
-            banner_toggle_flag_enabled: FeatureFlag::BuildPlanAutoReloadBannerToggle.is_enabled(),
-            post_purchase_modal_flag_enabled: FeatureFlag::BuildPlanAutoReloadPostPurchaseModal
-                .is_enabled(),
-        },
-        ctx
-    );
 }
 
 impl EnableAutoReloadModalBody {
@@ -74,17 +64,6 @@ impl EnableAutoReloadModalBody {
                                 .addon_credits_options
                                 .get(me.selected_denomination_index)
                                 .map(|option| option.credits);
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::AutoReloadModalClosed {
-                                    action: AutoReloadModalAction::EnabledAutoReload,
-                                    selected_credits,
-                                    banner_toggle_flag_enabled:
-                                        FeatureFlag::BuildPlanAutoReloadBannerToggle.is_enabled(),
-                                    post_purchase_modal_flag_enabled:
-                                        FeatureFlag::BuildPlanAutoReloadPostPurchaseModal.is_enabled(),
-                                },
-                                ctx
-                            );
 
                             ctx.emit(EnableAutoReloadModalBodyEvent::ShowToast {
                                 message: "Auto-reload settings updated".to_string(),
