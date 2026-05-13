@@ -5,7 +5,6 @@ use crate::ai::agent_management::AgentNotificationsModel;
 use crate::code::editor::{add_color, remove_color};
 use crate::code::icon_from_file_path;
 use crate::safe_triangle::SafeTriangle;
-use crate::send_telemetry_from_app_ctx;
 use crate::terminal::cli_agent_sessions::listener::agent_supports_rich_status;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::view::TerminalViewState;

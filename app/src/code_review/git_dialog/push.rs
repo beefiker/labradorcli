@@ -31,7 +31,6 @@ use crate::{
     ui_components::icons::Icon,
     util::git::{Commit, FileChangeEntry},
 };
-use warp_core::send_telemetry_from_ctx;
 
 /// Push-specific sub-actions, dispatched wrapped in `GitDialogAction::Push`.
 #[derive(Clone, Debug, PartialEq)]

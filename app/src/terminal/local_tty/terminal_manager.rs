@@ -72,11 +72,9 @@ use crate::features::FeatureFlag;
 use crate::pane_group::TerminalViewResources;
 use crate::persistence::ModelEvent;
 
-use crate::send_telemetry_on_executor;
 use crate::server::telemetry::{TelemetryAgentViewEntryOrigin, TelemetryEvent};
 use crate::settings::DebugSettings;
 use crate::settings::{PrivacySettings, SshSettings};
-use warp_core::send_telemetry_from_ctx;
 
 use crate::terminal::model::session::Sessions;
 

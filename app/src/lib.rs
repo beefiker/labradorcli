@@ -122,8 +122,6 @@ pub mod tab_configs;
 pub mod terminal;
 pub mod themes;
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::aws_credentials::AwsCredentialRefresher as _;
 use crate::ai::mcp::FileBasedMCPManager;
 use crate::ai::mcp::FileMCPWatcher;
 use crate::uri::web_intent_parser::maybe_rewrite_web_url_to_intent;
@@ -211,7 +209,6 @@ use crate::system::SystemStats;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::keys::TerminalKeybindings;
 use crate::terminal::resizable_data::ResizableData;
-use crate::terminal::view::inline_banner::ByoLlmAuthBannerSessionState;
 use crate::terminal::{AudibleBell, History};
 use crate::undo_close::UndoCloseStack;
 use crate::user_config::WarpConfig;
@@ -1188,13 +1185,7 @@ fn initialize_app(
     });
 
     // Initialize ApiKeyManager after UserWorkspaces so it can subscribe to workspace/settings changes
-    ctx.add_singleton_model(|ctx| {
-        #[cfg_attr(target_family = "wasm", allow(unused_mut))]
-        let mut manager = ::ai::api_keys::ApiKeyManager::new(ctx);
-        #[cfg(not(target_family = "wasm"))]
-        manager.subscribe_to_settings_changes(ctx);
-        manager
-    });
+    ctx.add_singleton_model(::ai::api_keys::ApiKeyManager::new);
 
     ctx.add_singleton_model(AntivirusInfo::new);
 
@@ -1579,9 +1570,6 @@ fn initialize_app(
     // AgentConversationsModel was previously bound to UpdateManager for RTC task updates; the
     // backing manager is gone but the local model is still required.
     ctx.add_singleton_model(AgentConversationsModel::new);
-
-    // ByoLlmAuthBannerSessionState tracks dismissal of the BYO LLM auth banner (e.g., AWS Bedrock login).
-    ctx.add_singleton_model(ByoLlmAuthBannerSessionState::new);
 
     ctx.add_singleton_model(|_| CodeManager::default());
     ctx.add_singleton_model(|_| OpenedFilesModel::new());

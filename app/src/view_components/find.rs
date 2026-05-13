@@ -3,7 +3,6 @@ use crate::editor::{
     EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
     TextOptions,
 };
-use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{FindOption, TelemetryEvent};
 use crate::settings::InputModeSettings;
 use crate::ui_components::{blended_colors, icons::Icon};

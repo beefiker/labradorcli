@@ -7,7 +7,6 @@ use super::{
     },
     SettingsSection,
 };
-use crate::send_telemetry_from_ctx;
 use crate::{appearance::Appearance, themes};
 use crate::{
     editor::EditorView, keyboard::write_custom_keybinding, util::bindings::CommandBinding,

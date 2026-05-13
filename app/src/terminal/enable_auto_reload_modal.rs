@@ -17,7 +17,6 @@ use warpui::{AppContext, Element, Entity, SingletonEntity as _, View, ViewContex
 use crate::features::FeatureFlag;
 use crate::menu::MenuItemFields;
 use crate::modal::{Modal, ModalEvent, MODAL_PADDING, MODAL_WIDTH};
-use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{AutoReloadModalAction, TelemetryEvent};
 use crate::ui_components::blended_colors;
 use crate::view_components::{Dropdown, ToastFlavor};

@@ -163,7 +163,6 @@ use crate::ui_components::{
 };
 use crate::view_components::action_button::TooltipAlignment;
 #[cfg(feature = "local_fs")]
-use crate::TelemetryEvent;
 use crate::{
     appearance::Appearance,
     code::editor::{add_color, remove_color},

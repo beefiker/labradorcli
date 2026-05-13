@@ -73,7 +73,6 @@ use crate::persistence::model::{
 };
 use crate::server::experiments::ServerExperiment;
 use crate::server::ids::{HashableId, ServerId, ToServerId};
-use crate::server::telemetry::TelemetryEvent;
 use crate::settings_view::SettingsSection;
 use crate::suggestions::ignored_suggestions_model::SuggestionType;
 use crate::tab::SelectedTabColor;

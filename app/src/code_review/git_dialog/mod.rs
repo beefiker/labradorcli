@@ -46,7 +46,6 @@ use crate::{
     workspace::ToastStack,
     workspaces::user_workspaces::UserWorkspaces,
 };
-use warp_core::send_telemetry_from_ctx;
 
 pub(crate) mod commit;
 pub(crate) mod pr;

@@ -8,7 +8,6 @@ use crate::code_review::comments::{
 };
 use crate::code_review::CodeReviewTelemetryEvent;
 use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
-use crate::send_telemetry_from_ctx;
 use crate::settings::AISettings;
 use crate::view_components::action_button::{
     ActionButton, ActionButtonTheme, ButtonSize, NakedTheme, SecondaryTheme,

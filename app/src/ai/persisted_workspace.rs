@@ -13,11 +13,9 @@ use serde::{Deserialize, Serialize};
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::persistence::ModelEvent;
 use crate::report_if_error;
-use crate::send_telemetry_from_ctx;
 use crate::settings::CodeSettings;
 use crate::terminal::TerminalView;
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
-use crate::TelemetryEvent;
 use ai::{
     index::full_source_code_embedding::manager::{CodebaseIndexManager, CodebaseIndexManagerEvent},
     workspace::{WorkspaceMetadata, WorkspaceMetadataEvent},

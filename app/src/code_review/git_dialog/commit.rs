@@ -43,7 +43,6 @@ use crate::{
     },
     view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme},
 };
-use warp_core::send_telemetry_from_ctx;
 
 /// What should happen after a successful commit.
 #[allow(clippy::enum_variant_names)] // `Commit` prefix is intentional: describes the always-present first stage.

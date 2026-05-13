@@ -494,9 +494,6 @@ pub enum WorkspaceAction {
     ToggleGlobalSearch,
     OpenGlobalSearch,
     ToggleConversationListView,
-    /// Reset the AWS Bedrock login banner dismissed state (for debugging).
-    #[cfg(debug_assertions)]
-    DebugResetAwsBedrockLoginBannerDismissed,
     /// Open the OpenWarp Launch Modal (for debugging)
     #[cfg(debug_assertions)]
     OpenOpenWarpLaunchModal,
@@ -835,8 +832,7 @@ impl WorkspaceAction {
             #[cfg(target_family = "wasm")]
             ToggleConversationTranscriptDetailsPanel => false,
             #[cfg(debug_assertions)]
-            DebugResetAwsBedrockLoginBannerDismissed
-            | OpenOpenWarpLaunchModal
+            OpenOpenWarpLaunchModal
             | ResetOpenWarpLaunchModalState
             | InstallOpenCodeWarpPlugin
             | UseLocalOpenCodeWarpPlugin => false,

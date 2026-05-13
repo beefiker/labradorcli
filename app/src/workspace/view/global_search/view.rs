@@ -27,8 +27,6 @@ use crate::ui_components::render_file_search_row::{render_file_search_row, FileS
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
 use crate::workspace::view::global_search::model::GlobalSearch;
 use crate::workspace::view::global_search::SearchConfig;
-use crate::TelemetryEvent;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};

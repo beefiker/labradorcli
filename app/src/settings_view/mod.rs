@@ -2,7 +2,6 @@ use self::telemetry::SettingsTelemetryEvent;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::server::telemetry::MCPServerCollectionPaneEntrypoint;
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
-use crate::TelemetryEvent;
 use crate::{
     ai::execution_profiles::profiles::ClientProfileId,
     appearance::Appearance,
@@ -43,7 +42,6 @@ use settings_page::{
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::{
     channel::ChannelState, context_flag::ContextFlag, features::FeatureFlag,
     settings::ToggleableSetting as _, ui::theme::color::internal_colors,

@@ -1,7 +1,6 @@
 use crate::appearance::Appearance;
 use crate::context_chips::prompt::Prompt;
 use crate::report_if_error;
-use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{PromptChoice, TelemetryEvent};
 use crate::settings::EnforceMinimumContrast;
 use crate::terminal::blockgrid_element::BlockGridElement;

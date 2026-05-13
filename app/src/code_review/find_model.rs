@@ -7,7 +7,6 @@ use std::ops::Range;
 use string_offset::CharOffset;
 #[cfg(not(target_family = "wasm"))]
 use warp_core::channel::ChannelState;
-use warp_core::send_telemetry_from_ctx;
 #[cfg(not(target_family = "wasm"))]
 use warp_editor::content::find::SearchConfig;
 #[cfg(not(target_family = "wasm"))]

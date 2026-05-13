@@ -56,7 +56,6 @@ use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
 use crate::search::ai_context_menu::view::{
     AIContextMenu, AIContextMenuCategory, AIContextMenuEvent,
 };
-use crate::server::telemetry::TelemetryEvent;
 use crate::settings_view::flags;
 use crate::suggestions::ignored_suggestions_model::{IgnoredSuggestionsModel, SuggestionType};
 use crate::ui_components::buttons::icon_button;

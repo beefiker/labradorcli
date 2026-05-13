@@ -24,7 +24,6 @@ use crate::ai::artifacts::{
     open_screenshot_lightbox, Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent,
 };
 use crate::appearance::Appearance;
-use crate::send_telemetry_from_ctx;
 use crate::ui_components::icon_with_status::{
     render_icon_with_status, IconWithStatusSizing, IconWithStatusVariant,
 };

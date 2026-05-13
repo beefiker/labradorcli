@@ -12,7 +12,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::{cmp, mem};
 use warp_core::platform::SessionPlatform;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::theme::Fill;
 use warp_editor::content::anchor::Anchor;
 use warp_editor::content::edit::EditDelta;

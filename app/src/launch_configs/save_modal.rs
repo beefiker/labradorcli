@@ -4,8 +4,6 @@ use crate::editor::{
     EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
 };
 use crate::launch_configs::launch_config::LaunchConfig;
-use crate::send_telemetry_from_ctx;
-use crate::server::telemetry::TelemetryEvent;
 use crate::user_config::launch_configs_dir;
 #[cfg(feature = "local_fs")]
 use crate::user_config::{util::file_name_to_human_readable_name, WarpConfig};

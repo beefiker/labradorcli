@@ -27,7 +27,6 @@ use std::{collections::HashMap, hash::Hasher};
 
 use warpui::{AppContext, SingletonEntity};
 
-use crate::send_telemetry_sync_from_app_ctx;
 
 /// Number of buckets we are using to partition user traffic. The largest valid
 /// bucket index is NUM_BUCKETS - 1.

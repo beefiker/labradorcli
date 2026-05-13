@@ -12,7 +12,6 @@ use crate::ai::blocklist::inline_action::requested_action::RenderableAction;
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::appearance::Appearance;
 use crate::code::lsp_telemetry::{LspEnablementSource, LspTelemetryEvent};
-use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{
     AgentModeSetupCodebaseContextActionType, AgentModeSetupCreateEnvironmentActionType,
     AgentModeSetupProjectScopedRulesActionType,
@@ -20,7 +19,6 @@ use crate::server::telemetry::{
 use crate::ui_components::icons::Icon;
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
-use crate::TelemetryEvent;
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use lsp::supported_servers::LSPServerType;
 use lsp_server_selector::{create_lsp_server_selector, LSPServerInfo};

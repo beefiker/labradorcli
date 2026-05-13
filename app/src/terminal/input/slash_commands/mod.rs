@@ -9,7 +9,6 @@ pub use view::{CloseReason, InlineSlashCommandView, SlashCommandsEvent};
 
 use ai::skills::SkillReference;
 use warp_core::features::FeatureFlag;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::AnsiColorIdentifier;
 use warpui::clipboard::ClipboardContent;
@@ -46,7 +45,6 @@ use crate::terminal::view::TerminalAction;
 use crate::ui_components::color_dot;
 use crate::view_components::DismissibleToast;
 use crate::workspace::{ForkedConversationDestination, ToastStack, WorkspaceAction};
-use crate::TelemetryEvent;
 #[cfg(not(target_family = "wasm"))]
 #[cfg(not(target_family = "wasm"))]
 use warpui::AppContext;

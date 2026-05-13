@@ -6,16 +6,13 @@ use crate::search::result_renderer::QueryResultRenderer;
 use crate::search::search_bar::SelectionUpdate;
 use crate::search::search_bar::{SearchBar, SearchBarEvent, SearchBarState, SearchResultOrdering};
 use crate::search::QueryFilter;
-use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::LaunchConfigUiLocation;
-use crate::server::telemetry::TelemetryEvent;
 use crate::settings::CtrlTabBehavior;
 use crate::terminal::keys_settings::KeysSettings;
 use crate::themes::theme::WarpTheme;
 use crate::view_components::DismissibleToast;
 use crate::ToastStack;
 use lazy_static::lazy_static;
-use warp_core::send_telemetry_from_app_ctx;
 use warp_util::path::LineAndColumnArg;
 
 use crate::search::action::search_item::MatchedBinding;

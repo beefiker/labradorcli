@@ -399,7 +399,6 @@ use crate::terminal::view::ssh_file_upload::FileUploadId;
 #[cfg(target_family = "wasm")]
 use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::ui_components::icons;
-use crate::TelemetryEvent;
 use autoupdate::AutoupdateStage;
 #[cfg(target_os = "macos")]
 use command::blocking::Command;
@@ -17848,21 +17847,6 @@ impl TypedActionView for Workspace {
             #[cfg(feature = "local_fs")]
             FileDeleted { path } => {
                 self.close_tabs_with_file_path(path, ctx);
-            }
-            #[cfg(debug_assertions)]
-            DebugResetAwsBedrockLoginBannerDismissed => {
-                // Reset the AWS Bedrock login banner dismissed state for debugging
-                AISettings::handle(ctx).update(ctx, |ai_settings, ctx| {
-                    if let Err(e) = ai_settings
-                        .aws_bedrock_login_banner_dismissed
-                        .set_value(false, ctx)
-                    {
-                        log::warn!(
-                            "Failed to reset AWS Bedrock login banner dismissed setting: {e}"
-                        );
-                    }
-                });
-                log::info!("AWS Bedrock login banner dismissed state has been reset");
             }
             #[cfg(debug_assertions)]
             OpenOzLaunchModal => {

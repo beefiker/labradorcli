@@ -7,9 +7,7 @@ mod mac;
 mod windows;
 
 use crate::features::FeatureFlag;
-use crate::send_telemetry_sync_from_app_ctx;
 use crate::server::server_api::ServerApi;
-use crate::server::telemetry::TelemetryEvent;
 use crate::workspace::Workspace;
 use crate::{
     channel::Channel, report_if_error, send_telemetry_from_ctx, server::datetime_ext::DateTimeExt,

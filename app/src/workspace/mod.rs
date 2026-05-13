@@ -173,12 +173,6 @@ pub fn init(app: &mut AppContext) {
         {
             app.register_editable_bindings([
                 EditableBinding::new(
-                    "workspace:debug_reset_aws_bedrock_login_banner_dismissed",
-                    "[Debug] Un-dismiss AWS login banner",
-                    WorkspaceAction::DebugResetAwsBedrockLoginBannerDismissed,
-                )
-                .with_context_predicate(id!("Workspace")),
-                EditableBinding::new(
                     "workspace:open_openwarp_launch_modal",
                     "[Debug] Open OpenWarp Launch Modal",
                     WorkspaceAction::OpenOpenWarpLaunchModal,

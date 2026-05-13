@@ -5,8 +5,6 @@ use futures::{future::BoxFuture, FutureExt};
 use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use crate::ai::agent::{AIAgentActionId, AIAgentActionType};
-use crate::send_telemetry_from_ctx;
-use crate::server::telemetry::TelemetryEvent;
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 
