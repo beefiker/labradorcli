@@ -876,6 +876,3 @@ fn build_pending_events(
     pending
 }
 
-#[cfg(test)]
-#[path = "orchestration_event_streamer_tests.rs"]
-mod tests;

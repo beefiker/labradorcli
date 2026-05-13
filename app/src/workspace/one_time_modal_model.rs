@@ -1,4 +1,3 @@
-use super::hoa_onboarding;
 use crate::auth::auth_manager::AuthManagerEvent;
 use crate::auth::AuthManager;
 use crate::channel::{Channel, ChannelState};
@@ -20,8 +19,6 @@ pub struct OneTimeModalModel {
     is_oz_launch_modal_open: bool,
     /// Whether the OpenWarp launch modal is currently being shown.
     is_openwarp_launch_modal_open: bool,
-    /// Whether the HOA onboarding flow is currently being shown.
-    is_hoa_onboarding_open: bool,
     /// The window ID where the currently open one-time modal should be displayed.
     /// This is captured when a modal is first opened and ensures the modal stays on that window.
     target_window_id: Option<WindowId>,
@@ -76,7 +73,6 @@ impl OneTimeModalModel {
             is_build_plan_migration_modal_open: false,
             is_oz_launch_modal_open: false,
             is_openwarp_launch_modal_open: false,
-            is_hoa_onboarding_open: false,
             target_window_id: None,
         }
     }
@@ -104,21 +100,11 @@ impl OneTimeModalModel {
         self.set_openwarp_launch_modal_open(false, ctx);
     }
 
-    /// Returns whether the HOA onboarding flow is currently open.
-    pub fn is_hoa_onboarding_open(&self) -> bool {
-        self.is_hoa_onboarding_open && self.target_window_id.is_some()
-    }
-
-    pub fn mark_hoa_onboarding_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_hoa_onboarding_open(false, ctx);
-    }
-
     /// Returns true if any one-time modal is currently open.
     pub fn is_any_modal_open(&self) -> bool {
         (self.is_oz_launch_modal_open
             || self.is_openwarp_launch_modal_open
-            || self.is_build_plan_migration_modal_open
-            || self.is_hoa_onboarding_open)
+            || self.is_build_plan_migration_modal_open)
             && self.target_window_id.is_some()
     }
 
@@ -194,40 +180,7 @@ impl OneTimeModalModel {
             return;
         }
 
-        if self.check_and_trigger_hoa_onboarding(ctx) {
-            return;
-        }
-
         self.check_and_trigger_build_plan_migration_modal(ctx);
-    }
-
-    fn set_hoa_onboarding_open(&mut self, is_open: bool, ctx: &mut ModelContext<Self>) -> bool {
-        if self.is_hoa_onboarding_open != is_open {
-            self.is_hoa_onboarding_open = is_open;
-            ctx.emit(OneTimeModalEvent::VisibilityChanged { is_open });
-            return true;
-        }
-        false
-    }
-
-    fn check_and_trigger_hoa_onboarding(&mut self, ctx: &mut ModelContext<Self>) -> bool {
-        if !FeatureFlag::HOAOnboardingFlow.is_enabled() {
-            return false;
-        }
-
-        if hoa_onboarding::has_completed_hoa_onboarding(ctx) {
-            return false;
-        }
-
-        // All required dependent feature flags must be enabled.
-        if !FeatureFlag::VerticalTabs.is_enabled()
-            || !FeatureFlag::HOANotifications.is_enabled()
-            || !FeatureFlag::TabConfigs.is_enabled()
-        {
-            return false;
-        }
-
-        self.set_hoa_onboarding_open(true, ctx)
     }
 
     fn check_and_trigger_oz_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
