@@ -1,20 +1,14 @@
 use std::sync::Arc;
 
 use crate::{
-    ai::{
-        llms::{is_using_api_key_for_provider, LLMPreferences},
-        AIRequestUsageModel, BuyCreditsBannerDisplayState,
-    },
     appearance::Appearance,
     settings::{AISettings, InputSettings},
     terminal::{
-        buy_credits_banner::BuyCreditsBanner,
         input::{Input, InputAction, InputSuggestionsMode, MenuPositioning},
         model::TerminalModel,
         view::{TerminalAction, PADDING_LEFT},
     },
     ui_components::icons::Icon,
-    workspaces::user_workspaces::UserWorkspaces,
 };
 use pathfinder_geometry::vector::vec2f;
 use vim::vim::{VimMode, VimState};
@@ -163,51 +157,17 @@ pub(super) fn wrap_input_with_terminal_padding_and_focus_handler(
 
 /// Renders the selected workflow info overlay over the input.
 pub(super) fn add_workflow_info_overlay(
-    stack: &mut Stack,
-    selected_workflow_state: &super::SelectedWorkflowState,
-    pane_height_px: f32,
-    menu_positioning: MenuPositioning,
+    _stack: &mut Stack,
+    _pane_height_px: f32,
+    _menu_positioning: MenuPositioning,
 ) {
-    let workflows_info_view =
-        Container::new(ChildView::new(&selected_workflow_state.more_info_view).finish())
-            .with_margin_left(16.)
-            .with_margin_right(16.)
-            .finish();
-
-    stack.add_positioned_overlay_child(
-        ConstrainedBox::new(workflows_info_view)
-            .with_max_height(pane_height_px * 0.35)
-            .finish(),
-        OffsetPositioning::from_axes(
-            PositioningAxis::relative_to_parent(
-                ParentOffsetBounds::ParentByPosition,
-                OffsetType::Pixel(0.),
-                AnchorPair::new(XAxisAnchor::Left, XAxisAnchor::Left),
-            ),
-            PositioningAxis::relative_to_parent(
-                ParentOffsetBounds::Unbounded,
-                OffsetType::Pixel(0.),
-                menu_positioning.workflows_info_y_anchor(),
-            ),
-        ),
-    );
 }
 
 /// Renders the voltron overlay over the input.
 pub(super) fn add_voltron_overlay(
-    stack: &mut Stack,
-    voltron_view: &ViewHandle<crate::voltron::Voltron>,
-    menu_positioning: MenuPositioning,
+    _stack: &mut Stack,
+    _menu_positioning: MenuPositioning,
 ) {
-    stack.add_positioned_overlay_child(
-        ChildView::new(voltron_view).finish(),
-        OffsetPositioning::offset_from_parent(
-            menu_positioning.voltron_offset(),
-            ParentOffsetBounds::Unbounded,
-            menu_positioning.voltron_parent_anchor(),
-            menu_positioning.voltron_child_anchor(),
-        ),
-    );
 }
 
 /// Renders the appropriate input suggestions overlay over the input, bsaed on the current input
@@ -475,69 +435,3 @@ fn render_command_token_description(
     .finish()
 }
 
-/// Conditionally adds the "buy credits" banner overlay.
-/// The overlay only is shown if all of the following is true:
-/// - The user is on a team that can purchase addon credits
-/// - The user is out of credits (or at their auto-reload limit)
-/// - The input is focused
-/// - There is not a BYO API key for the current model
-pub(super) fn maybe_add_buy_credits_banner(
-    stack: &mut Stack,
-    buy_credits_banner: &ViewHandle<BuyCreditsBanner>,
-    is_focused: bool,
-    terminal_view_id: EntityId,
-    is_input_at_top: bool,
-    app: &AppContext,
-) {
-    let can_purchase_addon_credits = UserWorkspaces::as_ref(app)
-        .current_team()
-        .and_then(|team| team.billing_metadata.tier.purchase_add_on_credits_policy)
-        .is_some_and(|policy| policy.enabled);
-
-    // Show buy credits banner if billing policy allows purchasing, input is focused,
-    // and either:
-    // 1. OutOfCredits: for users that are not auto-reload enabled
-    // 2. MonthlyLimitReached: Auto-reload enabled and is blocked by monthly limit
-    let ai_request_usage = AIRequestUsageModel::as_ref(app);
-    let should_show_banner = !matches!(
-        ai_request_usage.compute_buy_addon_credits_banner_display_state(app),
-        BuyCreditsBannerDisplayState::Hidden
-    );
-    let is_using_api_key_for_current_model = is_using_api_key_for_provider(
-        &LLMPreferences::as_ref(app)
-            .get_active_base_model(app, Some(terminal_view_id))
-            .provider,
-        app,
-    );
-    if can_purchase_addon_credits
-        && is_focused
-        && should_show_banner
-        && !is_using_api_key_for_current_model
-    {
-        add_buy_credits_banner_overlay(stack, buy_credits_banner, is_input_at_top);
-    }
-}
-
-/// Adds buy credits banner overlay to stack
-fn add_buy_credits_banner_overlay(
-    stack: &mut Stack,
-    buy_credits_banner: &ViewHandle<BuyCreditsBanner>,
-    is_input_at_top: bool,
-) {
-    use pathfinder_geometry::vector::vec2f;
-
-    let (parent_anchor, child_anchor, y_offset) = if is_input_at_top {
-        (ParentAnchor::BottomLeft, ChildAnchor::TopLeft, 8.)
-    } else {
-        (ParentAnchor::TopLeft, ChildAnchor::BottomLeft, -8.)
-    };
-    stack.add_positioned_child(
-        ChildView::new(buy_credits_banner).finish(),
-        OffsetPositioning::offset_from_parent(
-            vec2f(0., y_offset),
-            ParentOffsetBounds::Unbounded,
-            parent_anchor,
-            child_anchor,
-        ),
-    );
-}

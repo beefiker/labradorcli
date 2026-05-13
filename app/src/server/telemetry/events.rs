@@ -30,7 +30,6 @@ use crate::ai::agent::PassiveSuggestionTrigger;
 use crate::ai::agent::ServerOutputId;
 use crate::ai::agent::SuggestedLoggingId;
 use crate::ai::agent_management::notifications::NotificationSourceAgent;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::AIBlockResponseRating;
 use crate::ai::blocklist::CommandExecutionPermissionAllowedReason;
@@ -41,19 +40,10 @@ use crate::ai::predict::generate_ai_input_suggestions::GenerateAIInputSuggestion
 use crate::ai::predict::next_command_model::HistoryBasedAutosuggestionState;
 use crate::auth::auth_manager::LoginGatedFeature;
 use crate::channel::Channel;
-use crate::cloud_object::{
-    model::generic_string_model::GenericStringObjectId, GenericStringObjectFormat, ObjectType,
-    Space,
-};
 #[cfg(feature = "local_fs")]
 use crate::code::editor_management::CodeSource;
-use crate::drive::CloudObjectTypeAndId;
-use crate::drive::DriveSortOrder;
 use crate::features::FeatureFlag;
 use crate::launch_configs::save_modal::SaveState;
-use crate::notebooks::telemetry::NotebookTelemetryAction;
-use crate::notebooks::NotebookId;
-use crate::notebooks::NotebookLocation;
 use crate::palette::PaletteMode;
 use crate::pane_group::PaneDragDropLocation;
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
@@ -95,9 +85,6 @@ use crate::tips::WelcomeTipFeature;
 use crate::util::file::external_editor::settings::EditorLayout;
 #[cfg(feature = "local_fs")]
 use crate::util::openable_file_type::FileTarget;
-use crate::workflows::WorkflowId;
-use crate::workflows::WorkflowSelectionSource;
-use crate::workflows::WorkflowSource;
 use crate::workspace::tab_settings::TabCloseButtonPosition;
 use crate::workspace::tab_settings::WorkspaceDecorationVisibility;
 use crate::workspace::TabMovement;
@@ -172,20 +159,7 @@ pub enum TelemetryCloudObjectType {
     Workflow,
     Notebook,
     Folder,
-    GenericStringObject(GenericStringObjectFormat),
-}
-
-impl From<&CloudObjectTypeAndId> for TelemetryCloudObjectType {
-    fn from(cloud_object_type_and_id: &CloudObjectTypeAndId) -> Self {
-        match cloud_object_type_and_id {
-            CloudObjectTypeAndId::Notebook(_) => Self::Notebook,
-            CloudObjectTypeAndId::Workflow(_) => Self::Workflow,
-            CloudObjectTypeAndId::Folder(_) => Self::Folder,
-            CloudObjectTypeAndId::GenericStringObject { object_type, .. } => {
-                Self::GenericStringObject(*object_type)
-            }
-        }
-    }
+    GenericStringObject,
 }
 
 /// For use when recording how a user has access to a cloud object.
@@ -197,16 +171,6 @@ pub enum TelemetrySpace {
     Team,
     /// The object was shared with the user.
     Shared,
-}
-
-impl From<Space> for TelemetrySpace {
-    fn from(space: Space) -> Self {
-        match space {
-            Space::Personal => Self::Personal,
-            Space::Team { .. } => Self::Team,
-            Space::Shared => Self::Shared,
-        }
-    }
 }
 
 /// Common metadata to include in all Warp Drive telemetry events that act on a specific object.
@@ -226,82 +190,7 @@ pub struct CloudObjectTelemetryMetadata {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct WorkflowTelemetryMetadata {
-    pub workflow_categories: Option<Vec<String>>,
-    pub workflow_source: WorkflowSource,
-    pub workflow_space: Option<TelemetrySpace>,
-    pub workflow_selection_source: WorkflowSelectionSource,
-    // This field is only populated for cloud workflows that have been synced to the server
-    pub workflow_id: Option<WorkflowId>,
-    // Any referenced workflow enums that have been synced to the cloud
-    pub enum_ids: Vec<GenericStringObjectId>,
-}
-
-/// Metadata to include in all notebook telemetry events.
-///
-/// There are 4 expected configurations:
-/// * Personal cloud notebooks: `notebook_id` is `Some`, `team_uid` is `None`, and location is `PersonalCloud`
-/// * Team cloud notebooks: `notebook_id` is `Some`, `team_uid` is `Some`, and location is `Team`
-/// * Local file-based notebooks: `notebook_id` and `team_uid` are `None`, and location is `LocalFile`
-/// * Remote file-based notebooks: `notebook_id` and `team_uid` are `None`, and location is `RemoteFile`
-///
-/// This representation allows for invalid combinations, but makes querying the data easier (for
-/// example, to find all notebook events for a given team).
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct NotebookTelemetryMetadata {
-    /// The notebook ID, only available for cloud notebooks that have been synced to the server.
-    pub notebook_id: Option<NotebookId>,
-    /// The team UID, only available for cloud notebooks in a shared team.
-    pub team_uid: Option<ServerId>,
-    pub space: Option<TelemetrySpace>,
-    /// Where the notebook is canonically located.
-    pub location: NotebookLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub markdown_table_count: Option<usize>,
-}
-
-impl NotebookTelemetryMetadata {
-    pub fn new(
-        notebook_id: impl Into<Option<NotebookId>>,
-        team_uid: impl Into<Option<ServerId>>,
-        location: impl Into<NotebookLocation>,
-        space: Option<TelemetrySpace>,
-    ) -> Self {
-        Self {
-            notebook_id: notebook_id.into(),
-            team_uid: team_uid.into(),
-            location: location.into(),
-            space,
-            markdown_table_count: None,
-        }
-    }
-
-    pub fn with_markdown_table_count(mut self, markdown_table_count: usize) -> Self {
-        self.markdown_table_count = Some(markdown_table_count);
-        self
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NotebookActionEvent {
-    #[serde(flatten)]
-    pub action: NotebookTelemetryAction,
-    #[serde(flatten)]
-    pub metadata: NotebookTelemetryMetadata,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct EnvVarTelemetryMetadata {
-    /// The object ID, only available for cloud env vars that have been synced to the server.
-    pub object_id: Option<GenericStringObjectId>,
-    /// The team UID, only available for cloud env vars in a shared team.
-    pub team_uid: Option<ServerId>,
-    pub space: TelemetrySpace,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
 pub struct MCPServerTelemetryMetadata {
-    pub object_id: GenericStringObjectId,
     pub name: String,
     pub transport_type: MCPServerTelemetryTransportType,
     /// The MCP server string extracted from '@modelcontextprotocol/<...>'.
@@ -585,9 +474,6 @@ impl From<&CommandSearchItemAction> for CommandSearchResultType {
         use crate::search::command_search::searcher::CommandSearchItemAction::*;
         match action {
             AcceptHistory(_) | ExecuteHistory(_) => Self::History,
-            AcceptWorkflow(_) => Self::Workflow,
-            AcceptNotebook(_) => Self::Notebook,
-            AcceptEnvVarCollection(_) => Self::EnvVarCollection,
             OpenWarpAI => Self::OpenWarpAI,
             TranslateUsingWarpAI => Self::TranslateUsingWarpAI,
             AcceptAIQuery(_) | RunAIQuery(_) => Self::AIQuery,
@@ -993,10 +879,6 @@ pub enum CodeContextDestination {
 
 #[derive(Clone, Debug, Serialize)]
 pub enum AgentModeCitation {
-    WarpDriveObject {
-        object_type: ObjectType,
-        uid: ObjectUid,
-    },
     WarpDocs {
         page: String,
     },
@@ -1374,8 +1256,6 @@ pub enum TelemetryEvent {
         action: String,
         value: String,
     },
-    WorkflowExecuted(WorkflowTelemetryMetadata),
-    WorkflowSelected(WorkflowTelemetryMetadata),
     OpenWorkflowSearch,
     OpenQuakeModeWindow,
     OpenWelcomeTips,
@@ -1547,12 +1427,6 @@ pub enum TelemetryEvent {
     AICommandSearchOpened {
         entrypoint: AICommandSearchEntrypoint,
     },
-    OpenNotebook(NotebookTelemetryMetadata),
-    EditNotebook {
-        metadata: NotebookTelemetryMetadata,
-        meaningful_change: bool,
-    },
-    NotebookAction(NotebookActionEvent),
     OpenedAltScreenFind,
     UserInitiatedClose {
         initiated_on: CloseTarget,
@@ -2186,9 +2060,6 @@ pub enum TelemetryEvent {
         /// vary by OS).  See `memory_footprint::memory_breakdown()`.
         memory_breakdown: serde_json::Value,
     },
-    EnvVarCollectionInvoked(EnvVarTelemetryMetadata),
-    EnvVarWorkflowParameterization(EnvVarTelemetryMetadata),
-
     /// The user imported settings from another terminal.
     CompletedSettingsImport {
         terminal_type: TerminalType,
@@ -2234,25 +2105,6 @@ pub enum TelemetryEvent {
     ToggleLigatureRendering {
         enabled: bool,
     },
-    WorkflowAliasAdded {
-        workflow_id: Option<WorkflowId>,
-        workflow_space: Option<TelemetrySpace>,
-    },
-    WorkflowAliasRemoved {
-        workflow_id: Option<WorkflowId>,
-        workflow_space: Option<TelemetrySpace>,
-    },
-    WorkflowAliasEnvVarsAttached {
-        workflow_id: Option<WorkflowId>,
-        workflow_space: Option<TelemetrySpace>,
-        env_vars_id: Option<GenericStringObjectId>,
-        env_vars_space: Option<TelemetrySpace>,
-    },
-    WorkflowAliasArgumentEdited {
-        workflow_id: Option<WorkflowId>,
-        workflow_space: Option<TelemetrySpace>,
-    },
-
     ToggledAgentModeAutoexecuteReadonlyCommandsSetting {
         src: AutonomySettingToggleSource,
         enabled: bool,
@@ -2329,10 +2181,6 @@ pub enum TelemetryEvent {
     AutoupdateMutexTimeout,
     #[cfg(windows)]
     AutoupdateForcekillFailed,
-    ExecutedWarpDrivePrompt {
-        id: Option<WorkflowId>,
-        selection_source: WorkflowSelectionSource,
-    },
     ImageReceived {
         image_protocol: ImageProtocol,
     },
@@ -3012,8 +2860,6 @@ impl TelemetryEvent {
             TelemetryEvent::FeaturesPageAction { action, value } => {
                 Some(json!({"action": action, "value": value}))
             }
-            TelemetryEvent::WorkflowExecuted(metadata) => Some(json!(metadata)),
-            TelemetryEvent::WorkflowSelected(metadata) => Some(json!(metadata)),
             TelemetryEvent::CompleteWelcomeTipFeature {
                 total_completed_count,
                 tip_name,
@@ -3115,16 +2961,6 @@ impl TelemetryEvent {
             TelemetryEvent::AICommandSearchOpened { entrypoint } => {
                 Some(json!({ "entrypoint": entrypoint }))
             }
-            TelemetryEvent::OpenNotebook(metadata) => Some(json!(metadata)),
-            TelemetryEvent::EditNotebook {
-                metadata,
-                meaningful_change,
-            } => Some(json!({
-                "notebook_id": metadata.notebook_id,
-                "team_uid": metadata.team_uid,
-                "meaningful_change": meaningful_change,
-            })),
-            TelemetryEvent::NotebookAction(event) => Some(json!(event)),
             TelemetryEvent::UserInitiatedClose { initiated_on } => {
                 Some(json!({ "initiated_on": initiated_on }))
             }
@@ -3665,8 +3501,6 @@ impl TelemetryEvent {
                 "total_application_usage_bytes": total_application_usage_bytes,
                 "memory_breakdown": memory_breakdown,
             })),
-            TelemetryEvent::EnvVarCollectionInvoked(metadata) => Some(json!(metadata)),
-            TelemetryEvent::EnvVarWorkflowParameterization(metadata) => Some(json!(metadata)),
             TelemetryEvent::CompletedSettingsImport {
                 terminal_type,
                 imported_settings,
@@ -3745,38 +3579,6 @@ impl TelemetryEvent {
             TelemetryEvent::ToggleLigatureRendering { enabled } => {
                 Some(json!({"enabled": enabled}))
             }
-            TelemetryEvent::WorkflowAliasAdded {
-                workflow_id,
-                workflow_space,
-            } => Some(json!({
-                "workflow_id": workflow_id,
-                "workflow_space": workflow_space,
-            })),
-            TelemetryEvent::WorkflowAliasRemoved {
-                workflow_id,
-                workflow_space,
-            } => Some(json!({
-                "workflow_id": workflow_id,
-                "workflow_space": workflow_space,
-            })),
-            TelemetryEvent::WorkflowAliasArgumentEdited {
-                workflow_id,
-                workflow_space,
-            } => Some(json!({
-                "workflow_id": workflow_id,
-                "workflow_space": workflow_space,
-            })),
-            TelemetryEvent::WorkflowAliasEnvVarsAttached {
-                workflow_id,
-                workflow_space,
-                env_vars_id,
-                env_vars_space,
-            } => Some(json!({
-                "workflow_id": workflow_id,
-                "workflow_space": workflow_space,
-                "env_vars_id": env_vars_id,
-                "env_vars_space": env_vars_space,
-            })),
             TelemetryEvent::AutoupdateRelaunchAttempt { new_version } => Some(json!({
                 "new_version": new_version,
             })),
@@ -3836,13 +3638,6 @@ impl TelemetryEvent {
                 "server_output_id": server_output_id,
                 "conversation_id": conversation_id,
                 "rating": rating,
-            })),
-            TelemetryEvent::ExecutedWarpDrivePrompt {
-                id,
-                selection_source,
-            } => Some(json!({
-                "id": id,
-                "selection_source": selection_source,
             })),
             TelemetryEvent::ImageReceived { image_protocol } => Some(json!({
                 "image_protocol": image_protocol,
@@ -4600,8 +4395,6 @@ impl TelemetryEvent {
             | TelemetryEvent::KeybindingResetToDefault { .. }
             | TelemetryEvent::KeybindingRemoved { .. }
             | TelemetryEvent::FeaturesPageAction { .. }
-            | TelemetryEvent::WorkflowExecuted(_)
-            | TelemetryEvent::WorkflowSelected(_)
             | TelemetryEvent::OpenWorkflowSearch
             | TelemetryEvent::OpenQuakeModeWindow
             | TelemetryEvent::OpenWelcomeTips
@@ -4676,9 +4469,6 @@ impl TelemetryEvent {
             | TelemetryEvent::CommandSearchFilterChanged { .. }
             | TelemetryEvent::CommandSearchAsyncQueryCompleted { .. }
             | TelemetryEvent::AICommandSearchOpened { .. }
-            | TelemetryEvent::OpenNotebook(_)
-            | TelemetryEvent::EditNotebook { .. }
-            | TelemetryEvent::NotebookAction(_)
             | TelemetryEvent::OpenedAltScreenFind
             | TelemetryEvent::UserInitiatedClose { .. }
             | TelemetryEvent::QuitModalShown { .. }
@@ -4823,8 +4613,6 @@ impl TelemetryEvent {
             | TelemetryEvent::ResourceUsageStats { .. }
             | TelemetryEvent::MemoryUsageStats { .. }
             | TelemetryEvent::MemoryUsageHigh { .. }
-            | TelemetryEvent::EnvVarCollectionInvoked(_)
-            | TelemetryEvent::EnvVarWorkflowParameterization(_)
             | TelemetryEvent::CompletedSettingsImport { .. }
             | TelemetryEvent::SettingsImportConfigFocused(_)
             | TelemetryEvent::SettingsImportResetButtonClicked
@@ -4837,10 +4625,6 @@ impl TelemetryEvent {
             | TelemetryEvent::AgentModeOpenedCitation { .. }
             | TelemetryEvent::OpenedSharingDialog(_)
             | TelemetryEvent::ToggleLigatureRendering { .. }
-            | TelemetryEvent::WorkflowAliasAdded { .. }
-            | TelemetryEvent::WorkflowAliasRemoved { .. }
-            | TelemetryEvent::WorkflowAliasEnvVarsAttached { .. }
-            | TelemetryEvent::WorkflowAliasArgumentEdited { .. }
             | TelemetryEvent::ToggledAgentModeAutoexecuteReadonlyCommandsSetting { .. }
             | TelemetryEvent::ChangedAgentModeCodingPermissions { .. }
             | TelemetryEvent::RepoOutlineConstructionSuccess { .. }
@@ -4855,7 +4639,6 @@ impl TelemetryEvent {
             | TelemetryEvent::MCPTemplateShared
             | TelemetryEvent::MCPServerSpawned { .. }
             | TelemetryEvent::MCPToolCallAccepted { .. }
-            | TelemetryEvent::ExecutedWarpDrivePrompt { .. }
             | TelemetryEvent::ToggleSshWarpification { .. }
             | TelemetryEvent::SetSshExtensionInstallMode { .. }
             | TelemetryEvent::SshRemoteServerChoiceDoNotAskAgainToggled { .. }
@@ -5096,9 +4879,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 EnablementState::Flag(FeatureFlag::CreatingSharedSessions)
             }
             Self::JoinedSharedSession => EnablementState::Flag(FeatureFlag::ViewingSharedSessions),
-            Self::OpenNotebook | Self::EditNotebook | Self::NotebookAction => {
-                EnablementState::Always
-            }
             Self::ToggleSettingsSync { .. } => EnablementState::Always,
             Self::AgentTipShown | Self::AgentTipClicked | Self::ToggleShowAgentTips => {
                 EnablementState::Flag(FeatureFlag::AgentTips)
@@ -5156,8 +4936,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::KeybindingResetToDefault => EnablementState::Always,
             Self::KeybindingRemoved => EnablementState::Always,
             Self::FeaturesPageAction => EnablementState::Always,
-            Self::WorkflowExecuted => EnablementState::Always,
-            Self::WorkflowSelected => EnablementState::Always,
             Self::OpenWorkflowSearch => EnablementState::Always,
             Self::OpenQuakeModeWindow => EnablementState::Always,
             Self::OpenWelcomeTips => EnablementState::Always,
@@ -5354,9 +5132,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             | Self::AgentModePotentialAutoDetectionFalsePositive => {
                 EnablementState::Flag(FeatureFlag::AgentMode)
             }
-            Self::EnvVarCollectionInvoked | Self::EnvVarWorkflowParameterization => {
-                EnablementState::Always
-            }
             Self::BlockCompletedOnDogfoodOnly => EnablementState::ChannelSpecific {
                 channels: vec![Channel::Local, Channel::Dev],
             },
@@ -5406,12 +5181,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::OpenedSharingDialog => EnablementState::Always,
             Self::ToggleLigatureRendering => EnablementState::Flag(FeatureFlag::Ligatures),
-            Self::WorkflowAliasAdded
-            | Self::WorkflowAliasRemoved
-            | Self::WorkflowAliasArgumentEdited
-            | Self::WorkflowAliasEnvVarsAttached => {
-                EnablementState::Flag(FeatureFlag::WorkflowAliases)
-            }
             Self::ToggledAgentModeAutoexecuteReadonlyCommandsSetting
             | Self::ChangedAgentModeCodingPermissions
             | Self::AutoexecutedAgentModeRequestedCommand => EnablementState::Always,
@@ -5429,7 +5198,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::AgentModeRatedResponse => {
                 EnablementState::Flag(FeatureFlag::GlobalAIAnalyticsBanner)
             }
-            Self::ExecutedWarpDrivePrompt => EnablementState::Flag(FeatureFlag::AgentModeWorkflows),
             Self::ImageReceived => EnablementState::Always,
             Self::FileExceededContextLimit => EnablementState::Always,
             Self::AgentModeError => EnablementState::Always,
@@ -5655,8 +5423,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::KeybindingResetToDefault => "Keybinding Reset to Default",
             Self::KeybindingRemoved => "Keybinding Removed",
             Self::OpenWorkflowSearch => "Open Workflows Search",
-            Self::WorkflowExecuted => "Workflow Executed",
-            Self::WorkflowSelected => "Workflow Selected",
             Self::FeaturesPageAction => "Features Page Action",
             Self::OpenQuakeModeWindow => "Open Quake Mode Window",
             Self::OpenWelcomeTips => "Open Welcome Tips",
@@ -5720,9 +5486,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::CommandSearchFilterChanged => "Command Search Filter Changed",
             Self::CommandSearchAsyncQueryCompleted => "Command Search Async Query Completed",
             Self::AICommandSearchOpened => "AI Command Search opened",
-            Self::OpenNotebook => "Notebook Opened",
-            Self::EditNotebook => "Notebook Edited",
-            Self::NotebookAction => "Notebook Action",
             Self::OpenedAltScreenFind => "Opened alt screen find bar",
             Self::UserInitiatedClose => "User Initiated Closing Something",
             Self::QuitModalShown => "Quit Modal Shown",
@@ -5895,10 +5658,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Toggle Intelligent Autosuggestions Setting"
             }
             Self::ToggleVoiceInputSetting => "Toggle Voice Input Setting",
-            Self::EnvVarCollectionInvoked => "Invoked Environment Variables",
-            Self::EnvVarWorkflowParameterization => {
-                "Parameterized Workflow With Environment Variables"
-            }
             Self::CompletedSettingsImport => "Completed Settings Import",
             Self::SettingsImportConfigFocused => "Focused Config in Settings Import",
             Self::SettingsImportConfigParsed => "Parsed Config in Settings Import",
@@ -5915,10 +5674,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ToggleGlobalAI => "Toggle Global AI Enablement",
             Self::ToggleActiveAI => "Toggle Active AI Enablement",
             Self::ToggleLigatureRendering => "Toggle Ligature Rendering",
-            Self::WorkflowAliasAdded => "Added Workflow Alias",
-            Self::WorkflowAliasRemoved => "Removed Workflow Alias",
-            Self::WorkflowAliasArgumentEdited => "Edited Workflow Alias Argument",
-            Self::WorkflowAliasEnvVarsAttached => "Attached Workflow Alias Environment Variables",
 
             Self::ToggledAgentModeAutoexecuteReadonlyCommandsSetting => {
                 "AIAutonomy.ToggledAutoexecuteReadonlyCommandsSetting"
@@ -5954,7 +5709,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ActiveIndexedReposChanged => "Active Indexed Repos Changed",
             Self::AttachedImagesToAgentModeQuery => "AgentMode.AttachedImages",
             Self::AgentModeRatedResponse => "AgentMode.RatedResponse",
-            Self::ExecutedWarpDrivePrompt => "AgentMode.ExecutedWarpDrivePrompt",
             Self::ImageReceived => "Image Received",
             Self::FileExceededContextLimit => "AgentMode.Code.FileExceededContextLimit",
             Self::AgentModeError => "AgentMode.Error",
@@ -6236,8 +5990,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::KeybindingResetToDefault => "Reset a custom keybinding to its default",
             Self::KeybindingRemoved => "Removed / cleared a keybinding",
             Self::FeaturesPageAction => "Changed settings in Features Page",
-            Self::WorkflowExecuted => "Executed workflow",
-            Self::WorkflowSelected => "Selected workflow and populated into the Input Editor",
             Self::OpenWorkflowSearch => "Opened workflows search in command search pane",
             Self::OpenQuakeModeWindow => {
                 "Toggled quake mode window when previously hidden or closed"
@@ -6345,11 +6097,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::AICommandSearchOpened => {
                 "Opened the modal for AI Command Search, where you can use natural language to search for commands"
-            }
-            Self::OpenNotebook => "Opened a notebook",
-            Self::EditNotebook => "Edited a notebook",
-            Self::NotebookAction => {
-                "Took an action on a notebook: edit, delete, modified font size, etc."
             }
             Self::OpenedAltScreenFind => "Opened the Find bar in the Alt Screen",
             Self::UserInitiatedClose => "Attempted to either quit the app or close a window",
@@ -6651,10 +6398,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::AgentModeCodeFilesNavigated => "Agent Mode Code files navigated",
             Self::AgentModeCodeDiffHunksNavigated => "Agent Mode Code diff hunks navigated",
-            Self::EnvVarCollectionInvoked => "Invoked an environment variables object",
-            Self::EnvVarWorkflowParameterization => {
-                "Selected from environment variables dropdown to parameterize workflow"
-            }
             Self::ObjectLinkCopied => "The web link to an object has been copied.",
             Self::FileTreeToggled => "Opened the file tree/project explorer",
             Self::GlobalSearchOpened => "Opened the global search view",
@@ -6725,14 +6468,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ToggleGlobalAI => "Toggled global AI enablement.",
             Self::ToggleActiveAI => "Toggled active AI enablement.",
             Self::ToggleLigatureRendering => "Toggled ligature rendering",
-            Self::WorkflowAliasAdded => "Added an alias to a Warp Drive workflow",
-            Self::WorkflowAliasRemoved => "Removed an alias from a Warp Drive workflow",
-            Self::WorkflowAliasArgumentEdited => {
-                "Edited an argument in a Warp Drive workflow alias"
-            }
-            Self::WorkflowAliasEnvVarsAttached => {
-                "Added or removed environment variables for a Warp Drive workflow alias"
-            }
             Self::ToggledAgentModeAutoexecuteReadonlyCommandsSetting => {
                 "Toggled setting to autoexecute readonly Agent Mode requested commands"
             }
@@ -6775,7 +6510,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ActiveIndexedReposChanged => {
                 "Active indexed repositories changed, affecting codebase context."
             }
-            Self::ExecutedWarpDrivePrompt => "Executed a saved prompt.",
             Self::ImageReceived => "Received an image through an image protocol over the pty",
             Self::FileExceededContextLimit => "File from AI exceeded context limit",
             Self::AgentModeError => "Received an error when getting Agent Mode response",

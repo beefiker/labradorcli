@@ -11,11 +11,9 @@ use warpui::{AppContext, GetSingletonModelHandle, SingletonEntity as _, UpdateMo
 
 use crate::ai::agent::conversation::ServerAIConversationMetadata;
 use crate::ai::agent_sdk::driver::{AgentDriverError, WARP_DRIVE_SYNC_TIMEOUT};
-use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::agent_sdk::{AmbientAgentTaskId, Owner};
 use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::auth::auth_state::AuthStateProvider;
-use crate::cloud_object::Owner;
-use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ai::AIClient;
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_workspaces::UserWorkspaces;

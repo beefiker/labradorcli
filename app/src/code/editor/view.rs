@@ -2,7 +2,6 @@
 // Adding this file level gate as some of the code around editability is not used in WASM yet.
 
 use crate::code::editor::{
-    comment_editor::{CommentEditor, CommentEditorEvent},
     comments::PendingComment,
     diff::DiffStatus,
     element::{
@@ -25,7 +24,6 @@ use crate::{
     code_review::comments::{CommentId, CommentOrigin},
     editor::InteractionState,
     features::FeatureFlag,
-    notebooks::editor::rich_text_styles,
     settings::{AppEditorSettings, FontSettings},
     view_components::find::FindDirection,
 };
@@ -272,7 +270,6 @@ pub struct CodeEditorView {
     vim_model: ModelHandle<VimModel>,
     // Track the most recent Vim search direction to determine how to cycle (n/N) thereafter.
     last_search_direction: Direction,
-    active_comment_editor: ViewHandle<CommentEditor>,
     /// TODO: maybe turn into a map for fast UUID or range lookup
     comment_locations: Vec<SavedComment>,
     /// Save position of the comment button rendered within this code editor view.
@@ -369,13 +366,6 @@ impl CodeEditorView {
             ctx.notify();
         });
 
-        let comment_model = model.as_ref(ctx).comments().clone();
-        let comment_editor =
-            ctx.add_typed_action_view(|ctx| CommentEditor::new(ctx, comment_model));
-        ctx.subscribe_to_view(&comment_editor, |me, _, event, ctx| {
-            me.handle_comment_editor_event(event, ctx);
-        });
-
         Self {
             searcher,
             find_bar: Some(find_bar),
@@ -417,7 +407,6 @@ impl CodeEditorView {
             supports_vim_mode,
             vim_model,
             last_search_direction: Direction::Forward,
-            active_comment_editor: comment_editor,
             comment_save_position_id: format!("code_editor_comment_{}", ctx.view_id()),
             show_comment_editor_provider: render_options.show_comment_editor_provider,
             find_references_save_position_id: format!(
@@ -1104,42 +1093,6 @@ impl CodeEditorView {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    fn handle_comment_editor_event(
-        &mut self,
-        event: &CommentEditorEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            CommentEditorEvent::ContentChanged => {
-                // Handle comment content changes if needed
-                ctx.notify();
-            }
-            CommentEditorEvent::CommentSaved {
-                id,
-                comment_text,
-                line,
-            } => {
-                let Some(line) = line else {
-                    debug_assert!(false, "Comment saved event missing line information");
-                    return;
-                };
-                self.save_comment(*id, comment_text, line, ctx);
-            }
-            CommentEditorEvent::CloseEditor => {
-                // Close the comment editor by updating the pending comment state to Closed
-                self.model.update(ctx, |model, ctx| {
-                    model.comments().update(ctx, |comments, _| {
-                        comments.pending_comment = PendingComment::Closed;
-                    });
-                });
-                ctx.notify();
-            }
-            CommentEditorEvent::DeleteComment { id } => {
-                ctx.emit(CodeEditorEvent::DeleteComment { id: *id });
             }
         }
     }
@@ -2091,17 +2044,6 @@ impl CodeEditorView {
             return;
         }
 
-        self.active_comment_editor
-            .update(ctx, |comment_editor, ctx| {
-                comment_editor.reopen_saved_comment(
-                    id,
-                    Some(location.clone()),
-                    comment_text,
-                    origin,
-                    ctx,
-                );
-            });
-
         self.model.update(ctx, |editor_model, ctx| {
             editor_model.reopen_comment_line(id, location, comment_text, origin, ctx);
         });
@@ -2292,40 +2234,9 @@ impl View for CodeEditorView {
             stack.add_overlay_child(dialog);
         }
 
-        if !FeatureFlag::EmbeddedCodeReviewComments.is_enabled() {
-            // Render the open comment editor.
-            if let PendingComment::Open { line, .. } = pending_comment {
-                let render_state_ref = render_state.as_ref(app);
-                let vertical_offset = render_state_ref
-                    .vertical_offset_at_render_location(line.clone().into_render_line_location())
-                    .unwrap_or_default()
-                    + render_state_ref.styles().base_line_height();
-
-                let line_location = app.element_position_by_id_at_last_frame(
-                    self.window_id,
-                    &self.comment_save_position_id,
-                );
-
-                let should_render_comment_editor = match line_location {
-                    Some(line_location) => self
-                        .show_comment_editor_provider
-                        .should_show_comment_editor(line_location, app),
-                    None => true,
-                };
-
-                if should_render_comment_editor {
-                    stack.add_positioned_child(
-                        ChildView::new(&self.active_comment_editor).finish(),
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(0., vertical_offset.as_f32()),
-                            ParentOffsetBounds::ParentByPosition,
-                            ParentAnchor::TopLeft,
-                            ChildAnchor::TopLeft,
-                        ),
-                    );
-                }
-            }
-        }
+        // Comment editor overlay rendering was removed alongside the rich-text editor
+        // module; the underlying view type no longer exists.
+        let _ = pending_comment;
         stack.finish()
     }
 
@@ -2360,32 +2271,25 @@ impl View for CodeEditorView {
     }
 }
 
+// `code_text_styles` previously composed `notebooks::editor::rich_text_styles`
+// before applying code-editor-specific overrides. With the notebooks editor
+// gone, this helper has no body it can supply; call sites are broken in the
+// Dwarf fork until the rich-text editor is reimplemented or replaced.
 pub fn code_text_styles(
-    appearance: &Appearance,
-    font_settings: &FontSettings,
-    line_height_override: Option<f32>,
+    _appearance: &Appearance,
+    _font_settings: &FontSettings,
+    _line_height_override: Option<f32>,
 ) -> RichTextStyles {
-    let mut styling = rich_text_styles(appearance, font_settings);
-    let theme = appearance.theme();
-    styling.base_text = ParagraphStyles {
-        font_size: appearance.monospace_font_size(),
-        line_height_ratio: line_height_override.unwrap_or(appearance.line_height_ratio()),
-        font_family: appearance.monospace_font_family(),
-        font_weight: Default::default(),
-        text_color: theme.main_text_color(theme.background()).into_solid(),
-        baseline_ratio: 0.8,
-        fixed_width_tab_size: Some(4),
-    };
-    styling.block_spacings.text = BlockSpacing {
-        margin: Margin::uniform(0.).with_left(1.),
-        padding: Padding::uniform(0.),
-    };
-    styling.show_placeholder_text_on_empty_block = false;
-    styling.minimum_paragraph_height = None;
-    styling.cursor_width = 2.;
-    // URLs are not clickable in code editors, so we should not highlight them.
-    styling.highlight_urls = false;
-    styling
+    rich_text_styles_placeholder()
+}
+
+fn rich_text_styles_placeholder() -> RichTextStyles {
+    // The underlying `RichTextStyles` constructor lived in the deleted
+    // `notebooks::editor` module. There is no surviving constructor; calling
+    // this function will panic at runtime.
+    panic!(
+        "rich text editor styling is unavailable in this fork; the notebooks editor was removed"
+    );
 }
 
 #[cfg(feature = "integration_tests")]

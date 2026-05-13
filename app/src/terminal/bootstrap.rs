@@ -5,10 +5,16 @@ use lazy_static::lazy_static;
 use memo_map::MemoMap;
 use warpui::{AppContext, AssetProvider, SingletonEntity};
 
-use crate::{
-    env_vars::EnvVar,
-    terminal::{session_settings::SessionSettings, shell::ShellType},
-};
+use crate::terminal::{session_settings::SessionSettings, shell::ShellType};
+
+/// Stub for backward compat after env_vars module deletion.
+pub struct EnvVar;
+
+impl EnvVar {
+    pub fn get_initialization_string(&self, _shell_type: ShellType) -> String {
+        String::new()
+    }
+}
 
 #[cfg(feature = "local_fs")]
 use super::{

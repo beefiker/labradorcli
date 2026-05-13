@@ -24,7 +24,7 @@ use crate::code_review::context::{
 use crate::{
     ai::agent::CurrentHead,
     code::editor::view::CodeEditorRenderOptions,
-    code::editor::{CommentEditor, CommentEditorEvent, EditorCommentsModel, EditorReviewComment},
+    code::editor::EditorReviewComment,
     code_review::{comments::ReviewCommentBatch, DiffSetScope},
 };
 use crate::{
@@ -740,8 +740,6 @@ pub struct CodeReviewView {
     find_model: ModelHandle<CodeReviewFindModel>,
     find_bar: ViewHandle<Find<CodeReviewFindModel>>,
     comment_list_view: ViewHandle<crate::code_review::comment_list_view::CommentListView>,
-    /// Optional overlay composer for creating a new review-level comment.
-    comment_composer: Option<ViewHandle<CommentEditor>>,
 
     /// Precise position to auto-scroll to once editor layout completes
     pending_precise_scroll: Option<PendingPreciseScroll>,
@@ -1440,7 +1438,6 @@ impl CodeReviewView {
             find_model,
             find_bar,
             comment_list_view,
-            comment_composer: None,
             pending_precise_scroll: None,
             pending_jump_to_comment: None,
             active_comment_model: None,
@@ -1847,81 +1844,10 @@ impl CodeReviewView {
 
     fn open_review_comment_composer(
         &mut self,
-        existing_comment: Option<AttachedReviewComment>,
-        ctx: &mut ViewContext<Self>,
+        _existing_comment: Option<AttachedReviewComment>,
+        _ctx: &mut ViewContext<Self>,
     ) {
-        if self.comment_composer.is_some() {
-            return;
-        }
-
-        let comment_model = ctx.add_model(EditorCommentsModel::new);
-        let comment_model_handle = comment_model.clone();
-
-        let composer = ctx.add_typed_action_view(move |ctx| {
-            CommentEditor::new(ctx, comment_model_handle.clone())
-        });
-
-        if let Some(comment) = &existing_comment {
-            composer.update(ctx, |editor, ctx| {
-                editor.reopen_saved_comment(
-                    &comment.id,
-                    None,
-                    &comment.content,
-                    &comment.origin,
-                    ctx,
-                );
-            });
-        }
-
-        ctx.subscribe_to_view(&composer, |me, _, event, ctx| match event {
-            CommentEditorEvent::CommentSaved {
-                id, comment_text, ..
-            } => {
-                if let Some(id) = id {
-                    if let Some(comment) = me.get_comment_by_id(*id, ctx) {
-                        let mut updated = comment;
-                        updated.content = comment_text.clone();
-                        updated.last_update_time = chrono::Local::now();
-                        me.update_review_comment(updated, ctx);
-                    }
-                } else {
-                    let base = me.get_diff_base(ctx).ok();
-                    let head = me.get_current_head(ctx);
-                    let new_comment = AttachedReviewComment {
-                        id: CommentId::new(),
-                        content: comment_text.clone(),
-                        target: AttachedReviewCommentTarget::General,
-                        last_update_time: chrono::Local::now(),
-                        base,
-                        head,
-                        outdated: false,
-                        origin: CommentOrigin::Native,
-                    };
-
-                    me.update_review_comment(new_comment, ctx);
-                }
-            }
-            CommentEditorEvent::DeleteComment { id } => {
-                me.delete_comment_by_id(*id, ctx);
-                me.comment_composer = None;
-                me.update_header_dropdown_active_state(ctx);
-                ctx.notify();
-            }
-            CommentEditorEvent::CloseEditor => {
-                me.comment_composer = None;
-                me.update_header_dropdown_active_state(ctx);
-                ctx.notify();
-            }
-            _ => {}
-        });
-
-        self.comment_composer = Some(composer.clone());
-
-        // Focus the comment editor when the composer opens
-        ctx.focus(&composer);
-
-        self.update_header_dropdown_active_state(ctx);
-        ctx.notify();
+        // Composer disabled: CommentEditor was removed alongside notebooks::editor.
     }
 
     fn handle_edit_comment(&mut self, comment_id: &CommentId, ctx: &mut ViewContext<Self>) {
@@ -2529,7 +2455,7 @@ impl CodeReviewView {
     }
 
     fn update_header_dropdown_active_state(&mut self, ctx: &mut ViewContext<Self>) {
-        let is_active = self.header_menu_open || self.comment_composer.is_some();
+        let is_active = self.header_menu_open;
         self.header_dropdown_button.update(ctx, |button, ctx| {
             button.set_active(is_active, ctx);
         });
@@ -7266,30 +7192,7 @@ impl View for CodeReviewView {
             .with_child(content_with_handler)
             .with_constrain_absolute_children();
 
-        // Pane-level comment composer overlay, anchored to the header position.
-        if let Some(composer) = &self.comment_composer {
-            let editor = ChildView::new(composer).finish();
-            let styled_composer = Container::new(
-                ConstrainedBox::new(editor)
-                    .with_max_width(DEFAULT_COMMENT_MAX_WIDTH)
-                    .with_max_height(260.)
-                    .finish(),
-            )
-            .with_margin_left(32.)
-            .with_margin_right(32.)
-            .finish();
-
-            stack.add_positioned_child(
-                styled_composer,
-                OffsetPositioning::offset_from_save_position_element(
-                    self.header_position_id.as_str(),
-                    vec2f(0., -40.),
-                    PositionedElementOffsetBounds::ParentByPosition,
-                    PositionedElementAnchor::BottomRight,
-                    ChildAnchor::TopRight,
-                ),
-            );
-        }
+        // Pane-level comment composer overlay removed alongside CommentEditor.
 
         // Header dropdown menu is rendered inline with the header button in CodeReviewHeader
 

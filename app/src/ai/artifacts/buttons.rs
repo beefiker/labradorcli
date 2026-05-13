@@ -5,7 +5,6 @@ use warp_core::ui::theme::AnsiColorIdentifier;
 use warpui::elements::{ChildView, Element, Empty, ParentElement, Wrap};
 use warpui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
-use crate::notebooks::NotebookId;
 use crate::terminal::input::MenuPositioning;
 
 use super::file_button_label;
@@ -54,7 +53,7 @@ impl ArtifactButtonsRow {
 }
 
 pub enum ArtifactButtonsRowEvent {
-    OpenPlan { notebook_uid: NotebookId },
+    OpenPlan { notebook_uid: String },
     CopyBranch { branch: String },
     OpenPullRequest { url: String },
     ViewScreenshots { artifact_uids: Vec<String> },
@@ -63,7 +62,7 @@ pub enum ArtifactButtonsRowEvent {
 
 #[derive(Debug, Clone)]
 pub enum ArtifactButtonAction {
-    OpenPlan { notebook_uid: NotebookId },
+    OpenPlan { notebook_uid: String },
     CopyBranch { branch: String },
     OpenPullRequest { url: String },
     ViewScreenshots { artifact_uids: Vec<String> },
@@ -102,7 +101,7 @@ impl TypedActionView for ArtifactButtonsRow {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         let event = match action {
             ArtifactButtonAction::OpenPlan { notebook_uid } => ArtifactButtonsRowEvent::OpenPlan {
-                notebook_uid: *notebook_uid,
+                notebook_uid: notebook_uid.clone(),
             },
             ArtifactButtonAction::CopyBranch { branch } => ArtifactButtonsRowEvent::CopyBranch {
                 branch: branch.clone(),
@@ -145,8 +144,9 @@ fn collect_buttons(
                 if let Some(notebook_uid) = notebook_uid {
                     let button_text = title.clone().unwrap_or("Untitled Plan".to_string());
                     let theme = theme.clone();
+                    let notebook_uid = notebook_uid.clone();
                     buttons.push(ctx.add_typed_action_view(move |_| {
-                        make_plan_button(button_text, *notebook_uid, theme)
+                        make_plan_button(button_text, notebook_uid.clone(), theme)
                     }));
                 }
             }
@@ -206,7 +206,7 @@ fn collect_buttons(
 
 fn make_plan_button(
     title: String,
-    notebook_uid: NotebookId,
+    notebook_uid: String,
     theme: Arc<dyn ActionButtonTheme>,
 ) -> ActionButton {
     make_artifact_button(

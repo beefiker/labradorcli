@@ -619,7 +619,6 @@ fn realistic_nav_items() -> Vec<SettingsNavItem> {
             "Agents",
             SettingsSection::ai_subpages().to_vec(),
         )),
-        SettingsNavItem::Page(SettingsSection::BillingAndUsage),
         SettingsNavItem::Umbrella(SettingsUmbrella::new(
             "Code",
             SettingsSection::code_subpages().to_vec(),
@@ -646,9 +645,9 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
     // All umbrellas default to collapsed.
     let stops = build_nav_stops(&nav_items, |_| true);
 
-    // Expect: Account, <Agents umbrella>, BillingAndUsage, <Code umbrella>,
-    // <Cloud platform umbrella>, Teams.
-    assert_eq!(stops.len(), 6);
+    // Expect: Account, <Agents umbrella>, <Code umbrella>,
+    // <Cloud platform umbrella>.
+    assert_eq!(stops.len(), 4);
     assert!(matches!(
         stops[0],
         NavStop::Section(SettingsSection::Account)
@@ -663,20 +662,16 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
     ));
     assert!(matches!(
         stops[2],
-        NavStop::Section(SettingsSection::BillingAndUsage)
-    ));
-    assert!(matches!(
-        stops[3],
         NavStop::CollapsedUmbrella {
-            nav_index: 3,
+            nav_index: 2,
             first_subpage: SettingsSection::CodeIndexing,
             last_subpage: SettingsSection::EditorAndCodeReview,
         }
     ));
     assert!(matches!(
-        stops[4],
+        stops[3],
         NavStop::CollapsedUmbrella {
-            nav_index: 4,
+            nav_index: 3,
             first_subpage: SettingsSection::CloudEnvironments,
             last_subpage: SettingsSection::CloudEnvironments,
         }
@@ -692,8 +687,7 @@ fn expanded_umbrella_produces_section_stop_per_subpage() {
     let stops = build_nav_stops(&nav_items, |_| true);
 
     // Expect: Account, WarpAgent, AgentProfiles, AgentMCPServers, Knowledge,
-    // ThirdPartyCLIAgents, BillingAndUsage, <Code umbrella>,
-    // <Cloud platform umbrella>, Teams.
+    // ThirdPartyCLIAgents, <Code umbrella>, <Cloud platform umbrella>.
     let sections: Vec<_> = stops
         .iter()
         .map(|s| match s {
@@ -710,10 +704,8 @@ fn expanded_umbrella_produces_section_stop_per_subpage() {
             "AgentMCPServers",
             "Knowledge",
             "ThirdPartyCLIAgents",
-            "BillingAndUsage",
+            "Umbrella@2",
             "Umbrella@3",
-            "Umbrella@4",
-            "Teams",
         ]
     );
 }
@@ -799,15 +791,6 @@ fn filtered_out_top_level_page_is_skipped() {
 // ── current_stop_index ──────────────────────────────────────────────────────
 
 #[test]
-fn current_stop_index_matches_section_stop() {
-    let nav_items = realistic_nav_items();
-    let stops = build_nav_stops(&nav_items, |_| true);
-
-    let idx = current_stop_index(&stops, &nav_items, SettingsSection::BillingAndUsage);
-    assert_eq!(idx, Some(2));
-}
-
-#[test]
 fn current_stop_index_maps_subpage_to_collapsed_umbrella() {
     // Edge case: the user manually collapsed the Agents umbrella while still
     // on one of its subpages. The collapsed umbrella should match as the
@@ -888,8 +871,6 @@ fn arrow_down_from_account_with_collapsed_agents_lands_on_first_subpage() {
     let nav_items = realistic_nav_items();
     let stops = build_nav_stops(&nav_items, |_| true);
 
-    // Pressing Down from Account should auto-expand Agents and select WarpAgent,
-    // not skip over to BillingAndUsage.
     let next = simulate_cycle(
         &nav_items,
         &stops,
@@ -900,77 +881,25 @@ fn arrow_down_from_account_with_collapsed_agents_lands_on_first_subpage() {
 }
 
 #[test]
-fn arrow_up_from_billing_and_usage_with_collapsed_agents_lands_on_last_subpage() {
-    let nav_items = realistic_nav_items();
-    let stops = build_nav_stops(&nav_items, |_| true);
-
-    // Pressing Up from BillingAndUsage should land on the collapsed Agents
-    // umbrella, which resolves to ThirdPartyCLIAgents (last visible subpage)
-    // so the user continues moving in natural reading order rather than being
-    // jumped back to the top of the umbrella.
-    let next = simulate_cycle(
-        &nav_items,
-        &stops,
-        SettingsSection::BillingAndUsage,
-        CycleDirection::Up,
-    );
-    assert_eq!(next, SettingsSection::ThirdPartyCLIAgents);
-}
-
-#[test]
-fn arrow_up_into_collapsed_umbrella_respects_search_filter_for_last_subpage() {
-    let nav_items = realistic_nav_items();
-    // Hide the last two AI subpages; the last *visible* subpage of the
-    // still-collapsed Agents umbrella should be AgentMCPServers.
-    let is_visible = |section: SettingsSection| {
-        !matches!(
-            section,
-            SettingsSection::Knowledge | SettingsSection::ThirdPartyCLIAgents
-        )
-    };
-    let stops = build_nav_stops(&nav_items, is_visible);
-
-    // From BillingAndUsage, Up should land on the last *visible* AI subpage
-    // (AgentMCPServers), not on the filtered-out Knowledge/ThirdPartyCLIAgents
-    // or on the first subpage WarpAgent.
-    let next = simulate_cycle(
-        &nav_items,
-        &stops,
-        SettingsSection::BillingAndUsage,
-        CycleDirection::Up,
-    );
-    assert_eq!(next, SettingsSection::AgentMCPServers);
-}
-
-#[test]
-fn arrow_down_from_expanded_last_subpage_leaves_umbrella() {
-    let mut nav_items = realistic_nav_items();
-    set_expanded(&mut nav_items, 1, true); // expand Agents
-    let stops = build_nav_stops(&nav_items, |_| true);
-
-    // ThirdPartyCLIAgents is the last Agents subpage; Down should move to
-    // BillingAndUsage (the next top-level page in the nav order).
-    let next = simulate_cycle(
-        &nav_items,
-        &stops,
-        SettingsSection::ThirdPartyCLIAgents,
-        CycleDirection::Down,
-    );
-    assert_eq!(next, SettingsSection::BillingAndUsage);
-}
-
-#[test]
 fn arrow_down_across_adjacent_collapsed_umbrellas() {
     let nav_items = realistic_nav_items();
-    // Both Code and Cloud platform umbrellas are collapsed.
     let stops = build_nav_stops(&nav_items, |_| true);
 
-    // From BillingAndUsage, Down should land on the first Code subpage
-    // (Code umbrella auto-expands).
+    // From Account, Down should auto-expand Agents and land on its first subpage.
+    let next_after_account = simulate_cycle(
+        &nav_items,
+        &stops,
+        SettingsSection::Account,
+        CycleDirection::Down,
+    );
+    assert_eq!(next_after_account, SettingsSection::WarpAgent);
+
+    // From WarpAgent (collapsed Agents umbrella), Down should land on the first
+    // Code subpage (Code umbrella auto-expands).
     let next_after_billing = simulate_cycle(
         &nav_items,
         &stops,
-        SettingsSection::BillingAndUsage,
+        SettingsSection::WarpAgent,
         CycleDirection::Down,
     );
     assert_eq!(next_after_billing, SettingsSection::CodeIndexing);

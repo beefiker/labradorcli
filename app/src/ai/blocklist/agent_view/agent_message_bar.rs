@@ -23,7 +23,7 @@ use crate::ai::blocklist::{
     BlocklistAIContextEvent, BlocklistAIContextModel, BlocklistAIHistoryEvent,
     BlocklistAIInputEvent, BlocklistAIInputModel,
 };
-use crate::ai::document::ai_document_model::{AIDocumentModel, AIDocumentModelEvent};
+
 use crate::ai::mcp::{
     templatable_manager::{FigmaMcpStatus, TemplatableMCPServerManagerEvent},
     TemplatableMCPServerManager,

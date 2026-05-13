@@ -26,7 +26,7 @@ use warp_managed_secrets::{client::SecretOwner, ManagedSecretManager, ManagedSec
 use warpui::{platform::TerminationMode, AppContext, SingletonEntity as _};
 
 use crate::{
-    auth::UserUid, cloud_object::Owner, server::ids::ServerId,
+    ai::agent_sdk::Owner, auth::UserUid, server::ids::ServerId,
     util::time_format::format_approx_duration_from_now_utc,
 };
 

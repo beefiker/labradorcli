@@ -2,12 +2,10 @@ pub mod ai;
 pub mod auth;
 pub mod harness_support;
 pub mod managed_secrets;
-pub mod object;
 pub(crate) mod presigned_upload;
 pub mod team;
 pub mod workspace;
 
-use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::get_relevant_files::api::{GetRelevantFiles, GetRelevantFilesResponse};
 use crate::ai::predict::generate_ai_input_suggestions;
 use crate::ai::predict::generate_ai_input_suggestions::GenerateAIInputSuggestionsRequest;
@@ -25,7 +23,6 @@ use base64::prelude::BASE64_URL_SAFE;
 use base64::Engine;
 use channel_versions::ChannelVersions;
 use futures::StreamExt;
-use object::ObjectClient;
 use prost::Message;
 use team::TeamClient;
 use url::Url;
@@ -398,9 +395,9 @@ pub struct ServerApi {
     /// Cached ambient workload token for requests from ambient agents.
     ambient_workload_token: Arc<Mutex<Option<warp_isolation_platform::WorkloadToken>>>,
     /// The ambient agent task ID for requests from cloud agents.
-    ambient_agent_task_id: Arc<RwLock<Option<AmbientAgentTaskId>>>,
+    ambient_agent_task_id: Arc<RwLock<Option<crate::ai::agent_sdk::AmbientAgentTaskId>>>,
     /// The source of agent runs (e.g. CLI, GitHub Action). Set once at startup and immutable.
-    agent_source: Option<ai::AgentSource>,
+    agent_source: Option<()>,
 
     #[cfg(feature = "agent_mode_evals")]
     eval_user_id: Option<i32>,
@@ -410,7 +407,7 @@ impl ServerApi {
     fn new(
         auth_state: Arc<AuthState>,
         event_sender: async_channel::Sender<ServerApiEvent>,
-        agent_source: Option<ai::AgentSource>,
+        agent_source: Option<()>,
     ) -> Self {
         // We generate a random user ID for evals so we can run evals in parallel.
         #[cfg(feature = "agent_mode_evals")]
@@ -458,7 +455,10 @@ impl ServerApi {
     }
 
     /// Sets the ambient agent task ID to be sent with all subsequent requests.
-    pub fn set_ambient_agent_task_id(&self, task_id: Option<AmbientAgentTaskId>) {
+    pub fn set_ambient_agent_task_id(
+        &self,
+        task_id: Option<crate::ai::agent_sdk::AmbientAgentTaskId>,
+    ) {
         *self.ambient_agent_task_id.write() = task_id;
     }
 
@@ -1299,7 +1299,7 @@ impl ServerApiProvider {
     /// Constructs a new ServerApiProvider.
     pub fn new(
         auth_state: Arc<AuthState>,
-        agent_source: Option<ai::AgentSource>,
+        agent_source: Option<()>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
         let (event_sender, event_receiver) = async_channel::bounded(10);
@@ -1389,10 +1389,6 @@ impl ServerApiProvider {
     }
 
     pub fn get_ai_client(&self) -> Arc<dyn AIClient> {
-        self.server_api.clone()
-    }
-
-    pub fn get_cloud_objects_client(&self) -> Arc<dyn ObjectClient> {
         self.server_api.clone()
     }
 

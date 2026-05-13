@@ -11,7 +11,6 @@ use crate::{
             BlocklistAIInputModel,
         },
         execution_profiles::profiles::AIExecutionProfilesModel,
-        AIRequestUsageModel,
     },
     appearance::Appearance,
     completer::SessionContext,
@@ -37,7 +36,6 @@ use crate::{
         profile_model_selector::{ProfileModelSelector, ProfileModelSelectorEvent},
         session_settings::{SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection},
         shared_session::SharedSessionStatus,
-        view::ambient_agent::{AmbientAgentViewModel, ModelSelector, ModelSelectorEvent},
         view::init::OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING,
         view::TerminalAction,
         CLIAgent, TerminalModel,
@@ -185,7 +183,6 @@ pub struct AgentInputFooter {
     model_selector: ViewHandle<ProfileModelSelector>,
     ftu_callout_close_button: ViewHandle<ActionButton>,
     prompt_alert: ViewHandle<PromptAlertView>,
-    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
     left_display_chips: Vec<ViewHandle<DisplayChip>>,
     right_display_chips: Vec<ViewHandle<DisplayChip>>,
     // Separate set of display chips for the CLI agent footer.
@@ -220,7 +217,6 @@ pub struct AgentInputFooter {
     cli_voice_input_state: CLIVoiceInputState,
     #[cfg(feature = "voice_input")]
     cli_transcription_handle: Option<SpawnedFutureHandle>,
-    v2_model_selector: Option<ViewHandle<ModelSelector>>,
 }
 
 impl AgentInputFooter {
@@ -230,7 +226,6 @@ impl AgentInputFooter {
         terminal_view_id: EntityId,
         ai_input_model: ModelHandle<BlocklistAIInputModel>,
         terminal_model: Arc<FairMutex<TerminalModel>>,
-        ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
         prompt: ModelHandle<PromptType>,
         display_chip_config: DisplayChipConfig,
         ctx: &mut ViewContext<Self>,
@@ -549,7 +544,6 @@ impl AgentInputFooter {
                 menu_positioning_provider.clone(),
                 terminal_view_id,
                 ai_input_model,
-                ambient_agent_view_model.clone(),
                 terminal_model.clone(),
                 None,
                 ctx,
@@ -562,12 +556,6 @@ impl AgentInputFooter {
             me.handle_profile_model_selector_event(event, ctx);
         });
 
-        if let Some(ambient_agent_view_model) = ambient_agent_view_model.as_ref() {
-            ctx.subscribe_to_model(ambient_agent_view_model, |_, _, _, ctx| {
-                ctx.notify();
-            });
-        }
-
         let prompt_alert = ctx.add_typed_action_view(PromptAlertView::new);
         ctx.subscribe_to_view(&prompt_alert, |_, _, event, ctx| {
             ctx.emit(AgentInputFooterEvent::PromptAlert(event.clone()));
@@ -579,9 +567,7 @@ impl AgentInputFooter {
         ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |_, _, _, ctx| {
             ctx.notify();
         });
-        ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |_, _, _, ctx| {
-            ctx.notify()
-        });
+        // AIRequestUsageModel removed; no subscription needed.
         ctx.subscribe_to_model(&AISettings::handle(ctx), |_, _, event, ctx| {
             if let AISettingsChangedEvent::AIAutoDetectionEnabled { .. } = event {
                 ctx.notify()
@@ -653,27 +639,11 @@ impl AgentInputFooter {
             me.update_display_chips(&model, ctx);
         });
 
-        let v2_model_selector = if FeatureFlag::CloudModeInputV2.is_enabled() {
-            let view = ctx.add_typed_action_view(|ctx| {
-                ModelSelector::new(menu_positioning_provider.clone(), terminal_view_id, ctx)
-            });
-            ctx.subscribe_to_view(&view, |_, _, event, ctx| match event {
-                ModelSelectorEvent::MenuVisibilityChanged { open } => {
-                    if *open {
-                        ctx.emit(AgentInputFooterEvent::ModelSelectorOpened);
-                    } else {
-                        ctx.emit(AgentInputFooterEvent::ModelSelectorClosed);
-                    }
-                }
-            });
-            Some(view)
-        } else {
-            None
-        };
+        let _ = menu_positioning_provider;
+        let _ = terminal_view_id;
 
         let mut me = Self {
             terminal_view_id,
-            ambient_agent_view_model,
             nld_button,
             mic_button,
             file_button,
@@ -709,7 +679,6 @@ impl AgentInputFooter {
                         ctx.dispatch_typed_action(AgentInputFooterAction::DismissFtuModelCallout);
                     })
             }),
-            v2_model_selector,
         };
         me.sync_fast_forward_button(ctx);
         me.update_context_window_button(ctx);
@@ -729,29 +698,14 @@ impl AgentInputFooter {
         ctx.notify();
     }
 
-    pub fn is_v2_model_selector_open(&self, app: &AppContext) -> bool {
-        self.v2_model_selector
-            .as_ref()
-            .is_some_and(|s| s.as_ref(app).is_menu_open())
+    pub fn is_v2_model_selector_open(&self, _app: &AppContext) -> bool {
+        false
     }
 
-    pub fn open_v2_model_selector(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(selector) = self.v2_model_selector.clone() {
-            selector.update(ctx, |s, ctx| s.open_menu(ctx));
-        }
-    }
+    pub fn open_v2_model_selector(&mut self, _ctx: &mut ViewContext<Self>) {}
 
-    fn should_render_cloud_mode_v2(&self, app: &AppContext) -> bool {
-        FeatureFlag::CloudModeInputV2.is_enabled()
-            && FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model
-                        .as_ref(app)
-                        .is_configuring_ambient_agent()
-                })
+    fn should_render_cloud_mode_v2(&self, _app: &AppContext) -> bool {
+        false
     }
 
     fn render_cloud_mode_v2_footer(&self, app: &AppContext) -> Box<dyn Element> {
@@ -1746,13 +1700,8 @@ impl AgentInputFooter {
         shared_status: &SharedSessionStatus,
         app: &AppContext,
     ) -> Option<Box<dyn Element>> {
-        let is_cloud_mode = FeatureFlag::CloudModeImageContext.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model.as_ref(app).is_ambient_agent()
-                });
+        let is_cloud_mode = false;
+        let _ = app;
         if !item.available_in().is_available_for_agent_view()
             || !item.available_to_session_viewer(shared_status, is_cloud_mode)
         {
@@ -1867,13 +1816,7 @@ impl View for AgentInputFooter {
             .with_run_spacing(4.)
             .with_spacing(4.);
 
-        let is_ambient_agent = FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model.as_ref(app).is_ambient_agent()
-                });
+        let is_ambient_agent = false;
         let _ = is_ambient_agent;
 
         let terminal_model = self.terminal_model.lock();

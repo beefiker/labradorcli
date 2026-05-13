@@ -30,10 +30,8 @@ use crate::ai::agent::{
     PassiveSuggestionTriggerType, RunningCommand,
 };
 use crate::ai::agent::{DocumentContentAttachmentSource, FileContext};
-use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::ai::document::ai_document_model::{
-    AIDocumentId, AIDocumentModel, AIDocumentUserEditStatus,
-};
+use crate::ai::agent_sdk::AmbientAgentTaskId;
+use ai::document::AIDocumentId;
 use crate::ai::llms::LLMId;
 use crate::ai::{
     agent::{
@@ -43,13 +41,10 @@ use crate::ai::{
         UserQueryMode,
     },
     llms::LLMPreferences,
-    AIRequestUsageModel,
 };
-use crate::cloud_object::model::persistence::CloudModel;
 use crate::features::FeatureFlag;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::network::NetworkStatus;
-use crate::notebooks::editor::model::FileLinkResolutionContext;
 use crate::persistence::ModelEvent;
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::server::server_api::AIApiError;
@@ -723,78 +718,13 @@ impl BlocklistAIController {
     }
 
     /// Populates plan documents from user query to AIDocumentModel if not already present.
-    /// Parses attachments from query and creates AI documents for any user-attached plans.
-    /// This is split from parse_context_attachments to run later in the pipeline when new conversations are created.
+    /// No-op now that AIDocumentModel / CloudModel were removed.
     fn maybe_populate_plans_for_ai_document_model(
         &self,
-        referenced_attachments: &HashMap<String, AIAgentAttachment>,
-        conversation_id: AIConversationId,
-        ctx: &mut ModelContext<Self>,
+        _referenced_attachments: &HashMap<String, AIAgentAttachment>,
+        _conversation_id: AIConversationId,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        // Get file link resolution context from active session
-        let session = self.active_session.as_ref(ctx);
-        let file_link_resolution_context =
-            session
-                .current_working_directory()
-                .cloned()
-                .map(|working_directory| FileLinkResolutionContext {
-                    working_directory,
-                    shell_launch_data: session.shell_launch_data(ctx),
-                });
-
-        for attachment in referenced_attachments.values() {
-            let AIAgentAttachment::DocumentContent {
-                document_id,
-                content,
-                source,
-                ..
-            } = attachment
-            else {
-                continue;
-            };
-            if !matches!(*source, DocumentContentAttachmentSource::UserAttached) {
-                continue;
-            }
-            let document_id = match AIDocumentId::try_from(document_id.as_str()) {
-                Ok(id) => id,
-                Err(_) => {
-                    log::warn!("Invalid ai_document_id in document content: {document_id}");
-                    continue;
-                }
-            };
-
-            // Skip if document already exists in the model
-            let ai_document_model = AIDocumentModel::as_ref(ctx);
-            if ai_document_model
-                .get_current_document(&document_id)
-                .is_some()
-            {
-                continue;
-            }
-
-            // Look up notebook to get title and sync_id
-            let cloud_model = CloudModel::as_ref(ctx);
-            let notebook_data = cloud_model
-                .get_all_active_notebooks()
-                .find(|nb| nb.model().ai_document_id.as_ref() == Some(&document_id))
-                .map(|nb| (nb.model().title.clone(), nb.id));
-
-            if let Some((title, sync_id)) = notebook_data {
-                AIDocumentModel::handle(ctx).update(ctx, |model, model_ctx| {
-                    model.create_document_from_notebook(
-                        document_id,
-                        sync_id,
-                        title,
-                        content,
-                        conversation_id,
-                        file_link_resolution_context.clone(),
-                        model_ctx,
-                    );
-                });
-            } else {
-                log::warn!("Notebook not found for ai_document_id: {document_id}");
-            }
-        }
     }
 
     pub fn send_user_query_in_new_conversation(
@@ -2084,12 +2014,8 @@ impl BlocklistAIController {
                 context_model.reset_context_to_default(ctx);
             });
 
-            // Update the document status to UpToDate after query submission
-            if let Some(doc_id) = pending_document_id {
-                AIDocumentModel::handle(ctx).update(ctx, |model, mctx| {
-                    model.set_user_edit_status(&doc_id, AIDocumentUserEditStatus::UpToDate, mctx);
-                });
-            }
+            // AIDocumentModel removed; document edit status updates are dropped.
+            let _ = pending_document_id;
         }
 
         ctx.emit(BlocklistAIControllerEvent::SentRequest {
@@ -2332,9 +2258,7 @@ impl BlocklistAIController {
                                     );
                                 },
                             );
-                            AIRequestUsageModel::handle(ctx).update(ctx, |model, ctx| {
-                                model.enable_buy_credits_banner(ctx);
-                            });
+                            // AIRequestUsageModel removed; buy-credits banner cannot be toggled.
                         }
 
                         let mut renderable_error: RenderableAIError = e.as_ref().into();
@@ -2516,9 +2440,7 @@ impl BlocklistAIController {
                     stream_id,
                     conversation_id,
                 });
-                AIRequestUsageModel::handle(ctx).update(ctx, |request_usage_model, ctx| {
-                    request_usage_model.refresh_request_usage_async(ctx);
-                });
+                // AIRequestUsageModel removed; request usage refresh skipped.
 
                 self.maybe_refresh_ai_overages(ctx);
             }
@@ -2557,7 +2479,7 @@ impl BlocklistAIController {
 
         // If a user is below their personal limits, then we know that they won't eat into overages,
         // so we don't need to refresh.
-        let has_no_requests_remaining = !AIRequestUsageModel::as_ref(ctx).has_requests_remaining();
+        let has_no_requests_remaining = false;
         // If overages aren't enabled, we're not going to reap the benefit of refreshing at all anyway.
         let are_overages_enabled = workspace.are_overages_enabled();
 

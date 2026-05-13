@@ -5,7 +5,6 @@ use crate::{
         agent::{conversation::AIConversationId, AIAgentExchangeId},
         blocklist::{agent_view::AgentViewEntryOrigin, telemetry_banner::TelemetryBanner, AIBlock},
     },
-    env_vars::env_var_collection_block::EnvVarCollectionBlock,
     terminal::{
         block_list_viewport::ScrollPositionUpdate,
         model::{
@@ -13,7 +12,6 @@ use crate::{
         },
         ssh::{error::SshErrorBlock, install_tmux::SshInstallTmuxBlock, warpify::SshWarpifyBlock},
         view::{
-            ambient_agent::AmbientAgentEntryBlock,
             block_onboarding::onboarding_agentic_suggestions_block::OnboardingAgenticSuggestionsBlock,
             init_environment::InitEnvironmentBlock,
             ssh_remote_server_choice_view::SshRemoteServerChoiceView,
@@ -239,9 +237,6 @@ pub enum RichContentMetadata {
     OnboardingAgenticSuggestions {
         agentic_suggestions_block_handle: ViewHandle<OnboardingAgenticSuggestionsBlock>,
     },
-    EnvVarCollectionBlock {
-        env_var_collection_block_handle: ViewHandle<EnvVarCollectionBlock>,
-    },
     SshWarpifyBlock {
         ssh_warpify_block_handle: ViewHandle<SshWarpifyBlock>,
     },
@@ -264,9 +259,6 @@ pub enum RichContentMetadata {
         telemetry_banner_handle: ViewHandle<TelemetryBanner>,
     },
     AgentViewEntry(AgentViewEntryMetadata),
-    AmbientAgentBlock {
-        block_handle: ViewHandle<AmbientAgentEntryBlock>,
-    },
     InlineAgentViewHeader,
     AgentViewZeroState,
     TerminalViewZeroState,

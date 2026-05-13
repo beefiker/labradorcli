@@ -22,10 +22,8 @@ use super::AuthStateProvider;
 use super::UserUid;
 use crate::ai::llms::LLMPreferences;
 use crate::ai::persisted_workspace::PersistedWorkspace;
-use crate::ai::AIRequestUsageModel;
 use crate::autoupdate::AutoupdateState;
 use crate::persistence::ModelEvent;
-use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::auth::FetchUserResult;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::{
@@ -38,7 +36,6 @@ use crate::server::{
     },
     telemetry::AnonymousUserSignupEntrypoint,
 };
-use crate::settings::cloud_preferences_syncer::CloudPreferencesSyncer;
 use crate::settings::initializer::SettingsInitializer;
 use crate::settings::PrivacySettings;
 use crate::terminal::general_settings::GeneralSettings;
@@ -358,30 +355,11 @@ impl AuthManager {
                     initializer.handle_user_fetched(self.auth_state.clone(), ctx);
                 });
 
-                // Reset the initial-load condition so that any cloud preference
-                // sync waits for the *new* user's cloud objects rather than
-                // resolving immediately against stale data from a prior session.
-                // Only do this for non-refresh fetches (login/signup), not for
-                // token refreshes where the user identity hasn't changed.
-                if !from_refresh {
-                    UpdateManager::handle(ctx).update(ctx, |manager, _| {
-                        manager.reset_initial_load();
-                    });
-                }
-
                 // Now that we have a user, start polling for team and cloud object information.
                 // The polling loop's first tick fires immediately, so there is no need for a
                 // separate out-of-band refresh here.
                 TeamTesterStatus::handle(ctx).update(ctx, |model, ctx| {
                     model.initiate_data_pollers(false, ctx);
-                });
-
-                CloudPreferencesSyncer::handle(ctx).update(ctx, |model, ctx| {
-                    model.handle_user_fetched(self.auth_state.clone(), ctx)
-                });
-
-                AIRequestUsageModel::handle(ctx).update(ctx, |usage_model, ctx| {
-                    usage_model.refresh_request_usage_async(ctx);
                 });
 
                 LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {

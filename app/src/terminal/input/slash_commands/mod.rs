@@ -25,7 +25,6 @@ use crate::ai::blocklist::agent_view::{
     AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage, ENTER_OR_EXIT_CONFIRMATION_WINDOW,
 };
 use crate::ai::blocklist::{BlocklistAIHistoryModel, SlashCommandRequest};
-use crate::cloud_object::model::persistence::CloudModel;
 use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND_REGISTRY};
 use crate::search::slash_command_menu::static_commands::Availability;
@@ -46,7 +45,6 @@ use crate::terminal::input::{
 use crate::terminal::view::TerminalAction;
 use crate::ui_components::color_dot;
 use crate::view_components::DismissibleToast;
-use crate::workflows::{WorkflowSelectionSource, WorkflowSource, WorkflowType};
 use crate::workspace::{ForkedConversationDestination, ToastStack, WorkspaceAction};
 use crate::TelemetryEvent;
 #[cfg(not(target_family = "wasm"))]
@@ -250,29 +248,7 @@ impl Input {
                 });
                 ctx.notify();
             }
-            SlashCommandsEvent::SelectedSavedPrompt { id } => {
-                let Some(workflow) = CloudModel::as_ref(ctx).get_workflow(id).cloned() else {
-                    log::warn!("Tried to execute workflow for id {id:?} but it does not exist");
-                    return;
-                };
-                let is_in_agent_view = FeatureFlag::AgentView.is_enabled()
-                    && self.agent_view_controller.as_ref(ctx).is_fullscreen();
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::SlashCommandAccepted {
-                        command_details: SlashCommandAcceptedDetails::SavedPrompt,
-                        is_in_agent_view,
-                    },
-                    ctx
-                );
-
-                self.show_workflows_info_box_on_workflow_selection(
-                    WorkflowType::Cloud(Box::new(workflow)),
-                    WorkflowSource::WarpAI,
-                    WorkflowSelectionSource::SlashMenu,
-                    None,
-                    ctx,
-                );
-            }
+            SlashCommandsEvent::SelectedSavedPrompt { id: _ } => {}
             SlashCommandsEvent::SelectedStaticCommand {
                 id,
                 cmd_or_ctrl_enter,
@@ -751,9 +727,7 @@ impl Input {
                     )
                 });
             }
-            usage if command.name == commands::USAGE.name => {
-                ctx.dispatch_typed_action(&TerminalAction::OpenBillingAndUsagePane);
-            }
+            usage if command.name == commands::USAGE.name => {}
             remote_control if command.name == commands::REMOTE_CONTROL.name => {
                 return false;
             }

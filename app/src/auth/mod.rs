@@ -20,12 +20,8 @@ pub mod web_handoff;
 use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
-use crate::ai_assistant::requests::REQUEST_LIMIT_INFO_CACHE_KEY;
 use crate::code::editor_management::{CodeEditorStatus, CodeEditorSummary};
-use crate::env_vars::manager::EnvVarCollectionManager;
-use crate::notebooks::manager::NotebookManager;
 use crate::terminal::general_settings::GeneralSettings;
-use crate::workflows::manager::WorkflowManager;
 use ::settings::{Setting, SettingsManager, ToggleableSetting};
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 pub use auth_manager::AuthManager;
@@ -38,11 +34,8 @@ use warpui::modals::{AlertDialogWithCallbacks, ModalButton};
 use warp_core::user_preferences::GetUserPreferences as _;
 use warpui::{AppContext, SingletonEntity};
 
-use crate::cloud_object::model::persistence::CloudModel;
 use crate::focus_running_window_and_show_native_modal;
 use crate::palette::PaletteMode;
-use crate::server::cloud_objects::update_manager::UpdateManager;
-use crate::server::sync_queue::SyncQueue;
 use crate::server::telemetry::{PaletteSource, TelemetryEvent};
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::{
@@ -77,8 +70,7 @@ pub fn maybe_log_out(app: &mut AppContext) {
         .long_running_cmds
         .len();
     let num_shared_sessions = crate::session_management::num_shared_sessions(app);
-    let num_unsaved_objects =
-        CloudModel::as_ref(app).num_unsaved_objects_to_warn_about_before_quitting();
+    let num_unsaved_objects: usize = 0;
 
     let code_editors = CodeEditorStatus::all_editors(app).collect_vec();
     let code_editor_summary = CodeEditorSummary::new(&code_editors);
@@ -235,25 +227,12 @@ pub fn log_out(app: &mut AppContext) {
     AgentConversationsModel::handle(app).update(app, |agent_conversations_model, _| {
         agent_conversations_model.reset();
     });
-    CloudModel::handle(app).update(app, |cloud_model, _| {
-        cloud_model.reset();
-    });
-    // Clear the sync queue so that we don't try to sync the old user's objects to the new user.
-    SyncQueue::handle(app).update(app, |sync_queue, _| {
-        sync_queue.clear();
-    });
 
-    // Stop the cloud object and workspace metadata polling loops that were started on login.
-    UpdateManager::handle(app).update(app, |manager, _| {
-        manager.stop_polling_for_updated_objects();
-    });
+    // Stop the workspace metadata polling loop that was started on login.
     TeamUpdateManager::handle(app).update(app, |manager, _| {
         manager.stop_polling_for_workspace_metadata_updates();
     });
     remove_cloud_persisted_settings(app);
-    NotebookManager::handle(app).update(app, |manager, _| manager.reset());
-    EnvVarCollectionManager::handle(app).update(app, |manager, _| manager.reset());
-    WorkflowManager::handle(app).update(app, |manager, _| manager.reset());
 
     // Stop and leave all shared sessions
     SharedSessionManager::handle(app).update(app, |manager, ctx| {
@@ -309,13 +288,6 @@ fn remove_cloud_persisted_settings(app: &mut AppContext) {
         log::error!(
             "Failed to remove Crash Reporting Enabled Defaults Key from user defaults: {e:?}"
         );
-    }
-
-    if let Err(e) = app
-        .private_user_preferences()
-        .remove_value(REQUEST_LIMIT_INFO_CACHE_KEY)
-    {
-        log::error!("Failed to remove Request Limit Defaults Key from user defaults: {e:?}");
     }
 
     // Reset the Privacy Settings in the login screen to default values.

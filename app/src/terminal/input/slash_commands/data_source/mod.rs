@@ -333,51 +333,9 @@ impl SlashCommandDataSource {
             .map(|s| s.agent.supported_skill_providers())
     }
 
-    /// Returns true when the active conversation is associated with a cloud Oz
-    /// `AmbientAgentTask`. Used to gate `/continue-locally` to runs that can
-    /// actually be forked into a local Warp conversation.
-    ///
-    /// Permissive when the harness is not yet known: we consider an absent task or
-    /// missing `agent_config_snapshot.harness` to be Oz, matching the existing
-    /// tombstone gate (`conversation_ended_tombstone_view::render_action_buttons`).
-    /// Only an explicit non-Oz harness (Claude, Gemini, OpenCode, Unknown) hides the
-    /// command. Conversations without a `task_id` are local and never qualify.
     #[cfg(not(target_family = "wasm"))]
-    fn active_conversation_is_cloud_oz(&self, ctx: &AppContext) -> bool {
-        let agent_view_state = self.agent_view_controller.as_ref(ctx).agent_view_state();
-        let conversation_id = match agent_view_state.active_conversation_id() {
-            Some(id) => id,
-            None => match BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(self.terminal_view_id)
-            {
-                Some(conv) => conv.id(),
-                None => return false,
-            },
-        };
-
-        let history = BlocklistAIHistoryModel::as_ref(ctx);
-        let Some(conversation) = history.conversation(&conversation_id) else {
-            return false;
-        };
-        let Some(task_id) = conversation.task_id() else {
-            return false;
-        };
-
-        let Some(task) = AgentConversationsModel::as_ref(ctx).get_task_data(&task_id) else {
-            // Task data not yet fetched. Permissive default: assume Oz so the command
-            // is reachable while the fetch is in flight; once the fetch resolves,
-            // `TasksUpdated` triggers a recompute and a non-Oz task hides the command.
-            return true;
-        };
-
-        match task
-            .agent_config_snapshot
-            .as_ref()
-            .and_then(|s| s.harness.as_ref())
-        {
-            Some(_) => false,
-            None => true,
-        }
+    fn active_conversation_is_cloud_oz(&self, _ctx: &AppContext) -> bool {
+        false
     }
 }
 
@@ -542,26 +500,6 @@ impl InlineItem {
             name: command.name.to_owned(),
             description: Some(command.description.to_owned()),
             font_family: appearance.monospace_font_family(),
-            name_match_result: None,
-            description_match_result: None,
-            score: OrderedFloat(f64::MIN),
-            compact_layout: false,
-        }
-    }
-
-    pub(crate) fn from_saved_prompt(
-        saved_prompt: &crate::workflows::CloudWorkflow,
-        app: &AppContext,
-    ) -> Self {
-        let appearance = Appearance::as_ref(app);
-        Self {
-            action: AcceptSlashCommandOrSavedPrompt::SavedPrompt {
-                id: saved_prompt.id,
-            },
-            icon_path: "bundled/svg/prompt.svg",
-            name: saved_prompt.model().data.name().to_owned(),
-            description: None,
-            font_family: appearance.ui_font_family(),
             name_match_result: None,
             description_match_result: None,
             score: OrderedFloat(f64::MIN),

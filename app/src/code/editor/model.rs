@@ -26,8 +26,7 @@ use warpui::units::{IntoPixels, Pixels};
 
 use crate::util::link_detection::get_word_range_at_offset;
 use crate::{
-    appearance::Appearance, editor::InteractionState, notebooks::editor::model::word_unit,
-    themes::theme::AnsiColorIdentifier,
+    appearance::Appearance, editor::InteractionState, themes::theme::AnsiColorIdentifier,
 };
 
 use ai::diff_validation::DiffDelta;
@@ -1677,12 +1676,12 @@ impl CodeEditorModel {
 
     // TODO(CLD-1593)
     pub fn forward_word(&mut self, select: bool, ctx: &mut ModelContext<Self>) {
-        self.forward_word_with_unit(select, word_unit(ctx), ctx)
+        self.forward_word_with_unit(select, TextUnit::Word, ctx)
     }
 
     // TODO(CLD-1593)
     pub fn backward_word(&mut self, select: bool, ctx: &mut ModelContext<Self>) {
-        self.backward_word_with_unit(select, word_unit(ctx), ctx)
+        self.backward_word_with_unit(select, TextUnit::Word, ctx)
     }
 
     /// Returns the word under or immediately after the primary cursor on the current line,

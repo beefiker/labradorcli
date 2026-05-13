@@ -1,8 +1,7 @@
 use super::{
     common::{
         add_command_xray_overlay, add_input_suggestions_overlays, add_voltron_overlay,
-        add_workflow_info_overlay, maybe_add_buy_credits_banner,
-        wrap_input_with_terminal_padding_and_focus_handler,
+        add_workflow_info_overlay, wrap_input_with_terminal_padding_and_focus_handler,
     },
     Input, InputAction, InputDropTargetData,
 };
@@ -64,12 +63,8 @@ const CLOUD_MODE_V2_HORIZONTAL_GUTTER: f32 = 16.;
 const CLOUD_MODE_V2_CHIPS_ROW_TOP_PADDING: f32 = 4.;
 
 impl Input {
-    pub fn is_cloud_mode_input_v2_composing(&self, app: &AppContext) -> bool {
-        FeatureFlag::CloudModeInputV2.is_enabled()
-            && FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model()
-                .is_some_and(|model| model.as_ref(app).is_configuring_ambient_agent())
+    pub fn is_cloud_mode_input_v2_composing(&self, _app: &AppContext) -> bool {
+        false
     }
 
     /// Renders the input when there is an active `AgentView`.
@@ -112,32 +107,6 @@ impl Input {
                 column.add_child(
                     Container::new(images)
                         .with_margin_top(spacing::UDI_CHIP_MARGIN)
-                        .finish(),
-                );
-            }
-        }
-
-        let show_harness_row = FeatureFlag::CloudMode.is_enabled()
-            && FeatureFlag::AgentHarness.is_enabled()
-            && self
-                .ambient_agent_view_model()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model
-                        .as_ref(app)
-                        .is_configuring_ambient_agent()
-                });
-        if show_harness_row {
-            if let Some(harness_selector) = self.harness_selector() {
-                // Temporarily render the harness selector in the cloud mode UDI until we fully
-                // implement the new designs.
-                let harness_row = Flex::row()
-                    .with_main_axis_size(MainAxisSize::Min)
-                    .with_child(ChildView::new(harness_selector).finish())
-                    .finish();
-                column.add_child(
-                    Container::new(harness_row)
-                        .with_padding_top(spacing::UDI_CHIP_MARGIN)
-                        .with_padding_bottom(4.)
                         .finish(),
                 );
             }
@@ -323,14 +292,6 @@ impl Input {
 
         let mut outer_stack = Stack::new().with_constrain_absolute_children();
         outer_stack.add_child(column.finish());
-        maybe_add_buy_credits_banner(
-            &mut outer_stack,
-            &self.buy_credits_banner,
-            self.is_pane_focused(app),
-            self.terminal_view_id,
-            self.is_input_at_top(&model, app),
-            app,
-        );
 
         SavePosition::new(outer_stack.finish(), &self.save_position_id()).finish()
     }
@@ -484,14 +445,6 @@ impl Input {
 
         let mut outer_stack = Stack::new().with_constrain_absolute_children();
         outer_stack.add_child(input);
-        maybe_add_buy_credits_banner(
-            &mut outer_stack,
-            &self.buy_credits_banner,
-            self.is_pane_focused(app),
-            self.terminal_view_id,
-            self.is_input_at_top(&model, app),
-            app,
-        );
 
         SavePosition::new(outer_stack.finish(), &self.save_position_id()).finish()
     }
@@ -529,16 +482,11 @@ impl Input {
     }
 
     fn render_cloud_mode_v2_top_row(&self) -> Box<dyn Element> {
-        let mut row = Flex::row()
+        Flex::row()
             .with_main_axis_size(MainAxisSize::Min)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(CLOUD_MODE_V2_TOP_ROW_INNER_GAP);
-
-        if let Some(harness_selector) = self.harness_selector() {
-            row.add_child(ChildView::new(harness_selector).finish());
-        }
-
-        row.finish()
+            .with_spacing(CLOUD_MODE_V2_TOP_ROW_INNER_GAP)
+            .finish()
     }
 
     fn render_cloud_mode_v2_input_container(
@@ -607,46 +555,8 @@ impl Input {
             .finish()
     }
 
-    pub(super) fn render_ambient_agent_status_footer(&self, app: &AppContext) -> Box<dyn Element> {
-        let Some(ambient_agent_model) = self.ambient_agent_view_model() else {
-            return Empty::new().finish();
-        };
-        let ambient_agent_model = ambient_agent_model.as_ref(app);
-        let mut stack = Stack::new().with_constrain_absolute_children();
-
-        // Don't render status bar when agent has failed or is waiting for session
-        let show_status_bar = ambient_agent_model.error_message().is_none()
-            && !ambient_agent_model.is_waiting_for_session();
-
-        let model = self.model.lock();
-        maybe_add_buy_credits_banner(
-            &mut stack,
-            &self.buy_credits_banner,
-            self.focus_handle.as_ref().is_none_or(|h| h.is_focused(app)),
-            self.terminal_view_id,
-            self.is_input_at_top(&model, app),
-            app,
-        );
-
-        let save_position =
-            SavePosition::new(stack.finish(), &self.status_free_input_save_position_id()).finish();
-
-        let input = Hoverable::new(self.hoverable_handle.clone(), |_| save_position)
-            .on_hover(|is_hovered, ctx, _app, _position| {
-                ctx.dispatch_typed_action(InputAction::SetUDIHovered(is_hovered));
-            })
-            .on_middle_click(|ctx, _app, _position| {
-                ctx.dispatch_typed_action(TerminalAction::MiddleClickOnInput);
-            })
-            .finish();
-
-        let mut column = Flex::column();
-        if show_status_bar {
-            column.add_child(ChildView::new(&self.agent_status_view).finish());
-        }
-        column.add_child(input);
-
-        SavePosition::new(column.finish(), &self.save_position_id()).finish()
+    pub(super) fn render_ambient_agent_status_footer(&self, _app: &AppContext) -> Box<dyn Element> {
+        Empty::new().finish()
     }
 }
 

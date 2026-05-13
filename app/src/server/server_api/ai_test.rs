@@ -7,7 +7,6 @@ use super::{
     ExecutionLocation, ListRunsResponse, ReadAgentMessageResponse, RunFollowupRequest, RunSortBy,
     RunSortOrder, TaskListFilter,
 };
-use crate::notebooks::NotebookId;
 
 #[test]
 fn test_deserialize_file_artifact_download_response() {
@@ -698,20 +697,6 @@ fn test_deserialize_list_tasks_all_tasks_valid() {
 // ---------------------------------------------------------------------------------------------------------------------
 //  We test roundtripping serialize and deserialize since we use this for persisting artifacts for local conversations.
 // ---------------------------------------------------------------------------------------------------------------------
-
-#[test]
-fn test_artifact_plan_serialize_deserialize_roundtrip() {
-    let original = Artifact::Plan {
-        document_uid: "doc-123".to_string(),
-        notebook_uid: Some(NotebookId::from("notebook12345678901234".to_string())),
-        title: Some("My Plan".to_string()),
-    };
-
-    let serialized = serde_json::to_string(&original).unwrap();
-    let deserialized: Artifact = serde_json::from_str(&serialized).unwrap();
-
-    assert_eq!(original, deserialized);
-}
 
 #[test]
 fn test_deserialize_agent_message_headers() {

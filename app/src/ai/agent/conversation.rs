@@ -1,11 +1,10 @@
 use crate::ai::agent::comment::CodeReview;
 use crate::ai::agent::linearization::compute_task_depths;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::{RequestInput, ResponseStreamId, SerializedBlockListItem};
 use crate::ai::skills::SkillDescriptor;
 use crate::code_review::CodeReviewTelemetryEvent;
-use crate::notebooks::NotebookId;
 use crate::persistence::model::{ConversationUsageMetadata, ModelTokenUsage, ToolUsageMetadata};
 use crate::server::ids::ServerId;
 use crate::terminal::general_settings::GeneralSettings;
@@ -760,9 +759,7 @@ impl AIConversation {
     }
 
     pub fn server_id(&self) -> Option<ServerId> {
-        self.server_metadata
-            .as_ref()
-            .map(|metadata| metadata.metadata.uid)
+        None
     }
 
     pub fn server_metadata(&self) -> Option<&ServerAIConversationMetadata> {
@@ -1171,7 +1168,7 @@ impl AIConversation {
     pub fn update_plan_notebook_uid(
         &mut self,
         document_uid: AIDocumentId,
-        notebook_uid: NotebookId,
+        notebook_uid: String,
         terminal_view_id: Option<EntityId>,
         ctx: &mut ModelContext<BlocklistAIHistoryModel>,
     ) {
@@ -3551,14 +3548,8 @@ pub struct ServerAIConversationMetadata {
     /// Usage metadata including token counts, credits spent, etc.
     pub usage: ConversationUsageMetadata,
 
-    /// Server metadata (revision, timestamps, creator info, etc.).
-    pub metadata: crate::cloud_object::ServerMetadata,
-
-    /// Permissions for this conversation (space, guests, link sharing).
-    pub permissions: crate::cloud_object::ServerPermissions,
-
     /// The ID of the associated ambient agent task, if any.
-    pub ambient_agent_task_id: Option<crate::ai::ambient_agents::AmbientAgentTaskId>,
+    pub ambient_agent_task_id: Option<AmbientAgentTaskId>,
 
     /// The server conversation token used to identify this conversation on the server.
     pub server_conversation_token: ServerConversationToken,

@@ -19,17 +19,13 @@ use crate::ai::agent_conversations_model::{
 use crate::ai::agent_management::agent_type_selector::{
     AgentType, AgentTypeSelector, AgentTypeSelectorEvent,
 };
-use crate::ai::agent_management::cloud_setup_guide_view::{
-    CloudSetupGuideEvent, CloudSetupGuideView,
-};
 use crate::ai::agent_management::details_action_buttons::{
     ActionButtonsConfig, AgentDetailsButtonEvent, ConversationActionButtonsRow,
 };
 use crate::ai::agent_management::telemetry::{
     AgentManagementTelemetryEvent, ArtifactType, FilterType, OpenedFrom,
 };
-use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::ai::ambient_agents::{cancel_task_with_toast, AgentSource};
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::artifacts::{Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent};
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::ai::conversation_details_panel::{
@@ -45,7 +41,6 @@ use crate::editor::{
     PropagateHorizontalNavigationKeys, SingleLineEditorOptions, TextOptions,
 };
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::notebooks::NotebookId;
 use crate::settings::ai::AISettings;
 use crate::ui_components::avatar::{Avatar, AvatarContent};
 use crate::util::time_format::format_approx_duration_from_now_utc;
@@ -58,7 +53,6 @@ use crate::view_components::compactible_action_button::{
 use crate::view_components::dropdown::{Dropdown, DropdownAction, DropdownStyle};
 use crate::view_components::DismissibleToast;
 use crate::view_components::FilterableDropdown;
-use crate::workflows::WorkflowType;
 use crate::workspace::{ForkedConversationDestination, ToastStack};
 use crate::workspace::{RestoreConversationLayout, WorkspaceAction};
 use crate::workspaces::user_workspaces::UserWorkspaces;
@@ -177,8 +171,6 @@ pub struct AgentManagementView {
     agent_type_selector: ViewHandle<AgentTypeSelector>,
     is_agent_type_selector_open: bool,
 
-    cloud_setup_guide_view: ViewHandle<CloudSetupGuideView>,
-
     all_filter_button: ViewHandle<ActionButton>,
     personal_filter_button: ViewHandle<ActionButton>,
     status_dropdown: ViewHandle<Dropdown<AgentManagementViewAction>>,
@@ -286,15 +278,6 @@ impl AgentManagementView {
                 })
         });
 
-        let cloud_setup_guide_view = ctx.add_typed_action_view(CloudSetupGuideView::new);
-        ctx.subscribe_to_view(&cloud_setup_guide_view, |_, _, event, ctx| match event {
-            CloudSetupGuideEvent::OpenNewTabAndInsertWorkflow(workflow) => {
-                ctx.emit(AgentManagementViewEvent::OpenNewTabAndRunWorkflow(
-                    Box::new(workflow.clone()),
-                ));
-            }
-        });
-
         let search_editor = ctx.add_typed_action_view(|ctx| {
             let appearance = Appearance::handle(ctx).as_ref(ctx);
             let mut editor = EditorView::single_line(
@@ -351,7 +334,6 @@ impl AgentManagementView {
             is_viewing_setup_guide: false,
             setup_guide_button,
             view_agents_button,
-            cloud_setup_guide_view,
             loading_icon_mouse_state: MouseStateHandle::default(),
             all_filter_button,
             personal_filter_button,
@@ -540,35 +522,13 @@ impl AgentManagementView {
 
     /// Build the list of source filter items.
     fn build_source_dropdown_items() -> Vec<MenuItem<DropdownAction<AgentManagementViewAction>>> {
-        // Build up the sources list
-        let mut sources = vec![
-            AgentSource::WebApp,
-            AgentSource::CloudMode,
-            AgentSource::AgentWebhook,
-            AgentSource::Cli,
-        ];
-        if FeatureFlag::InteractiveConversationManagementView.is_enabled() {
-            sources.push(AgentSource::Interactive)
-        }
-        sources.push(AgentSource::Linear);
-        sources.push(AgentSource::Slack);
-
-        let mut items = vec![MenuItem::Item(
-            MenuItemFields::new("All").with_on_select_action(DropdownAction::SelectActionAndClose(
-                AgentManagementViewAction::SetSourceFilter(SourceFilter::All),
-            )),
-        )];
-        for source in sources {
-            items.push(MenuItem::Item(
-                MenuItemFields::new(source.display_name()).with_on_select_action(
-                    DropdownAction::SelectActionAndClose(
-                        AgentManagementViewAction::SetSourceFilter(SourceFilter::Specific(source)),
-                    ),
-                ),
-            ));
-        }
-
-        items
+        vec![MenuItem::Item(
+            MenuItemFields::new("All").with_on_select_action(
+                DropdownAction::SelectActionAndClose(AgentManagementViewAction::SetSourceFilter(
+                    SourceFilter::All,
+                )),
+            ),
+        )]
     }
 
     /// Update the source dropdown items when tasks change.
@@ -963,7 +923,8 @@ impl AgentManagementView {
                     ctx
                 );
 
-                cancel_task_with_toast(*task_id, ctx);
+                let _ = task_id;
+                let _ = ctx;
             }
             AgentDetailsButtonEvent::ForkConversation { conversation_id } => {
                 send_telemetry_from_ctx!(
@@ -1048,7 +1009,7 @@ impl AgentManagementView {
                     ctx
                 );
                 ctx.emit(AgentManagementViewEvent::OpenPlanNotebook {
-                    notebook_uid: *notebook_uid,
+                    notebook_uid: notebook_uid.clone(),
                 });
             }
             ArtifactButtonsRowEvent::CopyBranch { branch } => {
@@ -1142,10 +1103,7 @@ impl AgentManagementView {
                 let open_action =
                     task_wrapper.get_open_action(Some(RestoreConversationLayout::NewTab), ctx);
                 let copy_link_url = task_wrapper.session_or_conversation_link(ctx);
-                let Some(task) = model.get_task_data(task_id) else {
-                    return;
-                };
-                ConversationDetailsData::from_task(&task, open_action, copy_link_url, ctx)
+                ConversationDetailsData::from_task(*task_id, open_action, copy_link_url, ctx)
             }
             ManagementCardItemId::Conversation(conversation_id) => {
                 let Some(conversation) = model.get_conversation(conversation_id) else {
@@ -1254,7 +1212,7 @@ impl AgentManagementView {
             }
             ConversationDetailsPanelEvent::OpenPlanNotebook { notebook_uid } => {
                 ctx.emit(AgentManagementViewEvent::OpenPlanNotebook {
-                    notebook_uid: *notebook_uid,
+                    notebook_uid: notebook_uid.clone(),
                 });
             }
         }
@@ -2025,7 +1983,7 @@ impl View for AgentManagementView {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let main_content = match self.get_view_state(app) {
             ViewState::Loading => self.render_loading_state(app),
-            ViewState::SetupGuide { .. } => ChildView::new(&self.cloud_setup_guide_view).finish(),
+            ViewState::SetupGuide { .. } => Empty::new().finish(),
             ViewState::NoFilterMatches => self.render_no_results_view(app),
             ViewState::HasTasks => self.render_default_scroll_view(app),
         };
@@ -2087,8 +2045,7 @@ pub enum AgentManagementViewAction {
 }
 
 pub enum AgentManagementViewEvent {
-    OpenNewTabAndRunWorkflow(Box<WorkflowType>),
-    OpenPlanNotebook { notebook_uid: NotebookId },
+    OpenPlanNotebook { notebook_uid: String },
 }
 
 impl TypedActionView for AgentManagementView {

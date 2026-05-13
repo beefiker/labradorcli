@@ -182,18 +182,12 @@ impl Workspace {
             .ambient_agent_task_id_for_details_panel(ctx);
 
         self.transcript_details_panel.update(ctx, |panel, ctx| {
-            // If we have an ambient agent task ID, try to populate from task data
+            // If we have an ambient agent task ID, populate from task ID only (task struct removed).
             if let Some(task_id) = task_id {
-                let conversations_model_handle = AgentConversationsModel::handle(ctx);
-                let task = conversations_model_handle.update(ctx, |conversations_model, ctx| {
-                    conversations_model.get_or_async_fetch_task_data(&task_id, ctx)
-                });
-                if let Some(task) = task {
-                    let details = ConversationDetailsData::from_task(&task, None, None, ctx);
-                    panel.set_conversation_details(details, ctx);
-                    ctx.notify();
-                    return;
-                }
+                let details = ConversationDetailsData::from_task(task_id, None, None, ctx);
+                panel.set_conversation_details(details, ctx);
+                ctx.notify();
+                return;
             }
 
             // Otherwise, populate from conversation

@@ -1,12 +1,8 @@
 use futures::{future::BoxFuture, FutureExt};
-use warpui::{Entity, ModelContext, SingletonEntity};
+use warpui::{Entity, ModelContext};
 
-use crate::ai::{
-    agent::{
-        AIAgentAction, AIAgentActionType, DocumentContext, ReadDocumentsRequest,
-        ReadDocumentsResult,
-    },
-    document::ai_document_model::AIDocumentModel,
+use crate::ai::agent::{
+    AIAgentAction, AIAgentActionType, ReadDocumentsRequest, ReadDocumentsResult,
 };
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
@@ -23,42 +19,29 @@ impl ReadDocumentsExecutor {
         _input: ExecuteActionInput,
         _ctx: &mut ModelContext<Self>,
     ) -> bool {
-        // Document operations are always auto-executed
         true
     }
 
     pub(super) fn execute(
         &mut self,
         input: ExecuteActionInput,
-        ctx: &mut ModelContext<Self>,
+        _ctx: &mut ModelContext<Self>,
     ) -> impl Into<AnyActionExecution> {
         let ExecuteActionInput { action, .. } = input;
         let AIAgentAction {
-            action: AIAgentActionType::ReadDocuments(ReadDocumentsRequest { document_ids }),
+            action: AIAgentActionType::ReadDocuments(ReadDocumentsRequest { .. }),
             ..
         } = action
         else {
             return ActionExecution::<ReadDocumentsResult>::InvalidAction;
         };
 
-        // Access the model synchronously before the async block
-        let model = AIDocumentModel::handle(ctx);
-        let documents: Vec<DocumentContext> = document_ids
-            .iter()
-            .filter_map(|id| {
-                let model = model.as_ref(ctx);
-                let content = model.get_document_content(id, ctx)?;
-                let version = model.get_current_document(id)?.version;
-                Some(DocumentContext {
-                    document_id: *id,
-                    content,
-                    line_ranges: vec![],
-                    document_version: version,
-                })
-            })
-            .collect();
-
-        ActionExecution::Sync(ReadDocumentsResult::Success { documents }.into())
+        ActionExecution::Sync(
+            ReadDocumentsResult::Success {
+                documents: Vec::new(),
+            }
+            .into(),
+        )
     }
 
     pub(super) fn preprocess_action(

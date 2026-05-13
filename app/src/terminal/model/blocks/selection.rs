@@ -12,7 +12,6 @@ use warpui::{
 
 use crate::{
     ai::blocklist::AIBlock,
-    env_vars::env_var_collection_block::EnvVarCollectionBlock,
     terminal::{
         event::Event as TerminalEvent,
         model::{
@@ -1060,15 +1059,6 @@ impl BlockList {
                         {
                             let ai_block_view = app.view(&ai_block);
                             if let Some(selected_text) = ai_block_view.selected_text(app) {
-                                selected_texts.push(selected_text);
-                            }
-                        }
-
-                        if let Some(env_var_block) =
-                            app.view_with_id::<EnvVarCollectionBlock>(active_window_id, view_id)
-                        {
-                            let block = app.view(&env_var_block);
-                            if let Some(selected_text) = block.selected_text(app) {
                                 selected_texts.push(selected_text);
                             }
                         }

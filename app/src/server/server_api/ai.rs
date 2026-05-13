@@ -17,41 +17,27 @@ use warp_multi_agent_api::ConversationData;
 
 use super::auth::AuthClient;
 use super::ServerApi;
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{
     AIAgentConversationFormat, AIAgentHarness, AIAgentSerializedBlockFormat,
     ServerAIConversationMetadata,
 };
-use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::artifacts::Artifact;
 use crate::ai::generate_code_review_content::api::{
     GenerateCodeReviewContentRequest, GenerateCodeReviewContentResponse,
 };
-#[cfg(feature = "agent_mode_evals")]
-use crate::ai::request_usage_model::RequestLimitInfo;
-#[cfg(not(feature = "agent_mode_evals"))]
-use crate::ai::BonusGrant;
 use crate::persistence::model::ConversationUsageMetadata;
 use crate::terminal::model::block::SerializedBlock;
-#[cfg(not(feature = "agent_mode_evals"))]
 use crate::{
-    ai::request_usage_model::BonusGrantScope,
-    server::ids::ServerId,
-    workspaces::{gql_convert::PLACEHOLDER_WORKSPACE_UID, workspace::WorkspaceUid},
-};
-use crate::{
-    ai::{
-        llms::{
-            AvailableLLMs, DisableReason, LLMContextWindow, LLMInfo, LLMModelHost, LLMProvider,
-            LLMSpec, LLMUsageMetadata, ModelsByFeature, RoutingHostConfig,
-        },
-        RequestUsageInfo,
+    ai::llms::{
+        AvailableLLMs, DisableReason, LLMContextWindow, LLMInfo, LLMModelHost, LLMProvider,
+        LLMSpec, LLMUsageMetadata, ModelsByFeature, RoutingHostConfig,
     },
     ai_assistant::{
         execution_context::WarpAiExecutionContext, requests::GenerateDialogueResult,
         utils::TranscriptPart, AIGeneratedCommand, GenerateCommandsFromNaturalLanguageError,
     },
-    drive::workflows::ai_assist::{GeneratedCommandMetadata, GeneratedCommandMetadataError},
     server::graphql::{
         default_request_options, get_request_context, get_user_facing_error_message,
     },
@@ -62,19 +48,12 @@ use ai::index::full_source_code_embedding::{
     CodebaseContextConfig, ContentHash, EmbeddingConfig, NodeHash, RepoMetadata,
 };
 use warp_graphql::client::Operation;
-#[cfg(not(feature = "agent_mode_evals"))]
-use warp_graphql::queries::get_request_limit_info::{
-    GetRequestLimitInfo, GetRequestLimitInfoVariables,
-};
 use warp_graphql::{
     ai::{AgentTaskState, PlatformErrorCode},
     mutations::{
         confirm_file_artifact_upload::{
             ConfirmFileArtifactUpload, ConfirmFileArtifactUploadInput,
             ConfirmFileArtifactUploadResult, ConfirmFileArtifactUploadVariables,
-        },
-        create_agent_task::{
-            CreateAgentTask, CreateAgentTaskInput, CreateAgentTaskResult, CreateAgentTaskVariables,
         },
         create_file_artifact_upload_target::{
             CreateFileArtifactUploadTarget, CreateFileArtifactUploadTargetInput,
@@ -96,11 +75,6 @@ use warp_graphql::{
             GenerateDialogue, GenerateDialogueInput,
             GenerateDialogueResult as GenerateDialogueResultGraphql, GenerateDialogueStatus,
             GenerateDialogueVariables, TranscriptPart as TranscriptPartGraphql,
-        },
-        generate_metadata_for_command::{
-            GenerateMetadataForCommand, GenerateMetadataForCommandInput,
-            GenerateMetadataForCommandResult, GenerateMetadataForCommandStatus,
-            GenerateMetadataForCommandVariables,
         },
         populate_merkle_tree_cache::{
             PopulateMerkleTreeCache, PopulateMerkleTreeCacheResult,
@@ -140,14 +114,7 @@ use warp_graphql::{
         sync_merkle_tree::{
             SyncMerkleTree, SyncMerkleTreeInput, SyncMerkleTreeResult, SyncMerkleTreeVariables,
         },
-        task_attachments::{Task as TaskAttachmentsQuery, TaskInput, TaskResult, TaskVariables},
     },
-};
-
-// Re-export ambient agent types for backwards compatibility
-pub use crate::ai::ambient_agents::{
-    task::{AttachmentInput, TaskAttachment},
-    AgentConfigSnapshot, AgentSource, AmbientAgentTask, AmbientAgentTaskState, TaskStatusMessage,
 };
 
 const AI_ASSISTANT_REQUEST_TIMEOUT_SECONDS: u64 = 30;
@@ -174,37 +141,6 @@ impl TaskStatusUpdate {
             error_code: Some(error_code),
         }
     }
-}
-
-/// JSON payload sent to the public `POST /agent/run` API.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct SpawnAgentRequest {
-    pub prompt: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub config: Option<AgentConfigSnapshot>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub team: Option<bool>,
-    /// Use a Claude-compatible skill as the base prompt.
-    /// Format: "repo:skill_name" or just "skill_name".
-    /// The skill is resolved at runtime in the agent environment.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub skill: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub attachments: Vec<AttachmentInput>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub interactive: Option<bool>,
-    /// Populated when a cloud agent spawns a child run via the public API.
-    /// Not yet wired through the local start_agent flow.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parent_run_id: Option<String>,
-    /// Base64-encoded `warp.multi_agent.v1.Skill` payloads to restore as runtime skills.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub runtime_skills: Vec<String>,
-    /// Base64-encoded `warp.multi_agent.v1.Attachment` payloads to restore as referenced attachments.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub referenced_attachments: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -277,14 +213,6 @@ pub struct ReadAgentMessageResponse {
     pub sent_at: String,
     pub delivered_at: Option<String>,
     pub read_at: Option<String>,
-}
-
-#[derive(serde::Deserialize)]
-pub struct SpawnAgentResponse {
-    pub task_id: AmbientAgentTaskId,
-    pub run_id: String,
-    #[serde(default)]
-    pub at_capacity: bool,
 }
 
 /// Response from the artifact endpoint.
@@ -501,8 +429,6 @@ pub struct TaskListFilter {
     pub updated_after: Option<DateTime<Utc>>,
     pub created_after: Option<DateTime<Utc>>,
     pub created_before: Option<DateTime<Utc>>,
-    pub states: Option<Vec<AmbientAgentTaskState>>,
-    pub source: Option<AgentSource>,
     pub execution_location: Option<ExecutionLocation>,
     pub environment_id: Option<String>,
     pub skill_spec: Option<String>,
@@ -612,16 +538,6 @@ pub(crate) fn build_list_agent_runs_url(limit: i32, filter: &TaskListFilter) -> 
     if let Some(created_before) = filter.created_before {
         push("created_before", &created_before.to_rfc3339());
     }
-    if let Some(states) = filter.states.as_ref() {
-        for state in states {
-            if let Some(value) = state.as_query_param() {
-                push("state", value);
-            }
-        }
-    }
-    if let Some(source) = filter.source.as_ref() {
-        push("source", source.as_str());
-    }
     if let Some(execution_location) = filter.execution_location {
         push("execution_location", execution_location.as_query_param());
     }
@@ -664,37 +580,6 @@ pub(crate) fn build_list_agent_runs_url(limit: i32, filter: &TaskListFilter) -> 
 
 pub(crate) fn build_run_followup_url(run_id: &AmbientAgentTaskId) -> String {
     format!("agent/runs/{run_id}/followups")
-}
-
-struct ListRunsResponse {
-    runs: Vec<AmbientAgentTask>,
-}
-
-impl<'de> serde::Deserialize<'de> for ListRunsResponse {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(serde::Deserialize)]
-        struct RawResponse {
-            runs: Vec<serde_json::Value>,
-        }
-
-        let raw = RawResponse::deserialize(deserializer)?;
-        let mut runs = Vec::with_capacity(raw.runs.len());
-
-        for task_value in raw.runs.into_iter() {
-            match serde_json::from_value::<AmbientAgentTask>(task_value) {
-                Ok(task) => runs.push(task),
-                Err(e) => {
-                    // Log the error and skip this task instead of failing the entire request
-                    report_error!(anyhow!("Failed to deserialize ambient agent task: {}", e));
-                }
-            }
-        }
-
-        Ok(ListRunsResponse { runs })
-    }
 }
 
 /// Source information for an agent skill.
@@ -751,13 +636,6 @@ pub trait AIClient: 'static + Send + Sync {
         ai_execution_context: Option<WarpAiExecutionContext>,
     ) -> anyhow::Result<GenerateDialogueResult>;
 
-    async fn generate_metadata_for_command(
-        &self,
-        command: String,
-    ) -> Result<GeneratedCommandMetadata, GeneratedCommandMetadataError>;
-
-    async fn get_request_limit_info(&self) -> Result<RequestUsageInfo, anyhow::Error>;
-
     async fn get_feature_model_choices(&self) -> Result<ModelsByFeature, anyhow::Error>;
 
     /// Fetches the free-tier available models without requiring authentication.
@@ -788,14 +666,6 @@ pub trait AIClient: 'static + Send + Sync {
         request_ids: Vec<String>,
     ) -> anyhow::Result<i32, anyhow::Error>;
 
-    async fn create_agent_task(
-        &self,
-        prompt: String,
-        environment_uid: Option<String>,
-        parent_run_id: Option<String>,
-        config: Option<AgentConfigSnapshot>,
-    ) -> anyhow::Result<AmbientAgentTaskId, anyhow::Error>;
-
     async fn update_agent_task(
         &self,
         task_id: AmbientAgentTaskId,
@@ -805,28 +675,12 @@ pub trait AIClient: 'static + Send + Sync {
         status_message: Option<TaskStatusUpdate>,
     ) -> anyhow::Result<(), anyhow::Error>;
 
-    async fn spawn_agent(
-        &self,
-        request: SpawnAgentRequest,
-    ) -> anyhow::Result<SpawnAgentResponse, anyhow::Error>;
-
-    async fn list_ambient_agent_tasks(
-        &self,
-        limit: i32,
-        filter: TaskListFilter,
-    ) -> anyhow::Result<Vec<AmbientAgentTask>, anyhow::Error>;
-
     /// List agent runs and return the raw server JSON response.
     async fn list_agent_runs_raw(
         &self,
         limit: i32,
         filter: TaskListFilter,
     ) -> anyhow::Result<serde_json::Value, anyhow::Error>;
-
-    async fn get_ambient_agent_task(
-        &self,
-        task_id: &AmbientAgentTaskId,
-    ) -> anyhow::Result<AmbientAgentTask, anyhow::Error>;
 
     /// Fetch a single agent run and return the raw server JSON response.
     async fn get_agent_run_raw(
@@ -875,16 +729,6 @@ pub trait AIClient: 'static + Send + Sync {
         repo: Option<String>,
     ) -> anyhow::Result<Vec<AgentListItem>, anyhow::Error>;
 
-    async fn cancel_ambient_agent_task(
-        &self,
-        task_id: &AmbientAgentTaskId,
-    ) -> anyhow::Result<(), anyhow::Error>;
-
-    async fn get_task_attachments(
-        &self,
-        task_id: String,
-    ) -> anyhow::Result<Vec<TaskAttachment>, anyhow::Error>;
-
     async fn create_file_artifact_upload_target(
         &self,
         request: CreateFileArtifactUploadRequest,
@@ -900,23 +744,6 @@ pub trait AIClient: 'static + Send + Sync {
         &self,
         artifact_uid: &str,
     ) -> anyhow::Result<ArtifactDownloadResponse, anyhow::Error>;
-
-    async fn prepare_attachments_for_upload(
-        &self,
-        task_id: &AmbientAgentTaskId,
-        files: &[AttachmentFileInfo],
-    ) -> anyhow::Result<PrepareAttachmentUploadsResponse, anyhow::Error>;
-
-    async fn download_task_attachments(
-        &self,
-        task_id: &AmbientAgentTaskId,
-        attachment_ids: &[String],
-    ) -> anyhow::Result<DownloadAttachmentsResponse, anyhow::Error>;
-
-    async fn get_handoff_snapshot_attachments(
-        &self,
-        task_id: &AmbientAgentTaskId,
-    ) -> anyhow::Result<Vec<TaskAttachment>, anyhow::Error>;
 
     // --- Orchestrations V2 messaging ---
 
@@ -1079,105 +906,6 @@ impl AIClient for ServerApi {
             }
             GenerateDialogueResultGraphql::Unknown => {
                 Err(anyhow!("failed to generate AI dialogue"))
-            }
-        }
-    }
-
-    async fn generate_metadata_for_command(
-        &self,
-        command: String,
-    ) -> Result<GeneratedCommandMetadata, GeneratedCommandMetadataError> {
-        let default_err = GeneratedCommandMetadataError::Other;
-        let variables = GenerateMetadataForCommandVariables {
-            input: GenerateMetadataForCommandInput { command },
-            request_context: get_request_context(),
-        };
-
-        let operation = GenerateMetadataForCommand::build(variables);
-        let response = self
-            .send_graphql_request(
-                operation,
-                Some(Duration::from_secs(AI_ASSISTANT_REQUEST_TIMEOUT_SECONDS)),
-            )
-            .await
-            .map_err(|_| default_err)?;
-
-        match response.generate_metadata_for_command {
-            GenerateMetadataForCommandResult::GenerateMetadataForCommandOutput(output) => {
-                match output.status {
-                    GenerateMetadataForCommandStatus::GenerateMetadataForCommandSuccess(
-                        success,
-                    ) => Ok(success.into()),
-                    GenerateMetadataForCommandStatus::GenerateMetadataForCommandFailure(
-                        failure,
-                    ) => Err(failure.type_.into()),
-                    GenerateMetadataForCommandStatus::Unknown => {
-                        Err(GeneratedCommandMetadataError::Other)
-                    }
-                }
-            }
-            _ => Err(GeneratedCommandMetadataError::Other),
-        }
-    }
-
-    #[cfg(feature = "agent_mode_evals")]
-    async fn get_request_limit_info(&self) -> Result<RequestUsageInfo, anyhow::Error> {
-        Ok(RequestUsageInfo {
-            request_limit_info: RequestLimitInfo::new_for_evals(),
-            bonus_grants: vec![],
-        })
-    }
-
-    #[cfg(not(feature = "agent_mode_evals"))]
-    async fn get_request_limit_info(&self) -> Result<RequestUsageInfo, anyhow::Error> {
-        let variables = GetRequestLimitInfoVariables {
-            request_context: get_request_context(),
-        };
-        let operation = GetRequestLimitInfo::build(variables);
-        let response = self.send_graphql_request(operation, None).await?;
-
-        match response.user {
-            warp_graphql::queries::get_request_limit_info::UserResult::UserOutput(user_output) => {
-                let request_limit_info = user_output.user.request_limit_info.into();
-
-                let workspace_bonus_grants = user_output
-                    .user
-                    .workspaces
-                    .into_iter()
-                    .filter(|workspace| workspace.uid != PLACEHOLDER_WORKSPACE_UID.into())
-                    .flat_map(|workspace| {
-                        let workspace_uid =
-                            WorkspaceUid::from(ServerId::from_string_lossy(workspace.uid.inner()));
-                        workspace
-                            .bonus_grants_info
-                            .grants
-                            .into_iter()
-                            .map(move |grant| {
-                                BonusGrant::from_gql_bonus_grant(
-                                    grant,
-                                    BonusGrantScope::Workspace(workspace_uid),
-                                )
-                            })
-                    });
-
-                let bonus_grants: Vec<BonusGrant> = user_output
-                    .user
-                    .bonus_grants
-                    .into_iter()
-                    .map(|grant| BonusGrant::from_gql_bonus_grant(grant, BonusGrantScope::User))
-                    .chain(workspace_bonus_grants)
-                    .collect();
-
-                Ok(RequestUsageInfo {
-                    request_limit_info,
-                    bonus_grants,
-                })
-            }
-            warp_graphql::queries::get_request_limit_info::UserResult::UserFacingError(e) => {
-                Err(anyhow!(get_user_facing_error_message(e)))
-            }
-            warp_graphql::queries::get_request_limit_info::UserResult::Unknown => {
-                Err(anyhow!("failed to get request limit info"))
             }
         }
     }
@@ -1348,45 +1076,6 @@ impl AIClient for ServerApi {
         }
     }
 
-    async fn create_agent_task(
-        &self,
-        prompt: String,
-        environment_uid: Option<String>,
-        parent_run_id: Option<String>,
-        config: Option<AgentConfigSnapshot>,
-    ) -> anyhow::Result<AmbientAgentTaskId, anyhow::Error> {
-        // Serialize the config to JSON if provided
-        let agent_config_snapshot = config
-            .map(|c| serde_json::to_string(&c))
-            .transpose()
-            .map_err(|e| anyhow!("Failed to serialize agent config: {e}"))?;
-
-        let variables = CreateAgentTaskVariables {
-            input: CreateAgentTaskInput {
-                prompt,
-                environment_uid: environment_uid.map(|uid| uid.into()),
-                parent_run_id: parent_run_id.map(|run_id| run_id.into()),
-                agent_config_snapshot,
-            },
-            request_context: get_request_context(),
-        };
-
-        let operation = CreateAgentTask::build(variables);
-        let response = self.send_graphql_request(operation, None).await?;
-
-        match response.create_agent_task {
-            CreateAgentTaskResult::CreateAgentTaskOutput(output) => output
-                .task_id
-                .into_inner()
-                .parse()
-                .map_err(|e| anyhow!("Failed to parse task ID from server: {e}")),
-            CreateAgentTaskResult::UserFacingError(e) => {
-                Err(anyhow!(get_user_facing_error_message(e)))
-            }
-            CreateAgentTaskResult::Unknown => Err(anyhow!("failed to create agent task")),
-        }
-    }
-
     async fn update_agent_task(
         &self,
         task_id: AmbientAgentTaskId,
@@ -1421,24 +1110,6 @@ impl AIClient for ServerApi {
         }
     }
 
-    async fn spawn_agent(
-        &self,
-        request: SpawnAgentRequest,
-    ) -> anyhow::Result<SpawnAgentResponse, anyhow::Error> {
-        let response: SpawnAgentResponse = self.post_public_api("agent/run", &request).await?;
-        Ok(response)
-    }
-
-    async fn list_ambient_agent_tasks(
-        &self,
-        limit: i32,
-        filter: TaskListFilter,
-    ) -> anyhow::Result<Vec<AmbientAgentTask>, anyhow::Error> {
-        let url = build_list_agent_runs_url(limit, &filter);
-        let response: ListRunsResponse = self.get_public_api(&url).await?;
-        Ok(response.runs)
-    }
-
     async fn list_agent_runs_raw(
         &self,
         limit: i32,
@@ -1446,16 +1117,6 @@ impl AIClient for ServerApi {
     ) -> anyhow::Result<serde_json::Value, anyhow::Error> {
         let url = build_list_agent_runs_url(limit, &filter);
         let response: serde_json::Value = self.get_public_api(&url).await?;
-        Ok(response)
-    }
-
-    async fn get_ambient_agent_task(
-        &self,
-        task_id: &AmbientAgentTaskId,
-    ) -> anyhow::Result<AmbientAgentTask, anyhow::Error> {
-        let response: AmbientAgentTask = self
-            .get_public_api(&format!("agent/runs/{task_id}"))
-            .await?;
         Ok(response)
     }
 
@@ -1682,51 +1343,6 @@ impl AIClient for ServerApi {
         Ok(response.agents)
     }
 
-    async fn cancel_ambient_agent_task(
-        &self,
-        task_id: &AmbientAgentTaskId,
-    ) -> anyhow::Result<(), anyhow::Error> {
-        let _: String = self
-            .post_public_api(&format!("agent/tasks/{task_id}/cancel"), &())
-            .await?;
-        Ok(())
-    }
-
-    async fn get_task_attachments(
-        &self,
-        task_id: String,
-    ) -> anyhow::Result<Vec<TaskAttachment>, anyhow::Error> {
-        let variables = TaskVariables {
-            input: TaskInput {
-                task_id: cynic::Id::new(task_id),
-            },
-            request_context: get_request_context(),
-        };
-        let operation = TaskAttachmentsQuery::build(variables);
-        let response = self.send_graphql_request(operation, None).await?;
-
-        match response.task {
-            TaskResult::TaskOutput(output) => {
-                let attachments = output
-                    .task
-                    .attachments
-                    .into_iter()
-                    .map(|att| TaskAttachment {
-                        file_id: att.file_id.into_inner(),
-                        filename: att.filename,
-                        download_url: att.download_url,
-                        mime_type: att.mime_type,
-                    })
-                    .collect();
-                Ok(attachments)
-            }
-            TaskResult::UserFacingError(error) => {
-                Err(anyhow!(get_user_facing_error_message(error)))
-            }
-            TaskResult::Unknown => Err(anyhow!("Failed to fetch task attachments")),
-        }
-    }
-
     async fn create_file_artifact_upload_target(
         &self,
         request: CreateFileArtifactUploadRequest,
@@ -1809,62 +1425,6 @@ impl AIClient for ServerApi {
             .get_public_api(&format!("agent/artifacts/{artifact_uid}"))
             .await?;
         Ok(response)
-    }
-
-    async fn prepare_attachments_for_upload(
-        &self,
-        task_id: &AmbientAgentTaskId,
-        files: &[AttachmentFileInfo],
-    ) -> anyhow::Result<PrepareAttachmentUploadsResponse, anyhow::Error> {
-        let request = PrepareAttachmentUploadsRequest {
-            files: files.to_vec(),
-        };
-        let response: PrepareAttachmentUploadsResponse = self
-            .post_public_api(
-                &format!("agent/runs/{task_id}/attachments/prepare"),
-                &request,
-            )
-            .await?;
-        Ok(response)
-    }
-
-    async fn download_task_attachments(
-        &self,
-        task_id: &AmbientAgentTaskId,
-        attachment_ids: &[String],
-    ) -> anyhow::Result<DownloadAttachmentsResponse, anyhow::Error> {
-        let request = DownloadAttachmentsRequest {
-            attachment_ids: attachment_ids.to_vec(),
-        };
-        let response: DownloadAttachmentsResponse = self
-            .post_public_api(
-                &format!("agent/runs/{task_id}/attachments/download"),
-                &request,
-            )
-            .await?;
-        Ok(response)
-    }
-
-    async fn get_handoff_snapshot_attachments(
-        &self,
-        task_id: &AmbientAgentTaskId,
-    ) -> anyhow::Result<Vec<TaskAttachment>, anyhow::Error> {
-        let response: ListHandoffSnapshotAttachmentsResponse = self
-            .get_public_api(&format!("agent/runs/{task_id}/handoff/attachments"))
-            .await?;
-
-        Ok(response
-            .attachments
-            .into_iter()
-            .map(|attachment| TaskAttachment {
-                file_id: attachment.attachment_id,
-                filename: attachment.filename,
-                download_url: attachment.download_url,
-                mime_type: attachment
-                    .mime_type
-                    .unwrap_or_else(|| "application/octet-stream".to_string()),
-            })
-            .collect())
     }
 
     // --- Orchestrations V2 messaging ---
@@ -2332,8 +1892,6 @@ impl TryFrom<warp_graphql::ai::AIConversation> for ServerAIConversationMetadata 
             value.usage.usage_metadata.context_window_usage,
             value.usage.usage_metadata.credits_spent,
         );
-        let metadata = value.metadata.try_into()?;
-        let permissions = value.permissions.try_into()?;
         let ambient_agent_task_id = value
             .ambient_agent_task_id
             .map(|id| id.into_inner().parse())
@@ -2354,8 +1912,6 @@ impl TryFrom<warp_graphql::ai::AIConversation> for ServerAIConversationMetadata 
             working_directory: value.working_directory,
             harness: convert_harness(value.harness),
             usage,
-            metadata,
-            permissions,
             ambient_agent_task_id,
             server_conversation_token,
             artifacts,
@@ -2376,8 +1932,6 @@ impl TryFrom<warp_graphql::queries::list_ai_conversations::AIConversationMetadat
             value.usage.usage_metadata.context_window_usage,
             value.usage.usage_metadata.credits_spent,
         );
-        let metadata = value.metadata.try_into()?;
-        let permissions = value.permissions.try_into()?;
         let ambient_agent_task_id = value
             .ambient_agent_task_id
             .map(|id| id.into_inner().parse())
@@ -2397,8 +1951,6 @@ impl TryFrom<warp_graphql::queries::list_ai_conversations::AIConversationMetadat
             working_directory: value.working_directory,
             harness: convert_harness(value.harness),
             usage,
-            metadata,
-            permissions,
             ambient_agent_task_id,
             server_conversation_token,
             artifacts,

@@ -1,6 +1,4 @@
-use super::workflows::{WorkflowIdentity, WorkflowSearchItem};
 use crate::{
-    ai::AIRequestUsageModel,
     ai_assistant::{
         execution_context::WarpAiExecutionContext, GenerateCommandsFromNaturalLanguageError,
         AI_ASSISTANT_LOGO_COLOR,
@@ -16,17 +14,14 @@ use crate::{
             SyncDataSource,
         },
         result_renderer::ItemHighlightState,
-        workflows::fuzzy_match::FuzzyMatchWorkflowResult,
     },
     server::server_api::ai::AIClient,
     themes::theme::Blend,
     ui_components::icons::Icon as UIIcon,
     util::color::{ContrastingColor, MinimumAllowedContrast},
-    workflows::{AIWorkflowOrigin, WorkflowSource, WorkflowType},
 };
 
 use async_trait::async_trait;
-use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use serde_json::json;
 use std::{any::Any, sync::Arc};
@@ -144,27 +139,16 @@ impl SearchItem for WarpAISearchItem {
     }
 }
 
-/// The Dwarf AI data source provides two different types of results:
-/// - synchronous: the synchronous result provided by this data source is a
-///   single item that opens/translates using Dwarf AI when selected.
-/// - asynchronous: the asynchronous results are AI generated workflows
-/// In most cases, the data source should be registered _twice_: once as a sync source
-/// and once as an async source. That way, the mixer will treat these as two separate
-/// data sources.
-pub struct WarpAIDataSource {
-    ai_client: Arc<dyn AIClient>,
-    ai_execution_context: Option<WarpAiExecutionContext>,
-}
+/// The Dwarf AI data source provides a synchronous item that opens/translates
+/// using Dwarf AI when selected.
+pub struct WarpAIDataSource;
 
 impl WarpAIDataSource {
     pub fn new(
-        ai_client: Arc<dyn AIClient>,
-        ai_execution_context: Option<WarpAiExecutionContext>,
+        _ai_client: Arc<dyn AIClient>,
+        _ai_execution_context: Option<WarpAiExecutionContext>,
     ) -> Self {
-        Self {
-            ai_client,
-            ai_execution_context,
-        }
+        Self
     }
 }
 
@@ -192,51 +176,13 @@ impl AsyncDataSource for WarpAIDataSource {
 
     fn run_query(
         &self,
-        query: &Query,
+        _query: &Query,
         _app: &AppContext,
     ) -> BoxFuture<'static, Result<Vec<QueryResult<Self::Action>>, DataSourceRunErrorWrapper>> {
-        let query_text = query.text.clone();
-        let ai_execution_context = self.ai_execution_context.clone();
-        let ai_client = self.ai_client.clone();
-
-        Box::pin(async move {
-            let res = ai_client
-                .generate_commands_from_natural_language(query_text, ai_execution_context)
-                .await;
-
-            match res {
-                Ok(ai_commands) => {
-                    // The generated commands already have an inherent order so give
-                    // them a dummy Match and reverse the list so that the most plausible
-                    // commands are at the end.
-                    Ok(ai_commands
-                        .into_iter()
-                        .map(|ai_command| {
-                            WorkflowSearchItem {
-                                identity: WorkflowIdentity::Local(Box::new(
-                                    WorkflowType::AIGenerated {
-                                        workflow: ai_command.into(),
-                                        origin: AIWorkflowOrigin::CommandSearch,
-                                    },
-                                )),
-                                source: WorkflowSource::WarpAI,
-                                fuzzy_matched_workflow: FuzzyMatchWorkflowResult::no_match(),
-                            }
-                            .into()
-                        })
-                        .rev()
-                        .collect_vec())
-                }
-                Err(e) => Err(Box::new(e) as Box<dyn DataSourceRunError>),
-            }
-        })
+        Box::pin(async move { Ok(Vec::new()) })
     }
 
-    fn on_query_finished(&self, app: &mut AppContext) {
-        AIRequestUsageModel::handle(app).update(app, |request_usage_model, ctx| {
-            request_usage_model.refresh_request_usage_async(ctx);
-        });
-    }
+    fn on_query_finished(&self, _app: &mut AppContext) {}
 }
 
 impl DataSourceRunError for GenerateCommandsFromNaturalLanguageError {

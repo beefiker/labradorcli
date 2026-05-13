@@ -70,7 +70,6 @@ use super::TextLocation;
 use crate::ai::blocklist::block::view_impl::comments::address_comment_chips;
 use crate::ai::blocklist::block::{DetectedLinksState, RICH_CONTENT_LINK_FIRST_CHAR_POSITION_ID};
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
-use crate::cloud_object::model::persistence::CloudModel;
 
 use crate::settings_view::SettingsSection;
 use crate::terminal::block_list_element::BlockListMenuSource;
@@ -683,14 +682,9 @@ pub fn render_citation(
     let theme = appearance.theme();
 
     let (icon, name) = match citation {
-        AIAgentCitation::WarpDriveObject { uid } => {
-            let item = CloudModel::as_ref(app)
-                .get_by_uid(uid)?
-                .to_warp_drive_item(appearance)?;
-            (
-                item.icon(appearance, Some(theme.active_ui_text_color())),
-                item.display_name().unwrap_or(String::from("Untitled")),
-            )
+        AIAgentCitation::WarpDriveObject { uid: _ } => {
+            // Warp Drive citations are no longer resolvable; render a stub.
+            (None, String::from("Untitled"))
         }
         AIAgentCitation::WarpDocumentation { .. } => {
             let icon = render_dwarf_icon(font_size, 2.);

@@ -9,13 +9,11 @@ use std::rc::Rc;
 use chrono::{Duration, Local};
 
 use crate::appearance::Appearance;
-use crate::code::editor::comment_editor::create_readonly_comment_markdown_editor;
 use crate::code::editor::view::{CodeEditorRenderOptions, CodeEditorView};
 use crate::code_review::comments::{
     AttachedReviewComment, AttachedReviewCommentTarget, LineDiffContent,
 };
 use crate::editor::InteractionState;
-use crate::notebooks::editor::view::RichTextEditorView;
 use crate::util::time_format::human_readable_approx_duration;
 use pathfinder_color::ColorU;
 use warp_core::ui::theme::color::internal_colors::{neutral_1, neutral_2, text_sub};

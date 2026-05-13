@@ -1484,7 +1484,7 @@ fn test_exchanges_grouped_by_request_id() {
 #[test]
 fn test_multiple_create_documents_get_default_version() {
     use crate::ai::agent::{AIAgentActionResultType, CreateDocumentsResult};
-    use crate::ai::document::ai_document_model::AIDocumentVersion;
+    use ai::document::AIDocumentVersion;
 
     let doc_id_a = uuid::Uuid::new_v4().to_string();
     let doc_id_b = uuid::Uuid::new_v4().to_string();
@@ -1694,7 +1694,7 @@ fn test_multiple_create_documents_get_default_version() {
 #[test]
 fn test_create_then_edit_then_create_version_tracking() {
     use crate::ai::agent::{AIAgentActionResultType, CreateDocumentsResult, EditDocumentsResult};
-    use crate::ai::document::ai_document_model::AIDocumentVersion;
+    use ai::document::AIDocumentVersion;
 
     let doc_id_a = uuid::Uuid::new_v4().to_string();
     let doc_id_b = uuid::Uuid::new_v4().to_string();

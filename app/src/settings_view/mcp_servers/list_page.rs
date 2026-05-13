@@ -31,11 +31,6 @@ use crate::{
         FileBasedMCPManager, MCPGalleryManager, MCPProvider, TemplatableMCPServerInstallation,
     },
     appearance::Appearance,
-    cloud_object::{
-        model::persistence::{CloudModel, CloudModelEvent},
-        GenericStringObjectFormat, JsonObjectType,
-    },
-    drive::CloudObjectTypeAndId,
     editor::{EditorView, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions},
     pane_group::Direction,
     search_bar::SearchBar,
@@ -49,7 +44,6 @@ use crate::{
     },
     ui_components::blended_colors,
     view_components::action_button::{ActionButton, NakedTheme},
-    workflows::local_workflows::tail_command_for_shell,
     workspace::Workspace,
     workspaces::user_workspaces::UserWorkspaces,
 };
@@ -118,8 +112,6 @@ pub struct MCPServersListPageView {
 
 impl MCPServersListPageView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        Self::listen_to_cloud_model_events(ctx);
-
         // Subscribe to templatable MCP server manager state changes
         let templatable_manager = TemplatableMCPServerManager::handle(ctx);
         ctx.subscribe_to_model(&templatable_manager, |me, _, event, ctx| {
@@ -251,63 +243,6 @@ impl MCPServersListPageView {
         me.create_server_cards(ctx);
         me.create_file_based_server_cards(ctx);
         me
-    }
-
-    fn listen_to_cloud_model_events(ctx: &mut ViewContext<Self>) {
-        let cloud_model = CloudModel::handle(ctx);
-        ctx.subscribe_to_model(&cloud_model, |me, _, event, ctx| match event {
-            CloudModelEvent::ObjectUpdated {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
-                        id: _,
-                    },
-                source: _,
-            }
-            | CloudModelEvent::ObjectTrashed {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
-                        id: _,
-                    },
-                source: _,
-            }
-            | CloudModelEvent::ObjectUntrashed {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
-                        id: _,
-                    },
-                source: _,
-            }
-            | CloudModelEvent::ObjectCreated {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
-                        id: _,
-                    },
-            }
-            | CloudModelEvent::ObjectDeleted {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
-                        id: _,
-                    },
-                folder_id: _,
-            }
-            | CloudModelEvent::ObjectSynced {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
-                        id: _,
-                    },
-                client_id: _,
-                server_id: _,
-            } => {
-                me.refresh_server_cards(ctx);
-            }
-            _ => {}
-        });
     }
 
     fn is_shared(item_id: ServerCardItemId, app: &AppContext) -> bool {
@@ -634,8 +569,8 @@ impl MCPServersListPageView {
             };
 
             terminal_view_handle.update(ctx, |terminal, ctx| {
-                let shell_family = terminal.shell_family(ctx);
-                let tail_command = tail_command_for_shell(shell_family, log_file_path);
+                let _shell_family = terminal.shell_family(ctx);
+                let tail_command = format!("tail -f {}", log_file_path.display());
                 terminal.set_pending_command(&tail_command, ctx);
             });
         })

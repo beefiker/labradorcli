@@ -36,16 +36,14 @@ use crate::ai::agent_management::details_action_buttons::{
     ActionButtonsConfig, AgentDetailsButtonEvent, ConversationActionButtonsRow,
 };
 use crate::ai::agent_management::telemetry::{AgentManagementTelemetryEvent, OpenedFrom};
-use crate::ai::ambient_agents::{cancel_task_with_toast, AmbientAgentTaskId};
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::artifacts::{Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent};
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::harness_display;
 use crate::appearance::Appearance;
 #[cfg(target_family = "wasm")]
 use crate::auth::UserUid;
-use crate::notebooks::NotebookId;
 use crate::send_telemetry_from_ctx;
-use crate::server::server_api::ai::AmbientAgentTask;
 #[cfg(not(target_family = "wasm"))]
 use crate::settings::ai::{AISettings, AISettingsChangedEvent};
 use crate::ui_components::avatar::{Avatar, AvatarContent};
@@ -194,17 +192,10 @@ pub struct ConversationDetailsData {
 }
 
 impl ConversationDetailsData {
-    fn directory_for_task(task: &AmbientAgentTask, app: &AppContext) -> Option<String> {
+    fn directory_for_task(task_id: AmbientAgentTaskId, app: &AppContext) -> Option<String> {
         let history_model = BlocklistAIHistoryModel::as_ref(app);
         let conversation_id = history_model
-            .conversation_id_for_agent_id(&task.run_id().to_string())
-            .or_else(|| {
-                task.conversation_id().and_then(|conversation_id| {
-                    history_model.find_conversation_id_by_server_token(
-                        &ServerConversationToken::new(conversation_id.to_string()),
-                    )
-                })
-            })?;
+            .conversation_id_for_agent_id(&task_id.to_string())?;
 
         history_model
             .conversation(&conversation_id)
@@ -220,24 +211,11 @@ impl ConversationDetailsData {
         let mut directory = None;
         let mut conversation_id = None;
 
-        // Server metadata (creator, timestamps)
-        let mut creator = None;
+        // Creator metadata removed alongside ServerMetadata cleanup.
+        let creator: Option<CreatorInfo> = None;
+        let _ = app;
+
         if let Some(server_metadata) = conversation.server_metadata() {
-            if let Some(creator_uid_str) = &server_metadata.metadata.creator_uid {
-                let creator_uid = UserUid::new(creator_uid_str);
-                let user_profiles = UserProfiles::handle(app).as_ref(app);
-
-                if let Some(profile) = user_profiles.profile_for_uid(creator_uid) {
-                    let display_name = profile.displayable_identifier();
-                    let photo_url = Some(profile.photo_url.clone()).filter(|url| !url.is_empty());
-                    creator = Some(CreatorInfo::new(display_name, photo_url));
-                } else {
-                    // Fallback to first character of UID
-                    creator = Some(CreatorInfo::from_uid_fallback(creator_uid_str));
-                }
-            }
-
-            // Conversation ID (from server token)
             conversation_id = Some(
                 server_metadata
                     .server_conversation_token
@@ -298,56 +276,33 @@ impl ConversationDetailsData {
         }
     }
 
+    /// `AmbientAgentTask` struct was removed; callers should use `from_task_id` instead.
     pub fn from_task(
-        task: &AmbientAgentTask,
+        task_id: AmbientAgentTaskId,
         open_action: Option<WorkspaceAction>,
         copy_link_url: Option<String>,
         app: &AppContext,
     ) -> Self {
-        let error_message = if task.state.is_failure_like() {
-            task.status_message.as_ref().map(|m| m.message.clone())
-        } else {
-            None
-        };
-
-        let credits = task.active_run_execution().request_usage.and_then(|u| {
-            Some(CreditsInfo::AmbientConversation {
-                inference: u.inference_cost? as f32,
-                compute: u.compute_cost? as f32,
-            })
-        });
-
-        let skill_spec = task
-            .agent_config_snapshot
-            .as_ref()
-            .and_then(|config| config.skill_spec.as_ref())
-            .and_then(|spec_str| SkillSpec::from_str(spec_str).ok());
-
-        let harness = task.agent_config_snapshot.as_ref().and_then(|config| {
-            config.harness.as_ref().map(|h| h.harness_type)
-        });
-
+        let _ = (app,);
         ConversationDetailsData {
             mode: PanelMode::Task {
-                task_id: Some(task.run_id()),
-                directory: Self::directory_for_task(task, app),
-                display_status: Some(AgentRunDisplayStatus::from_task(task, app)),
-                error_message,
-                conversation_id: task.conversation_id().map(str::to_string),
+                task_id: Some(task_id),
+                directory: None,
+                display_status: None,
+                error_message: None,
+                conversation_id: None,
             },
-            title: task.title.clone(),
-            created_at: Some(task.created_at.with_timezone(&Local)),
-            artifacts: task.artifacts.clone(),
-            credits,
-            run_time: task.run_time(),
+            title: String::new(),
+            created_at: None,
+            artifacts: vec![],
+            credits: None,
+            run_time: None,
             open_action,
-            creator: task
-                .creator_display_name()
-                .map(|name| CreatorInfo::new(name, None)),
-            source_prompt: Some(task.prompt.clone()),
+            creator: None,
+            source_prompt: None,
             copy_link_url,
-            skill_spec,
-            harness,
+            skill_spec: None,
+            harness: None,
         }
     }
 
@@ -420,7 +375,7 @@ impl ConversationDetailsData {
 #[derive(Debug, Clone)]
 pub enum ConversationDetailsPanelEvent {
     Close,
-    OpenPlanNotebook { notebook_uid: NotebookId },
+    OpenPlanNotebook { notebook_uid: String },
 }
 
 /// Actions for the ConversationDetailsPanel.
@@ -591,7 +546,7 @@ impl ConversationDetailsPanel {
         match event {
             ArtifactButtonsRowEvent::OpenPlan { notebook_uid } => {
                 ctx.emit(ConversationDetailsPanelEvent::OpenPlanNotebook {
-                    notebook_uid: *notebook_uid,
+                    notebook_uid: notebook_uid.clone(),
                 });
             }
             ArtifactButtonsRowEvent::CopyBranch { branch } => {
@@ -723,7 +678,8 @@ impl ConversationDetailsPanel {
                     ctx
                 );
 
-                cancel_task_with_toast(*task_id, ctx);
+                let _ = task_id;
+                let _ = ctx;
             }
             AgentDetailsButtonEvent::ForkConversation { conversation_id } => {
                 send_telemetry_from_ctx!(

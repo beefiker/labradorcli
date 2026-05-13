@@ -20,8 +20,8 @@ use warpui::{
     ViewHandle,
 };
 
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::{
-    ai::ambient_agents::AmbientAgentTaskId,
     pane_group::NewTerminalOptions,
     root_view::{open_new_with_workspace_source, NewWorkspaceSource},
     terminal::{

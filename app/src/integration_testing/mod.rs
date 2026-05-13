@@ -7,7 +7,6 @@ pub mod assertions;
 pub mod block;
 pub mod block_filtering;
 pub mod clipboard;
-pub mod cloud_object;
 pub mod code_review;
 pub mod codebase_context;
 pub mod command_palette;
@@ -19,7 +18,6 @@ pub mod input;
 pub mod keybindings;
 pub mod launch_configs;
 pub mod navigation_palette;
-pub mod notebook;
 pub mod pane_group;
 pub mod persistence;
 #[cfg(target_os = "macos")]
@@ -34,9 +32,7 @@ pub mod terminal;
 pub mod themes;
 pub mod type_getters;
 pub mod view_getters;
-pub mod warp_drive;
 pub mod window;
-pub mod workflow;
 pub mod workspace;
 
 pub fn view_of_type<T: View>(app: &App, window_id: WindowId, tab_index: usize) -> ViewHandle<T> {

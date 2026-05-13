@@ -9,7 +9,7 @@ use warpui::{
 };
 
 use crate::{
-    ai::{blocklist::error_color, AIRequestUsageModel},
+    ai::blocklist::error_color,
     auth::AuthStateProvider,
     network::NetworkStatus,
     server::ids::ServerId,
@@ -95,16 +95,10 @@ pub struct PromptAlertView {
 
 impl PromptAlertView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        let request_usage_model = AIRequestUsageModel::handle(ctx);
         let user_workspaces = UserWorkspaces::handle(ctx);
         let network_status = NetworkStatus::handle(ctx);
         let privacy_settings = PrivacySettings::handle(ctx);
         let api_key_manager = ApiKeyManager::handle(ctx);
-
-        ctx.subscribe_to_model(&request_usage_model, |me, _, _, ctx| {
-            me.state = Self::determine_state(ctx);
-            ctx.notify();
-        });
 
         ctx.subscribe_to_model(&user_workspaces, |me, _, _, ctx| {
             me.state = Self::determine_state(ctx);

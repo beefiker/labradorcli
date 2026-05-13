@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use crate::ai::mcp::templatable::{
     GalleryData, JsonTemplate, TemplatableMCPServer, TemplateVariable,
 };
-use crate::server::cloud_objects::update_manager::{UpdateManager, UpdateManagerEvent};
 use crate::server::datetime_ext::DateTimeExt;
 use chrono::DateTime;
 use uuid::Uuid;
@@ -98,21 +97,11 @@ pub struct MCPGalleryManager {
 }
 
 impl MCPGalleryManager {
-    pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        let gallery_manager = Self {
+    pub fn new(_ctx: &mut ModelContext<Self>) -> Self {
+        Self {
             gallery_items: Default::default(),
             templatable_mcp_servers: Default::default(),
-        };
-
-        // Subscribe to UpdateManager events to receive MCP gallery updates
-        let update_manager = UpdateManager::handle(ctx);
-        ctx.subscribe_to_model(&update_manager, |me, event, ctx| {
-            if let UpdateManagerEvent::MCPGalleryUpdated { templates } = event {
-                me.update_gallery_items(templates.clone(), ctx);
-            }
-        });
-
-        gallery_manager
+        }
     }
 
     pub fn get_gallery(&self) -> Vec<GalleryMCPServer> {

@@ -69,6 +69,3 @@ macro_rules! server_id_traits {
     };
 }
 
-#[cfg(test)]
-#[path = "ids_test.rs"]
-mod tests;

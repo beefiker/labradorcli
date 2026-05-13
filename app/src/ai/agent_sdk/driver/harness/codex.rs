@@ -12,7 +12,7 @@ use warp_managed_secrets::ManagedSecretValue;
 use warpui::{ModelHandle, ModelSpawner};
 
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::server::server_api::harness_support::HarnessSupportClient;
 use crate::server::server_api::ServerApi;
 use crate::terminal::model::block::BlockId;

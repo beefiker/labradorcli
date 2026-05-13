@@ -3,7 +3,6 @@
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::auth::UserUid;
 use crate::context_chips::ContextChipKind;
-use crate::drive::sharing::ShareableObject;
 use crate::editor::{InteractionState, ReplicaId};
 use crate::server::telemetry::SharingDialogSource;
 use crate::settings::InputModeSettings;
@@ -69,7 +68,6 @@ use super::adapter::{Adapter, Kind, Participant};
 use super::sharer::inactivity_modal::InactivityModalEvent;
 use super::sharer::Sharer;
 use super::viewer::Viewer;
-use super::ConversationEndedTombstoneView;
 
 impl TerminalView {
     pub fn sharer_session_kind(&self) -> Option<&Kind> {
@@ -305,19 +303,10 @@ impl TerminalView {
     }
 
     fn update_shared_session_pane_header(&mut self, ctx: &mut ViewContext<Self>) {
-        let self_handle = ctx.handle();
-        let Some(shared_session) = &self.shared_session else {
+        if self.shared_session.is_none() {
             return;
-        };
-        self.pane_configuration.update(ctx, |pane_config, ctx| {
-            pane_config.set_shareable_object(
-                Some(ShareableObject::Session {
-                    handle: self_handle,
-                    session_id: *shared_session.session_id(),
-                    started_at: *shared_session.started_at(),
-                }),
-                ctx,
-            );
+        }
+        self.pane_configuration.update(ctx, |_pane_config, ctx| {
             ctx.notify();
         });
     }
@@ -541,14 +530,6 @@ impl TerminalView {
 
         self.pane_configuration.update(ctx, |pane_config, ctx| {
             pane_config.refresh_pane_header_overflow_menu_items(ctx);
-            pane_config.set_shareable_object(
-                Some(ShareableObject::Session {
-                    handle: self_handle,
-                    session_id,
-                    started_at,
-                }),
-                ctx,
-            );
             if !skip_sharing_dialog {
                 pane_config.toggle_sharing_dialog(SharingDialogSource::StartedSessionShare, ctx);
             }
@@ -648,14 +629,6 @@ impl TerminalView {
 
         self.pane_configuration.update(ctx, |pane_config, ctx| {
             pane_config.refresh_pane_header_overflow_menu_items(ctx);
-            pane_config.set_shareable_object(
-                Some(ShareableObject::Session {
-                    handle: self_handle,
-                    session_id,
-                    started_at,
-                }),
-                ctx,
-            );
             pane_config.notify_header_content_changed(ctx);
         });
 
@@ -719,20 +692,6 @@ impl TerminalView {
             self.restore_pty_to_sharer_size(ctx);
         }
 
-        // For ambient agent tasks, preserve the shareable object so the share dialog remains visible
-        let is_ambient_agent = self.is_ambient_agent_session(ctx);
-        let shareable_object_to_keep = if is_ambient_agent {
-            self.shared_session
-                .as_ref()
-                .map(|session| ShareableObject::Session {
-                    handle: ctx.handle(),
-                    session_id: *session.session_id(),
-                    started_at: *session.started_at(),
-                })
-        } else {
-            None
-        };
-
         self.shared_session = None;
         self.insert_shared_session_ended_banner(ctx);
         self.on_shared_session_reconnection_status_changed(false, ctx);
@@ -754,7 +713,6 @@ impl TerminalView {
 
         self.pane_configuration.update(ctx, |pane_config, ctx| {
             pane_config.refresh_pane_header_overflow_menu_items(ctx);
-            pane_config.set_shareable_object(shareable_object_to_keep, ctx);
             pane_config.notify_header_content_changed(ctx);
             ctx.notify();
         });
@@ -1558,22 +1516,7 @@ impl TerminalView {
         ctx.notify();
     }
 
-    pub fn insert_conversation_ended_tombstone(&mut self, ctx: &mut ViewContext<Self>) {
-        let task_id = self.model.lock().ambient_agent_task_id();
-        let terminal_view_id = self.id();
-
-        let tombstone_view_handle = ctx.add_typed_action_view(|ctx| {
-            ConversationEndedTombstoneView::new(ctx, terminal_view_id, task_id)
-        });
-        self.insert_rich_content(
-            None,
-            tombstone_view_handle,
-            None,
-            RichContentInsertionPosition::Append {
-                insert_below_long_running_block: true,
-            },
-            ctx,
-        );
+    pub fn insert_conversation_ended_tombstone(&mut self, _ctx: &mut ViewContext<Self>) {
         self.has_inserted_conversation_ended_tombstone = true;
     }
 

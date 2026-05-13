@@ -4,12 +4,10 @@ use crate::search::ai_context_menu::view::AIContextMenu;
 use crate::settings::InputSettings;
 use crate::{
     ai::{blocklist::block::cli_controller::CLISubagentController, llms::LLMPreferences},
-    cloud_object::model::generic_string_model::StringModel,
     settings::AISettingsChangedEvent,
     terminal::profile_model_selector::{
         calculate_max_profile_name_width, calculate_scaled_font_size,
     },
-    terminal::view::ambient_agent::AmbientAgentViewModel,
 };
 use pathfinder_color::ColorU;
 #[cfg(not(target_family = "wasm"))]
@@ -59,7 +57,6 @@ use crate::{
             BlocklistAIInputModel, InputConfig, InputType,
         },
         execution_profiles::profiles::AIExecutionProfilesModel,
-        AIRequestUsageModel,
     },
     network::NetworkStatus,
     settings::AISettings,
@@ -329,7 +326,6 @@ impl UniversalDeveloperInputButtonBar {
         terminal_view_id: EntityId,
         input_model: ModelHandle<BlocklistAIInputModel>,
         cli_subagent_controller: ModelHandle<CLISubagentController>,
-        ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
         terminal_model: std::sync::Arc<parking_lot::FairMutex<crate::terminal::TerminalModel>>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
@@ -398,7 +394,6 @@ impl UniversalDeveloperInputButtonBar {
                 menu_positioning_provider.clone(),
                 terminal_view_id,
                 input_model.clone(),
-                ambient_agent_view_model.clone(),
                 terminal_model.clone(),
                 None,
                 ctx,
@@ -412,7 +407,6 @@ impl UniversalDeveloperInputButtonBar {
                 menu_positioning_provider.clone(),
                 terminal_view_id,
                 input_model.clone(),
-                ambient_agent_view_model.clone(),
                 terminal_model.clone(),
                 None,
                 ctx,
@@ -533,9 +527,6 @@ impl UniversalDeveloperInputButtonBar {
         });
         ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |_, _, _, ctx| {
             ctx.notify();
-        });
-        ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |_, _, _, ctx| {
-            ctx.notify()
         });
 
         ctx.subscribe_to_model(&SessionSettings::handle(ctx), |_, _, event, ctx| {

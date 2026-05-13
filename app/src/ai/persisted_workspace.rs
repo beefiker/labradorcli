@@ -11,7 +11,6 @@ use repo_metadata::repositories::{DetectedRepositories, DetectedRepositoriesEven
 use serde::{Deserialize, Serialize};
 
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
-use crate::ai::AIRequestUsageModel;
 use crate::persistence::ModelEvent;
 use crate::report_if_error;
 use crate::send_telemetry_from_ctx;
@@ -637,14 +636,7 @@ impl PersistedWorkspace {
         manager: &mut CodebaseIndexManager,
         ctx: &mut ModelContext<CodebaseIndexManager>,
     ) {
-        let request_model = AIRequestUsageModel::handle(ctx);
-        let codebase_limits = request_model.as_ref(ctx).codebase_context_limits();
-        manager.update_max_limits(
-            codebase_limits.max_indices_allowed,
-            codebase_limits.max_files_per_repo,
-            codebase_limits.embedding_generation_batch_size,
-            ctx,
-        );
+        // AIRequestUsageModel removed; use default limits.
 
         #[cfg(feature = "local_fs")]
         for dir in all_working_directories(ctx) {
@@ -1227,7 +1219,7 @@ impl PersistedWorkspace {
 
 fn send_active_indexed_repos_changed_telemetry<T: Entity>(ctx: &mut ModelContext<T>) {
     let total = CodebaseIndexManager::as_ref(ctx).num_active_indices();
-    let hit_max = AIRequestUsageModel::as_ref(ctx).hit_codebase_index_limit(total);
+    let hit_max = false;
     send_telemetry_from_ctx!(
         TelemetryEvent::ActiveIndexedReposChanged {
             updated_number_of_codebase_indices: total,

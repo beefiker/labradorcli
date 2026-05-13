@@ -6,7 +6,6 @@ use warpui_extras::user_preferences;
 use crate::{
     appearance,
     banner::BannerState,
-    drive::settings::WarpDriveSettings,
     report_if_error,
     resource_center::TipsCompleted,
     search::command_search::settings::CommandSearchSettings,
@@ -24,7 +23,6 @@ use crate::{
     },
     undo_close::UndoCloseSettings,
     window_settings::WindowSettings,
-    workflows::aliases::WorkflowAliases,
     workspace::tab_settings::TabSettings,
 };
 
@@ -90,8 +88,6 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     SshSettings::register(ctx);
     VimBannerSettings::register(ctx);
     SharedSessionSettings::register(ctx);
-    WarpDriveSettings::register(ctx);
-    WorkflowAliases::register(ctx);
     EmacsBindingsSettings::register(ctx);
     SameLinePromptBlockSettings::register(ctx);
     SemanticSelection::register(ctx);

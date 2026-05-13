@@ -10,7 +10,6 @@ use crate::util::color::coloru_with_opacity;
 use crate::view_components::action_button::{ActionButtonTheme, NakedTheme};
 use crate::Appearance;
 
-pub mod plan_and_todo_list;
 pub mod prompt_alert;
 
 const BLURRED_OPACITY: u8 = 50;

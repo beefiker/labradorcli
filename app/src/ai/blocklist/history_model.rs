@@ -28,7 +28,7 @@ use crate::ai::agent::task::TaskId;
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::CancellationReason;
 use crate::ai::artifacts::Artifact;
-use crate::ai::document::ai_document_model::AIDocumentModel;
+
 use crate::input_suggestions::HistoryOrder;
 use crate::persistence::model::AgentConversationData;
 use crate::persistence::ModelEvent;

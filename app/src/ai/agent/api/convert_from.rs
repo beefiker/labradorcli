@@ -19,7 +19,7 @@ use crate::ai::agent::{
     WebSearchStatus,
 };
 use crate::ai::artifact_download::sanitized_basename;
-use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentVersion};
+use ai::document::{AIDocumentId, AIDocumentVersion};
 use ai::agent::action::LifecycleEventType as StartAgentLifecycleEventType;
 use ai::agent::action_result::StartAgentVersion;
 use ai::agent::convert::ToolToAIAgentActionError;

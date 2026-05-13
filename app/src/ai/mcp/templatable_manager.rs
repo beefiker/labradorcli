@@ -15,8 +15,6 @@ use std::collections::HashMap;
 #[cfg(not(target_family = "wasm"))]
 use std::sync::Arc;
 
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::mcp::templatable::CloudTemplatableMCPServer;
 use crate::ai::mcp::FileBasedMCPManager;
 use crate::ai::mcp::{templatable_installation::TemplatableMCPServerInstallation, MCPServerState};
 use futures_util::stream::AbortHandle;
@@ -39,8 +37,6 @@ type ReconnectResultSender =
 /// The core implementations are in the `native` and `wasm` modules.
 #[derive(Default)]
 pub struct TemplatableMCPServerManager {
-    #[cfg(not(target_family = "wasm"))]
-    cloud_templatable_mcp_servers: HashMap<Uuid, CloudTemplatableMCPServer>,
     locally_installed_servers: HashMap<Uuid, TemplatableMCPServerInstallation>,
     server_states: HashMap<Uuid, MCPServerState>,
     active_servers: HashMap<Uuid, TemplatableMCPServerInfo>,

@@ -23,10 +23,8 @@ use crate::terminal::cli_agent_sessions::plugin_manager::{
 use crate::terminal::cli_agent_sessions::{
     CLIAgentSessionStatus, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::{
-    ai::{
-        ambient_agents::AmbientAgentTaskId,
-    },
     auth::AuthStateProvider,
     server::server_api::{
         ai::AIClient,

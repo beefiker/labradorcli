@@ -16,15 +16,13 @@ use crate::warp_managed_paths_watcher::{
     repository_update_touches_path, repository_update_touches_prefix, WarpManagedPathsWatcher,
     WarpManagedPathsWatcherEvent,
 };
-use crate::workflows::workflow::Workflow;
 
 use super::util::{
     for_each_dir_entry, has_name, is_config_file, parse_multi_launch_config_dir_entry,
-    parse_multi_workflow_dir_entry, parse_single_theme_dir_entry, parse_tab_config_dir_entry,
+    parse_single_theme_dir_entry, parse_tab_config_dir_entry,
 };
 use super::{
-    launch_configs_dir, tab_configs_dir, themes_dir, workflows_dir, WarpConfigUpdateEvent,
-    LAUNCH_CONFIG_COMMENT,
+    launch_configs_dir, tab_configs_dir, themes_dir, WarpConfigUpdateEvent, LAUNCH_CONFIG_COMMENT,
 };
 
 impl super::WarpConfig {
@@ -55,13 +53,6 @@ impl super::WarpConfig {
                 },
             );
         }
-        let _ = ctx.spawn(
-            async move { load_workflows(&workflows_dir()) },
-            |me, user_workflows, ctx| {
-                me.local_user_workflows = user_workflows;
-                ctx.emit(WarpConfigUpdateEvent::LocalUserWorkflows);
-            },
-        );
         ctx.subscribe_to_model(
             &WarpManagedPathsWatcher::handle(ctx),
             Self::handle_warp_managed_paths_event,
@@ -87,17 +78,6 @@ impl super::WarpConfig {
                 |me, theme_config, ctx| {
                     me.theme_config = theme_config;
                     ctx.emit(WarpConfigUpdateEvent::Themes);
-                },
-            );
-        }
-
-        if update_touches_dir(update, &workflows_dir()) {
-            let workflow_dir = workflows_dir();
-            let _ = ctx.spawn(
-                async move { load_workflows(&workflow_dir) },
-                |me, workflows, ctx| {
-                    me.local_user_workflows = workflows;
-                    ctx.emit(WarpConfigUpdateEvent::LocalUserWorkflows);
                 },
             );
         }
@@ -171,15 +151,6 @@ pub fn load_theme_configs(theme_path: &Path) -> WarpThemeConfig {
         .into_iter()
         .for_each(|(theme_name, theme)| theme_configs.add_new_theme(theme_name, theme));
     theme_configs
-}
-
-/// Loads all workflows relative to the `workflow_path`.  A YAML file might
-/// contain multiple workflows.
-pub fn load_workflows(workflow_path: &Path) -> Vec<Workflow> {
-    for_each_dir_entry(workflow_path, parse_multi_workflow_dir_entry)
-        .into_iter()
-        .flatten()
-        .collect_vec()
 }
 
 /// Loads all launch configs relative to the `launch_config_path`. Each workflow is assumed to be in an

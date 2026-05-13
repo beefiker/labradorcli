@@ -246,8 +246,8 @@ where
 pub fn should_show_open_in_warp_link(path: &Path, app: &AppContext) -> bool {
     use crate::{
         code::view::is_binary_file,
-        notebooks::file::is_markdown_file,
         util::file::external_editor::{settings::EditorChoice, EditorSettings},
+        util::openable_file_type::is_markdown_file,
     };
     use warpui::SingletonEntity;
 

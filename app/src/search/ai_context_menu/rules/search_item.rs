@@ -3,7 +3,6 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 
 use crate::appearance::Appearance;
-use crate::cloud_object::{GenericStringObjectFormat, JsonObjectType, ObjectType};
 use crate::search::ai_context_menu::styles;
 use crate::search::ai_context_menu::{mixer::AIContextMenuSearchableAction, safe_truncate};
 use crate::search::item::SearchItem;
@@ -212,11 +211,8 @@ impl SearchItem for RuleSearchItem {
     }
 
     fn accept_result(&self) -> Self::Action {
-        AIContextMenuSearchableAction::InsertDriveObject {
-            object_type: ObjectType::GenericStringObject(GenericStringObjectFormat::Json(
-                JsonObjectType::AIFact,
-            )),
-            object_uid: self.rule_uid.clone(),
+        AIContextMenuSearchableAction::InsertText {
+            text: self.rule_uid.clone(),
         }
     }
 

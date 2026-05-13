@@ -1,7 +1,6 @@
 use session_sharing_protocol::common::{Guest, PendingGuest, Role, SessionId, TeamAclData};
 use warpui::{Entity, ModelContext, SingletonEntity};
 
-use crate::drive::sharing::SharingAccessLevel;
 pub struct SessionPermissionsManager {}
 
 impl SessionPermissionsManager {
@@ -29,10 +28,9 @@ impl SessionPermissionsManager {
         role: Option<Role>,
         ctx: &mut ModelContext<Self>,
     ) {
-        let access_level = role.map(|role| role.into());
         ctx.emit(SessionPermissionsEvent::LinkPermissionsUpdated {
             session_id,
-            access_level,
+            role,
         });
     }
 
@@ -59,7 +57,7 @@ pub enum SessionPermissionsEvent {
     },
     LinkPermissionsUpdated {
         session_id: SessionId,
-        access_level: Option<SharingAccessLevel>,
+        role: Option<Role>,
     },
     TeamPermissionsUpdated {
         session_id: SessionId,

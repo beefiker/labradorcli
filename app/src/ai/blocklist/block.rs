@@ -24,7 +24,6 @@ use crate::ai::agent::PassiveSuggestionTrigger;
 use crate::ai::agent::SuggestPromptRequest;
 use crate::ai::agent::SuggestPromptResult;
 use crate::ai::agent::TodoOperation;
-use crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE;
 use crate::ai::blocklist::agent_view::{AgentViewController, AgentViewEntryOrigin};
 use crate::ai::blocklist::context_model::AttachmentType;
 use crate::ai::blocklist::inline_action::code_diff_view::convert_file_edits_to_file_diffs;
@@ -39,14 +38,12 @@ use repo_metadata::repositories::DetectedRepositories;
 #[cfg(feature = "local_fs")]
 use crate::ai::skills::SkillOpenOrigin;
 use crate::ai::skills::{SkillManager, SkillTelemetryEvent};
-use crate::code::editor::comment_editor::create_readonly_comment_markdown_editor;
 use crate::code::editor::view::CodeEditorRenderOptions;
 use crate::code::editor_management::CodeSource;
 use crate::code_review::comment_rendering::{CommentViewCard, HeaderClickHandler};
 use crate::terminal::model::BlockId;
 use crate::terminal::model_events::ModelEvent;
 use crate::terminal::model_events::ModelEventDispatcher;
-use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 use crate::terminal::TerminalModel;
 use crate::view_components::action_button::{
     ActionButtonTheme, NakedTheme, PrimaryTheme, SecondaryTheme,
@@ -92,13 +89,8 @@ use crate::ai::blocklist::inline_action::search_codebase::{
 };
 use crate::ai::blocklist::inline_action::web_fetch::WebFetchView;
 use crate::ai::blocklist::inline_action::web_search::WebSearchView;
-use crate::ai::facts::{AIFact, AIMemory, CloudAIFactModel};
-use crate::ai::AIRequestUsageModel;
-use crate::ai::AIRequestUsageModelEvent;
-use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
-use crate::cloud_object::model::persistence::CloudModel;
+use crate::ai::facts::{AIFact, AIMemory};
 use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
-use crate::server::ids::SyncId;
 use crate::server::telemetry::AgentModeRewindEntrypoint;
 use crate::settings::InputSettings;
 use crate::terminal::view::{CodeDiffAction, TerminalAction};
@@ -167,14 +159,13 @@ use crate::ai::blocklist::permissions::{
     CommandExecutionPermission, CommandExecutionPermissionDeniedReason,
 };
 use crate::ai::blocklist::suggestion_chip_view::{SuggestedChipViewEvent, SuggestionChipView};
-use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel, AIDocumentVersion};
+use crate::server::ids::SyncId;
+use ai::document::{AIDocumentId, AIDocumentVersion};
 use crate::ai::get_relevant_files::controller::{
     GetRelevantFilesController, GetRelevantFilesControllerEvent,
 };
 use crate::auth::AuthStateProvider;
 use crate::code::editor::view::{CodeEditorEvent, CodeEditorView};
-use crate::notebooks::editor::model::FileLinkResolutionContext;
-use crate::notebooks::editor::view::{EditorViewEvent, RichTextEditorView};
 use crate::settings_view::SettingsSection;
 use crate::terminal::model::session::active_session::{ActiveSession, ActiveSessionEvent};
 use crate::terminal::{ShellLaunchData, TerminalView};
@@ -630,12 +621,11 @@ impl ImportedCommentGroup {
 pub(super) struct CommentElementState {
     pub(super) header_toggle_mouse_state: MouseStateHandle,
     pub(super) maximize_minimize_button: ViewHandle<ActionButton>,
-    pub(super) rich_text_editor: ViewHandle<RichTextEditorView>,
     pub(super) is_expanded: bool,
 }
 
 impl CommentElementState {
-    fn new(comment_id: CommentId, content: &str, ctx: &mut ViewContext<AIBlock>) -> Self {
+    fn new(comment_id: CommentId, _content: &str, ctx: &mut ViewContext<AIBlock>) -> Self {
         let action_button = ctx.add_view(move |_| {
             ActionButton::new("", NakedTheme)
                 .with_icon(Icon::Maximize)
@@ -645,16 +635,9 @@ impl CommentElementState {
                 .with_size(ButtonSize::Small)
         });
 
-        let rich_text_editor = create_readonly_comment_markdown_editor(
-            content, true, /* disable_scrolling */
-            None, /* allow comments to expand to full width */
-            ctx,
-        );
-
         CommentElementState {
             header_toggle_mouse_state: MouseStateHandle::default(),
             maximize_minimize_button: action_button,
-            rich_text_editor,
             is_expanded: false,
         }
     }
@@ -792,7 +775,6 @@ pub struct AIBlock {
     state_handles: AIBlockStateHandles,
     controller: ModelHandle<BlocklistAIController>,
     active_session: ModelHandle<ActiveSession>,
-    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
     terminal_view_id: EntityId,
     window_id: warpui::WindowId,
 
@@ -972,7 +954,6 @@ impl AIBlock {
         context_model: ModelHandle<BlocklistAIContextModel>,
         find_model: ModelHandle<TerminalFindModel>,
         active_session: ModelHandle<ActiveSession>,
-        ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
         cli_subagent_controller: &ModelHandle<CLISubagentController>,
         model_event_dispatcher: &ModelHandle<ModelEventDispatcher>,
         agent_view_controller: ModelHandle<AgentViewController>,
@@ -1102,32 +1083,7 @@ impl AIBlock {
                 .on_click(|ctx| ctx.dispatch_typed_action(AIBlockAction::OpenAIFactCollection))
         });
 
-        ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |me, _, event, ctx| {
-            if let AIRequestUsageModelEvent::RequestBonusRefunded {
-                requests_refunded,
-                server_conversation_id,
-                request_id,
-            } = event
-            {
-                let server_conversation_token = BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation(&me.client_ids.conversation_id)
-                    .and_then(|conversation| conversation.server_conversation_token())
-                    .cloned();
-
-                let server_output_id = me.model.server_output_id(ctx);
-
-                if let (Some(server_conversation_token), Some(server_output_id)) =
-                    (server_conversation_token, server_output_id)
-                {
-                    if request_id.eq(server_output_id.to_string().as_str())
-                        && server_conversation_id.eq(server_conversation_token.as_str())
-                    {
-                        me.request_refunded_count = Some(*requests_refunded);
-                        ctx.notify();
-                    }
-                }
-            }
-        });
+        // AIRequestUsageModel removed; request refund tracking is disabled.
 
         // Note: UpdatedStreamingExchange is handled by the dedicated on_updated_output()
         // callback in model_impl.rs, so we don't need to respond to it here.
@@ -1279,14 +1235,6 @@ impl AIBlock {
         let mut comment_states = HashMap::new();
         for (id, content) in comment_data {
             let state = CommentElementState::new(id, &content, ctx);
-            ctx.subscribe_to_view(&state.rich_text_editor, |me, view, event, ctx| {
-                if matches!(event, EditorViewEvent::TextSelectionChanged)
-                    && view.as_ref(ctx).selected_text(ctx).is_some()
-                {
-                    me.clear_other_selections(Some(view.id()), ctx.window_id(), ctx);
-                    ctx.emit(AIBlockEvent::ChildViewTextSelected);
-                }
-            });
             comment_states.insert(id, state);
         }
 
@@ -1327,7 +1275,6 @@ impl AIBlock {
             find_model,
             is_references_section_open: false,
             active_session,
-            ambient_agent_view_model,
             autonomy_setting_speedbump: Default::default(),
             suggested_rules: Default::default(),
             suggested_agent_mode_workflow: Default::default(),
@@ -2169,18 +2116,7 @@ impl AIBlock {
                 .map(|rule| rule.read(ctx, |rule, _| rule.logging_id()))
                 .collect_vec();
 
-            let existing_rules: HashSet<SuggestedLoggingId> = {
-                CloudModel::as_ref(ctx)
-                    .get_all_objects_of_type::<GenericStringObjectId, CloudAIFactModel>()
-                    .filter_map(|fact| {
-                        let AIFact::Memory(AIMemory {
-                            suggested_logging_id,
-                            ..
-                        }) = fact.model().string_model.clone();
-                        suggested_logging_id
-                    })
-                    .collect()
-            };
+            let existing_rules: HashSet<SuggestedLoggingId> = HashSet::new();
 
             for rule in suggestions.rules.into_iter() {
                 if existing_rules.contains(&rule.logging_id)
@@ -3339,69 +3275,11 @@ impl AIBlock {
 
     fn handle_create_documents_stream_update(
         &mut self,
-        action_id: &AIAgentActionId,
-        documents: &[DocumentToCreate],
-        ctx: &mut ViewContext<Self>,
+        _action_id: &AIAgentActionId,
+        _documents: &[DocumentToCreate],
+        _ctx: &mut ViewContext<Self>,
     ) {
-        let model_handle = AIDocumentModel::handle(ctx);
-        let conversation_id = self.client_ids.conversation_id;
-        // If the conversation stream has already been stopped, don't process the updates.
-        // We need to do this to avoid marking the document as streaming again in the AIDocumentModel on
-        // get_or_create_streaming_document_for_create_documents below after the stream has already been stopped.
-        // This might throw away the last update for a normally completed stream, but that's okay because
-        // we'll reset using the full content in the CreateDocumentsExecutor.
-        if !self.model.status(ctx).is_streaming() {
-            return;
-        }
-        let active_session_ref = self.active_session.as_ref(ctx);
-        let file_link_resolution_context =
-            active_session_ref
-                .current_working_directory()
-                .map(|working_directory| FileLinkResolutionContext {
-                    working_directory: working_directory.clone(),
-                    shell_launch_data: active_session_ref.shell_launch_data(ctx),
-                });
-
-        let mut opened_first = false;
-
-        for (index, document) in documents.iter().enumerate() {
-            let title = if document.title.is_empty() {
-                DEFAULT_PLANNING_DOCUMENT_TITLE.to_string()
-            } else {
-                document.title.clone()
-            };
-
-            let (document_id, created_new) = model_handle.update(ctx, |model, model_ctx| {
-                let (document_id, created_new) = model
-                    .get_or_create_streaming_document_for_create_documents(
-                        conversation_id,
-                        action_id,
-                        index,
-                        &title,
-                        document.content.clone(),
-                        file_link_resolution_context.clone(),
-                        model_ctx,
-                    );
-                if !created_new {
-                    model.apply_streamed_agent_update(
-                        &document_id,
-                        &title,
-                        &document.content,
-                        model_ctx,
-                    );
-                }
-                (document_id, created_new)
-            });
-
-            if created_new && !opened_first {
-                ctx.emit(AIBlockEvent::OpenAIDocumentPane {
-                    document_id,
-                    document_version: AIDocumentVersion::default(),
-                    is_auto_open: true,
-                });
-                opened_first = true;
-            }
-        }
+        // AIDocumentModel/notebooks editor were removed; this stream update is a no-op now.
     }
 
     fn calculate_renderable_action_index(
@@ -4477,9 +4355,9 @@ impl AIBlock {
                     .find_map(|search_view| search_view.as_ref(ctx).selected_text(ctx))
             })
             .or_else(|| {
-                self.comment_states
-                    .values()
-                    .find_map(|comment| comment.rich_text_editor.as_ref(ctx).selected_text(ctx))
+                let _ = &self.comment_states;
+                let _ = ctx;
+                None
             })
             .or_else(|| self.selected_text.read().clone())
     }
@@ -4592,16 +4470,7 @@ impl AIBlock {
             search_view.update(ctx, |view, ctx| view.clear_selection(ctx));
         }
 
-        for comment in self.comment_states.values() {
-            if source_view_id.is_some_and(|entity_id| comment.rich_text_editor.id() == entity_id)
-                && comment.rich_text_editor.window_id(ctx) == source_window_id
-            {
-                continue;
-            }
-            comment
-                .rich_text_editor
-                .update(ctx, |view, ctx| view.clear_text_selection(ctx));
-        }
+        let _ = (&self.comment_states, source_view_id, source_window_id);
 
         // If the event was dispatched by a nested view (i.e. code block, requested command, etc.),
         // clear the text selection at the `AIBlock` level (outside the code block).
@@ -6069,18 +5938,8 @@ impl TypedActionView for AIBlock {
                 }
 
                 if matches!(rating, AIBlockResponseRating::Negative) {
-                    if let Some(output_id) = output_id.clone() {
-                        let request_usage_model = AIRequestUsageModel::handle(ctx);
-                        request_usage_model.update(ctx, |request_usage_model, ctx| {
-                            request_usage_model
-                                .provide_negative_feedback_response_for_ai_conversation(
-                                    self.client_ids.conversation_id,
-                                    output_id.to_string(),
-                                    self.client_ids.client_exchange_id,
-                                    ctx,
-                                );
-                        });
-                    }
+                    // Negative feedback persistence removed alongside AIRequestUsageModel.
+                    let _ = output_id.clone();
                 }
 
                 let window_id = ctx.window_id();

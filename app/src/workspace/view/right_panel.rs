@@ -26,9 +26,12 @@ use crate::workspace::view::TOGGLE_RIGHT_PANEL_BINDING_NAME;
 use crate::workspace::WorkspaceAction;
 use crate::{
     appearance::Appearance,
-    drive::panel::{MAX_SIDEBAR_WIDTH_RATIO, MIN_SIDEBAR_WIDTH},
     terminal::resizable_data::{ModalType, ResizableData},
 };
+
+/// Fallback sidebar width constants (formerly in `drive::panel`).
+const MIN_SIDEBAR_WIDTH: f32 = 160.;
+const MAX_SIDEBAR_WIDTH_RATIO: f32 = 0.6;
 use crate::{code_review::diff_state::DiffStateModel, terminal::view::TerminalView};
 use dunce::canonicalize;
 use itertools::Itertools;

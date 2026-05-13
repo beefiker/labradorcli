@@ -62,8 +62,6 @@ use super::network::{
     control_action_failure_reason_string, session_ended_reason_string,
     viewer_removed_reason_string, write_to_pty_failure_reason_string, Network, NetworkEvent,
 };
-use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::terminal::view::ambient_agent::is_cloud_agent_pre_first_exchange;
 use crate::terminal::view::ExecuteCommandEvent;
 use crate::terminal::{Event as TerminalViewEvent, TerminalModel, TerminalView};
 use crate::view_components::ToastFlavor;
@@ -709,44 +707,12 @@ impl TerminalManager {
                     return;
                 };
 
-                let ambient_task_id: Option<AmbientAgentTaskId> = match &source_type {
-                    SessionSourceType::AmbientAgent { task_id } => {
-                        task_id.as_deref().and_then(|s| s.parse().ok())
-                    }
-                    _ => None,
-                };
-
-                // Mark terminal view as a shared ambient agent session view.
-                if matches!(&source_type, SessionSourceType::AmbientAgent { .. }) {
-                    let terminal_view_id = view.id();
-                    BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _ctx| {
-                        history.mark_terminal_view_as_ambient_agent_session_view(terminal_view_id);
-                    });
-
-                    // Register this ambient session as active for conversation list tracking.
-                    if let Some(task_id) = ambient_task_id {
-                        ActiveAgentViewsModel::handle(ctx).update(ctx, |model, ctx| {
-                            model.register_ambient_session(terminal_view_id, task_id, ctx);
-                        });
-                    }
-                }
-
                 let session_id = network.as_ref(ctx).session_id();
                 Manager::handle(ctx).update(ctx, |manager, ctx| {
                     manager.joined_share(weak_view_handle.clone(), session_id, ctx);
                 });
 
                 view.update(ctx, |terminal_view, ctx| {
-                    if let Some(task_id) = ambient_task_id {
-                        if let Some(ambient_agent_view_model) =
-                            terminal_view.ambient_agent_view_model()
-                        {
-                            ambient_agent_view_model.update(ctx, |model, ctx| {
-                                model.enter_viewing_existing_session(task_id, ctx);
-                            });
-                        }
-                    }
-
                     terminal_view.on_session_share_joined(
                         viewer_id.clone(),
                         *viewer_firebase_uid,
@@ -979,18 +945,6 @@ impl TerminalManager {
                 };
 
                 view.update(ctx, |view, ctx| {
-                    // In cloud-mode startup (before the first exchange), shared-session input
-                    // sync reflects environment setup commands. Skip applying remote edits so
-                    // the visible input isn't populated with setup-command text.
-                    if FeatureFlag::CloudModeSetupV2.is_enabled()
-                        && is_cloud_agent_pre_first_exchange(
-                            view.ambient_agent_view_model(),
-                            view.agent_view_controller(),
-                            ctx,
-                        )
-                    {
-                        return;
-                    }
                     view.input().update(ctx, |input, ctx| {
                         input.process_remote_edits(block_id, operations.clone(), ctx);
                     })
@@ -1294,17 +1248,7 @@ impl TerminalManager {
         let Some(view) = weak_view_handle.upgrade(ctx) else {
             return;
         };
-        // During cloud startup (pre-first-exchange), keep local input mode stable
-        // and ignore remote shell/ai mode toggles from session-sharing context sync.
-        let is_pre_first_exchange = FeatureFlag::CloudModeSetupV2.is_enabled()
-            && is_cloud_agent_pre_first_exchange(
-                view.as_ref(ctx).ambient_agent_view_model(),
-                view.as_ref(ctx).agent_view_controller(),
-                ctx,
-            );
-        let suppress_input_mode_update =
-            view.as_ref(ctx).is_shared_ambient_agent_session() || is_pre_first_exchange;
-        if suppress_input_mode_update {
+        if view.as_ref(ctx).is_shared_ambient_agent_session() {
             return;
         }
         apply_input_mode_update(weak_view_handle, input_mode, guard, ctx);

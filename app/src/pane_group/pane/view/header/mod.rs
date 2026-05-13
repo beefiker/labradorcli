@@ -45,8 +45,6 @@ use warpui::{
 
 use super::PaneDropTargetData;
 
-mod sharing;
-
 pub(crate) mod components;
 
 pub(crate) const PANE_HEADER_HEIGHT: f32 = 34.;

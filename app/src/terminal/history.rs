@@ -14,18 +14,14 @@ use super::{
     shell::ShellType,
 };
 use crate::{
-    cloud_object::{
-        model::{persistence::CloudModel, view::CloudViewModel},
-        Space,
-    },
     server::ids::{ClientId, HashableId as _, SyncId},
     terminal::model::session::{Session, SessionId},
     util::dedupe_from_last,
-    workflows::{
-        local_workflows::LocalWorkflows, workflow::Workflow, WorkflowId, WorkflowSource,
-        WorkflowType,
-    },
 };
+
+/// Stub for backward compat after workflows module deletion.
+#[derive(Clone, Debug)]
+pub enum LinkedWorkflowData {}
 
 mod up_arrow;
 pub(crate) use up_arrow::UpArrowHistoryConfig;
@@ -80,12 +76,7 @@ impl From<crate::persistence::model::Command> for PersistedCommand {
             }),
             git_branch: command.git_branch,
             workflow_id: command.cloud_workflow_id.and_then(|workflow_id| {
-                if let Some(client_id) = ClientId::from_hash(workflow_id.as_str()) {
-                    Some(SyncId::ClientId(client_id))
-                } else {
-                    WorkflowId::from_hash(workflow_id.as_str())
-                        .map(|id| SyncId::ServerId(id.into()))
-                }
+                ClientId::from_hash(workflow_id.as_str()).map(SyncId::ClientId)
             }),
             workflow_command: command.workflow_command,
             is_agent_executed: command.is_agent_executed.unwrap_or(false),
@@ -213,49 +204,6 @@ pub struct History {
     session_id_to_shell_host: HashMap<SessionId, ShellHost>,
 }
 
-#[derive(Clone, Debug)]
-pub enum LinkedWorkflowData {
-    /// The history entry is linked to a `CloudWorkflow` by its ID.
-    Id(SyncId),
-
-    /// The history entry is linked to a local `Workflow` by its command.
-    ///
-    /// Local workflows are not keyed by any common ID.
-    Command(String),
-}
-
-impl LinkedWorkflowData {
-    /// Returns the WorkflowType and WorkflowSource corresponding to this `LinkedWorkflowData`, if
-    /// any.
-    pub fn linked_workflow(&self, ctx: &AppContext) -> Option<(WorkflowType, WorkflowSource)> {
-        match self {
-            LinkedWorkflowData::Id(id) => {
-                let cloud_model = CloudModel::as_ref(ctx);
-                let workflow = cloud_model.get_workflow(id);
-                let workflow_source = match CloudViewModel::as_ref(ctx).object_space(&id.uid(), ctx)
-                {
-                    Some(Space::Team { team_uid }) => WorkflowSource::Team { team_uid },
-                    _ => WorkflowSource::PersonalCloud,
-                };
-                workflow.map(|workflow| {
-                    (
-                        WorkflowType::Cloud(Box::new(workflow.clone())),
-                        workflow_source,
-                    )
-                })
-            }
-            LinkedWorkflowData::Command(workflow_command) => {
-                if let Some((workflow_source, workflow)) = LocalWorkflows::as_ref(ctx)
-                    .workflow_with_command(ctx, workflow_command.as_str())
-                {
-                    Some((WorkflowType::Local(workflow.clone()), workflow_source))
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
 
 /// For history entries coming from the shell history file, only the command is populated.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -384,22 +332,6 @@ impl HistoryEntry {
         }
     }
 
-    /// Returns an `Option` containing the workflow linked to this command, if any.
-    ///
-    /// First looks up the workflow using `self.workflow_id`, then falls back to looking up the
-    /// workflow using `self.workflow_command`, if any.
-    pub fn linked_workflow(&self, app: &AppContext) -> Option<Workflow> {
-        match (&self.workflow_id, &self.workflow_command) {
-            (Some(workflow_id), _) => CloudModel::as_ref(app)
-                .get_workflow(workflow_id)
-                .map(|workflow| workflow.model().data.clone()),
-            (_, Some(workflow_command)) => LocalWorkflows::as_ref(app)
-                .workflow_with_command(app, workflow_command)
-                .map(|(_, workflow)| workflow.clone()),
-            _ => None,
-        }
-    }
-
     /// Indicates that at least one of the optional rich history fields is Some.
     pub fn has_metadata(&self) -> bool {
         // Destructure this so that we _must_ update this method when new metadata fields are added
@@ -426,17 +358,6 @@ impl HistoryEntry {
             || workflow_command.is_some()
     }
 
-    /// Returns `LinkedWorkflowData` referring to the workflow used to create this history command,
-    /// if any.
-    pub fn linked_workflow_data(&self) -> Option<LinkedWorkflowData> {
-        match (&self.workflow_id, &self.workflow_command) {
-            (Some(workflow_id), _) => Some(LinkedWorkflowData::Id(*workflow_id)),
-            (_, Some(workflow_command)) => {
-                Some(LinkedWorkflowData::Command(workflow_command.clone()))
-            }
-            _ => None,
-        }
-    }
 }
 
 impl From<PersistedCommand> for HistoryEntry {

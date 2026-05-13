@@ -9,8 +9,7 @@ use crate::code::editor::{
 use crate::{
     cmd_or_ctrl_shift, code_review::comments::CommentId,
     code_review::telemetry_event::CodeReviewTelemetryEvent, editor::InteractionState,
-    features::FeatureFlag, notebooks::editor::model::word_unit, send_telemetry_from_ctx,
-    util::bindings::CustomAction,
+    features::FeatureFlag, send_telemetry_from_ctx, util::bindings::CustomAction,
 };
 use lazy_static::lazy_static;
 use rangemap::RangeSet;
@@ -910,10 +909,10 @@ impl TypedActionView for CodeEditorView {
                 );
             }),
             DeleteWordLeft => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Backwards, word_unit(ctx), false, ctx);
+                model.delete(TextDirection::Backwards, TextUnit::Word, false, ctx);
             }),
             DeleteWordRight => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Forwards, word_unit(ctx), false, ctx);
+                model.delete(TextDirection::Forwards, TextUnit::Word, false, ctx);
             }),
             CutLineLeft => self.model.update(ctx, |model, ctx| {
                 model.delete(TextDirection::Backwards, TextUnit::LineBoundary, true, ctx);
@@ -922,10 +921,10 @@ impl TypedActionView for CodeEditorView {
                 model.delete(TextDirection::Forwards, TextUnit::LineBoundary, true, ctx);
             }),
             CutWordLeft => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Backwards, word_unit(ctx), true, ctx);
+                model.delete(TextDirection::Backwards, TextUnit::Word, true, ctx);
             }),
             CutWordRight => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Forwards, word_unit(ctx), true, ctx);
+                model.delete(TextDirection::Forwards, TextUnit::Word, true, ctx);
             }),
             MoveUp => self.model.update(ctx, |model, ctx| model.move_up(ctx)),
             MoveDown => self.model.update(ctx, |model, ctx| model.move_down(ctx)),

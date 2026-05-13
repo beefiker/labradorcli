@@ -13,34 +13,23 @@ use std::{collections::HashMap, future::Future};
 use crate::ai::mcp::http_client::build_client_with_headers;
 use crate::ai::mcp::templatable::GalleryData;
 use crate::ai::mcp::templatable_manager::FigmaMcpStatus;
-use crate::ai::mcp::{
-    Author, CloudMCPServer, JsonTemplate, MCPGalleryManager, MCPServerUpdate,
-    ParsedTemplatableMCPServerResult,
-};
+use crate::ai::mcp::{Author, JsonTemplate, MCPGalleryManager, MCPServerUpdate};
 
 use crate::ai::mcp::parsing::resolve_json;
 use crate::ai::mcp::TemplatableMCPServer;
 use crate::auth::AuthStateProvider;
-use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::{CloudObject, CloudObjectLocation, CloudObjectMetadataExt, Space};
-use crate::server::cloud_objects::update_manager::InitiatedBy;
-use crate::server::ids::{ClientId, ServerId};
+use crate::server::ids::ClientId;
 use crate::server::telemetry::{
     MCPServerModel, MCPServerTelemetryTransportType, MCPTemplateCreationSource,
 };
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{
     ai::mcp::{
-        logs, templatable::CloudTemplatableMCPServer, templatable_installation::VariableValue,
-        MCPServer, StaticEnvVar, TemplatableMCPServerInstallation, TransportType,
+        logs, templatable_installation::VariableValue, MCPServer, StaticEnvVar,
+        TemplatableMCPServerInstallation, TransportType,
     },
-    cloud_object::{GenericStringObjectFormat, JsonObjectType},
-    drive::CloudObjectTypeAndId,
     persistence::ModelEvent,
     send_telemetry_from_ctx,
-    server::{
-        cloud_objects::update_manager::UpdateManager, ids::SyncId, telemetry::TelemetryEvent,
-    },
+    server::telemetry::TelemetryEvent,
     settings::AISettings,
     view_components::DismissibleToast,
     workspace::ToastStack,
@@ -95,25 +84,6 @@ impl SpawnMode {
 
     fn is_reconnect(&self) -> bool {
         matches!(self, SpawnMode::Reconnect)
-    }
-}
-
-enum LegacyToTemplatableMCPConversionError {
-    TemplateAlreadyExists,
-    NoDBConnection,
-    InstallationFailed,
-}
-
-impl fmt::Display for LegacyToTemplatableMCPConversionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::TemplateAlreadyExists => write!(f, "templatable MCP server already exists"),
-            Self::NoDBConnection => write!(f, "failed to connect to database"),
-            Self::InstallationFailed => write!(
-                f,
-                "created template successfully, but could not create installation"
-            ),
-        }
     }
 }
 
@@ -199,91 +169,6 @@ impl TemplatableMCPServerManager {
             FileBasedMCPManagerEvent::CloudEnvMcpScanComplete { .. } => {}
         });
 
-        // TemplatableMCPServerManager is the source of truth for templatable MCP servers stored on the cloud
-        let cloud_model = CloudModel::handle(ctx);
-        ctx.subscribe_to_model(&cloud_model, |me, event, ctx| match event {
-            CloudModelEvent::ObjectUpdated {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                        id: _,
-                    },
-                source: _,
-            }
-            | CloudModelEvent::ObjectTrashed {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                        id: _,
-                    },
-                source: _,
-            }
-            | CloudModelEvent::ObjectUntrashed {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                        id: _,
-                    },
-                source: _,
-            }
-            | CloudModelEvent::ObjectDeleted {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                        id: _,
-                    },
-                folder_id: _,
-            }
-            | CloudModelEvent::ObjectSynced {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                        id: _,
-                    },
-                client_id: _,
-                server_id: _,
-            }
-            | CloudModelEvent::ObjectMoved {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                        id: _,
-                    },
-                source: _,
-                from_folder: _,
-                to_folder: _,
-            } => {
-                me.fetch_cloud_servers(ctx);
-            },
-            CloudModelEvent::ObjectCreated {
-                type_and_id:
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                        id: new_sync_id
-                    },
-            } => {
-                log::debug!("A new MCP server template was found with sync id {new_sync_id}");
-                if let Some(new_server) = CloudTemplatableMCPServer::get_by_id(new_sync_id, ctx) {
-                    let uuid = new_server.model().string_model.uuid;
-                    if let Some(legacy_server) = CloudMCPServer::get_by_uuid(&uuid, ctx) {
-                        let old_sync_id = legacy_server.sync_id();
-                        me.delete_legacy_mcp_server(old_sync_id, InitiatedBy::System, ctx);
-                        log::info!("Successfully converted MCP server {old_sync_id} into {uuid} with sync id {new_sync_id}.");
-                        ctx.emit(TemplatableMCPServerManagerEvent::LegacyServerConverted);
-                    }
-                }
-                me.fetch_cloud_servers(ctx);
-            },
-            _ => {}
-        });
-
         let database_connection =
             crate::persistence::database_file_path()
                 .to_str()
@@ -294,7 +179,6 @@ impl TemplatableMCPServerManager {
                 });
 
         let mut me = Self {
-            cloud_templatable_mcp_servers: Default::default(),
             server_states: Default::default(),
             active_servers: Default::default(),
             spawned_servers: Default::default(),
@@ -307,8 +191,6 @@ impl TemplatableMCPServerManager {
             pending_reconnections: Default::default(),
             pending_oauth_csrf: Default::default(),
         };
-
-        me.fetch_cloud_servers(ctx);
 
         // If we're not in a test, try to load credentials from secure storage.
         if !cfg!(test) {
@@ -332,60 +214,12 @@ impl TemplatableMCPServerManager {
             }
         }
 
-        // Migrate legacy MCPs to be templatables on app start. Uses UpdateManager
-        let servers_to_restart: HashSet<Uuid> =
-            running_legacy_server_uuids.iter().cloned().collect();
-        me.convert_all_legacy_to_templatable(servers_to_restart, ctx);
-
+        let _ = running_legacy_server_uuids;
         me
     }
 
-    fn delete_orphaned_installations(&mut self, ctx: &mut ModelContext<Self>) {
-        let orphaned_installations: Vec<Uuid> = self.locally_installed_servers
-            .iter()
-            .filter(|(_, installation)| {
-                // Gallery-sourced installations don't have a corresponding cloud template
-                // and should never be treated as orphans.
-                installation.gallery_uuid().is_none()
-                    && !self.cloud_templatable_mcp_servers.contains_key(&installation.template_uuid())
-            })
-            .map(|(installation_uuid, installation)| {
-                log::info!("Deleting orphaned MCP server installation {installation_uuid} named {} with no corresponding cloud template {}", installation.templatable_mcp_server().name, installation.template_uuid());
-                *installation_uuid
-            })
-            .collect();
-
-        self.delete_templatable_mcp_server_installations(orphaned_installations, ctx);
-    }
-
-    fn fetch_cloud_servers(&mut self, ctx: &mut ModelContext<Self>) {
-        self.cloud_templatable_mcp_servers = Self::get_cloud_servers(ctx);
-        self.delete_orphaned_installations(ctx);
-        ctx.emit(TemplatableMCPServerManagerEvent::TemplatableMCPServersUpdated);
-    }
-
-    fn get_cloud_servers(ctx: &mut ModelContext<Self>) -> HashMap<Uuid, CloudTemplatableMCPServer> {
-        let cloud_templatable_mcp_servers: Vec<CloudTemplatableMCPServer> =
-            CloudTemplatableMCPServer::get_all(ctx);
-        cloud_templatable_mcp_servers
-            .into_iter()
-            .map(|server| (server.model().string_model.uuid, server))
-            .collect()
-    }
-
-    pub fn get_cloud_server(
-        &self,
-        template_uuid: Uuid,
-        _ctx: &mut ModelContext<Self>,
-    ) -> Option<&CloudTemplatableMCPServer> {
-        self.cloud_templatable_mcp_servers.get(&template_uuid)
-    }
-
-    pub fn is_server_installation_shared(&self, installation_uuid: Uuid, app: &AppContext) -> bool {
-        match self.get_installed_server(&installation_uuid) {
-            Some(installation) => self.is_server_template_shared(installation.template_uuid(), app),
-            None => false,
-        }
+    pub fn is_server_installation_shared(&self, _installation_uuid: Uuid, _app: &AppContext) -> bool {
+        false
     }
 
     pub fn change_server_state(
@@ -409,91 +243,22 @@ impl TemplatableMCPServerManager {
         });
     }
 
-    pub fn is_server_template_shared(&self, template_uuid: Uuid, app: &AppContext) -> bool {
-        match self.get_space(template_uuid, app) {
-            Some(Space::Personal) => false,
-            Some(Space::Team { team_uid: _ }) => true,
-            Some(Space::Shared) => true,
-            None => false,
-        }
+    pub fn is_server_template_shared(&self, _template_uuid: Uuid, _app: &AppContext) -> bool {
+        false
     }
 
-    fn get_space(&self, template_uuid: Uuid, app: &AppContext) -> Option<Space> {
-        self.cloud_templatable_mcp_servers
-            .get(&template_uuid)
-            .map(|template| template.space(app))
-    }
-
-    /// Gets a CloudTemplatableMCPServer by its UUID.
-    /// Returns the CloudTemplatableMCPServer model if found, otherwise None.
-    pub fn get_cloud_templatable_mcp_server(
-        &self,
-        uuid: Uuid,
-    ) -> Option<&CloudTemplatableMCPServer> {
-        self.cloud_templatable_mcp_servers.get(&uuid)
-    }
-
-    pub fn get_creator(&self, template_uuid: Uuid, app: &AppContext) -> Option<String> {
-        let server = self.get_cloud_templatable_mcp_server(template_uuid);
-        server.map(|server| server.metadata().semantic_creator(app))?
+    pub fn get_creator(&self, _template_uuid: Uuid, _app: &AppContext) -> Option<String> {
+        None
     }
 
     /// Gets a TemplatableMCPServer by its UUID.
     /// Returns the TemplatableMCPServer model if found, otherwise None.
-    pub fn get_templatable_mcp_server(&self, uuid: Uuid) -> Option<&TemplatableMCPServer> {
-        self.get_cloud_templatable_mcp_server(uuid)
-            .map(|server| &server.model().string_model)
-    }
-
-    /// Creates a new templatable MCP server in the specified space.
-    pub fn create_templatable_mcp_server(
-        &mut self,
-        templatable_mcp_server: TemplatableMCPServer,
-        space: Space,
-        initiated_by: InitiatedBy,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let owner = UserWorkspaces::as_ref(ctx).space_to_owner(space, ctx);
-        if let Some(owner) = owner {
-            let update_manager = UpdateManager::handle(ctx);
-            update_manager.update(ctx, |update_manager, ctx| {
-                let client_id = ClientId::default();
-                update_manager.create_templatable_mcp_server(
-                    templatable_mcp_server.clone(),
-                    client_id,
-                    owner,
-                    initiated_by,
-                    ctx,
-                );
-            });
-        }
+    pub fn get_templatable_mcp_server(&self, _uuid: Uuid) -> Option<&TemplatableMCPServer> {
+        None
     }
 
     pub fn get_all_templatable_mcp_servers(&self) -> Vec<&TemplatableMCPServer> {
-        self.cloud_templatable_mcp_servers
-            .values()
-            .map(|server| &server.model().string_model)
-            .collect()
-    }
-
-    pub fn update_templatable_mcp_server(
-        &mut self,
-        template_server: TemplatableMCPServer,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let cloud_templatable_mcp_server =
-            self.get_cloud_templatable_mcp_server(template_server.uuid);
-        if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-            let update_manager = UpdateManager::handle(ctx);
-            update_manager.update(ctx, |update_manager, ctx| {
-                update_manager.update_templatable_mcp_server(
-                    template_server,
-                    cloud_templatable_mcp_server.id,
-                    cloud_templatable_mcp_server.metadata.revision.clone(),
-                    ctx,
-                );
-            });
-        }
+        Vec::new()
     }
 
     pub fn delete_templatable_mcp_server(&mut self, uuid: Uuid, ctx: &mut ModelContext<Self>) {
@@ -504,43 +269,6 @@ impl TemplatableMCPServerManager {
             self.delete_credentials_from_secure_storage(installation_uuid, ctx);
             self.delete_templatable_mcp_server_installation(installation_uuid, ctx);
         }
-
-        let cloud_templatable_mcp_server = self.get_cloud_templatable_mcp_server(uuid);
-        if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-            let cloud_object_type_and_id = CloudObjectTypeAndId::GenericStringObject {
-                object_type: GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                id: cloud_templatable_mcp_server.id,
-            };
-
-            let update_manager = UpdateManager::handle(ctx);
-            update_manager.update(ctx, |update_manager, ctx| {
-                update_manager.delete_object_by_user(cloud_object_type_and_id, ctx);
-            });
-        }
-    }
-
-    pub fn delete_legacy_mcp_server(
-        &mut self,
-        sync_id: SyncId,
-        initiated_by: InitiatedBy,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        // The legacy MCPServerManager no longer runs servers, so we only need
-        // to delete the cloud object. OAuth credentials were already copied
-        // during conversion.
-        let cloud_object_type_and_id = CloudObjectTypeAndId::GenericStringObject {
-            object_type: GenericStringObjectFormat::Json(JsonObjectType::MCPServer),
-            id: sync_id,
-        };
-
-        let update_manager = UpdateManager::handle(ctx);
-        update_manager.update(ctx, |update_manager, ctx| {
-            update_manager.delete_object_with_initiated_by(
-                cloud_object_type_and_id,
-                initiated_by,
-                ctx,
-            );
-        });
     }
 
     /// Get all runnable MCP servers (templatable installations).
@@ -553,12 +281,8 @@ impl TemplatableMCPServerManager {
     }
 
     /// Get all cloud synced MCP servers (templatable templates).
-    pub fn get_all_cloud_synced_mcp_servers(ctx: &AppContext) -> HashMap<Uuid, String> {
-        TemplatableMCPServerManager::as_ref(ctx)
-            .get_all_templatable_mcp_servers()
-            .iter()
-            .map(|&server| (server.uuid, server.name.clone()))
-            .collect()
+    pub fn get_all_cloud_synced_mcp_servers(_ctx: &AppContext) -> HashMap<Uuid, String> {
+        HashMap::new()
     }
 
     /// Get the name for an MCP server based on uuid.
@@ -1294,236 +1018,40 @@ impl TemplatableMCPServerManager {
         }
     }
 
-    pub fn is_authorized_editor(&self, template_uuid: Uuid, ctx: &AppContext) -> bool {
-        let cloud_templatable_mcp_server = self.get_cloud_templatable_mcp_server(template_uuid);
-
-        if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-            let auth_state = AuthStateProvider::as_ref(ctx).get();
-            let current_team = UserWorkspaces::as_ref(ctx).current_team();
-
-            let has_admin_permissions = current_team.is_some_and(|team| {
-                team.has_admin_permissions(&auth_state.user_email().unwrap_or_default())
-            });
-            let is_author = cloud_templatable_mcp_server.metadata().creator_uid
-                == auth_state.user_id().map(|user_id| user_id.as_string());
-
-            has_admin_permissions || is_author
-        } else {
-            false
-        }
+    pub fn is_authorized_editor(&self, _template_uuid: Uuid, _ctx: &AppContext) -> bool {
+        false
     }
 
-    pub fn is_author(&self, template_uuid: Uuid, ctx: &AppContext) -> bool {
-        let cloud_templatable_mcp_server = self.get_cloud_templatable_mcp_server(template_uuid);
-        if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-            let auth_state = AuthStateProvider::as_ref(ctx).get();
-            cloud_templatable_mcp_server.metadata().creator_uid
-                == auth_state.user_id().map(|user_id| user_id.as_string())
-        } else {
-            false
-        }
-    }
-
-    fn copy_oauth_from_legacy_to_templatable(
-        &mut self,
-        sync_id: SyncId,
-        template_uuid: Uuid,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        // Read legacy credentials directly from secure storage rather than
-        // going through the (now-removed) MCPServerManager singleton.
-        let legacy_credentials: HashMap<SyncId, oauth::PersistedCredentials> =
-            oauth::load_credentials_from_secure_storage(
-                ctx,
-                crate::ai::mcp::manager::oauth::LEGACY_MCP_CREDENTIALS_KEY,
-            );
-        if let Some(legacy_cred) = legacy_credentials.get(&sync_id) {
-            log::info!(
-                "Copying OAuth credentials from legacy server {sync_id} to template {template_uuid}"
-            );
-            self.server_credentials
-                .insert(template_uuid, legacy_cred.clone());
-            write_to_secure_storage(
-                ctx,
-                TEMPLATABLE_MCP_CREDENTIALS_KEY,
-                &self.server_credentials,
-            );
-        }
-    }
-
-    fn convert_legacy_to_templatable(
-        &mut self,
-        sync_id: SyncId,
-        mut legacy_mcp_server: MCPServer,
-        space: Space,
-        automatically_start_server: bool,
-        initiated_by: InitiatedBy,
-        ctx: &mut ModelContext<Self>,
-    ) -> Result<ParsedTemplatableMCPServerResult, LegacyToTemplatableMCPConversionError> {
-        let template_uuid = legacy_mcp_server.uuid;
-        if self.get_templatable_mcp_server(template_uuid).is_some() {
-            self.delete_legacy_mcp_server(sync_id, InitiatedBy::System, ctx);
-            return Err(LegacyToTemplatableMCPConversionError::TemplateAlreadyExists);
-        }
-
-        if let Some(conn) = &self.database_connection {
-            let mut conn = conn.lock();
-            legacy_mcp_server.fill_environment_variables(&mut conn);
-        } else {
-            return Err(LegacyToTemplatableMCPConversionError::NoDBConnection);
-        }
-
-        let parsed_result = legacy_mcp_server.to_parsed_templatable_mcp_server_result();
-        let ParsedTemplatableMCPServerResult {
-            templatable_mcp_server,
-            templatable_mcp_server_installation,
-        } = parsed_result.clone();
-        let template_uuid = templatable_mcp_server.uuid;
-        self.create_templatable_mcp_server(templatable_mcp_server, space, initiated_by, ctx);
-        self.copy_oauth_from_legacy_to_templatable(sync_id, template_uuid, ctx);
-        if let Some(templatable_mcp_server_installation) = templatable_mcp_server_installation {
-            let installation = self.install_from_template(
-                templatable_mcp_server_installation
-                    .templatable_mcp_server()
-                    .clone(),
-                templatable_mcp_server_installation
-                    .variable_values()
-                    .clone(),
-                automatically_start_server,
-                ctx,
-            );
-            if installation.is_some() {
-                return Ok(parsed_result);
-            }
-        }
-        Err(LegacyToTemplatableMCPConversionError::InstallationFailed)
-    }
-
-    /// To support deprecating the legacy MCPServerManager,
-    /// we need to convert all legacy MCP to templatable MCP on app start up
-    fn convert_all_legacy_to_templatable(
-        &mut self,
-        servers_to_restart: HashSet<Uuid>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        // Import inline because of circular dependencies
-        use crate::ai::mcp::CloudMCPServer;
-        let cloud_legacy_servers = CloudMCPServer::get_all(ctx);
-        log::info!(
-            "Converting {} legacy MCP servers into templatable MCP servers",
-            cloud_legacy_servers.len()
-        );
-        for cloud_legacy_server in cloud_legacy_servers {
-            let sync_id = cloud_legacy_server.sync_id();
-            let legacy_mcp_server = cloud_legacy_server.model().string_model.clone();
-            let uuid = legacy_mcp_server.uuid;
-            let result = self.convert_legacy_to_templatable(
-                sync_id,
-                legacy_mcp_server,
-                Space::Personal,
-                servers_to_restart.contains(&uuid),
-                InitiatedBy::System,
-                ctx,
-            );
-            match result {
-                Ok(result) => {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::MCPTemplateCreated {
-                            source: MCPTemplateCreationSource::Conversion,
-                            variables: result.templatable_mcp_server.template.variables,
-                            name: result.templatable_mcp_server.name,
-                        },
-                        ctx
-                    );
-                }
-                Err(e) => log::error!("{e}"),
-            }
-        }
+    pub fn is_author(&self, _template_uuid: Uuid, _ctx: &AppContext) -> bool {
+        false
     }
 
     pub fn share_templatable_mcp_server(
         &mut self,
-        template_uuid: Uuid,
-        ctx: &mut ModelContext<Self>,
+        _template_uuid: Uuid,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let sync_id = self
-            .get_cloud_templatable_mcp_server(template_uuid)
-            .map(|server| server.sync_id());
-        let team_uid = TemplatableMCPServerManager::get_first_team_space_id(ctx);
-
-        if let Some(sync_id) = sync_id {
-            if let Some(team_uid) = team_uid {
-                let object_type_and_id = CloudObjectTypeAndId::GenericStringObject {
-                    object_type: GenericStringObjectFormat::Json(
-                        JsonObjectType::TemplatableMCPServer,
-                    ),
-                    id: sync_id,
-                };
-                UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-                    update_manager.move_object_to_location(
-                        object_type_and_id,
-                        CloudObjectLocation::Space(Space::Team { team_uid }),
-                        ctx,
-                    );
-                });
-                send_telemetry_from_ctx!(TelemetryEvent::MCPTemplateShared, ctx);
-            }
-        }
     }
 
     pub fn share_templatable_mcp_server_installation(
         &mut self,
-        installation_uuid: Uuid,
-        ctx: &mut ModelContext<Self>,
+        _installation_uuid: Uuid,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let template_uuid = self.get_template_uuid(installation_uuid);
-        if let Some(template_uuid) = template_uuid {
-            self.share_templatable_mcp_server(template_uuid, ctx);
-        }
     }
 
     pub fn unshare_templatable_mcp_server(
         &mut self,
-        template_uuid: Uuid,
-        ctx: &mut ModelContext<Self>,
+        _template_uuid: Uuid,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let cloud_templatable_mcp_server = self.get_cloud_templatable_mcp_server(template_uuid);
-
-        if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-            let sync_id = cloud_templatable_mcp_server.sync_id();
-
-            let object_type_and_id = CloudObjectTypeAndId::GenericStringObject {
-                object_type: GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer),
-                id: sync_id,
-            };
-            UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-                update_manager.move_object_to_location(
-                    object_type_and_id,
-                    CloudObjectLocation::Space(Space::Personal),
-                    ctx,
-                );
-            });
-        }
     }
 
     pub fn unshare_templatable_mcp_server_installation(
         &mut self,
-        installation_uuid: Uuid,
-        ctx: &mut ModelContext<Self>,
+        _installation_uuid: Uuid,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let template_uuid = self.get_template_uuid(installation_uuid);
-        if let Some(template_uuid) = template_uuid {
-            self.unshare_templatable_mcp_server(template_uuid, ctx);
-        }
-    }
-
-    pub fn get_first_team_space_id(app: &AppContext) -> Option<ServerId> {
-        let user_workspaces = UserWorkspaces::as_ref(app);
-        let all_user_spaces = user_workspaces.all_user_spaces(app);
-        all_user_spaces.into_iter().find_map(|space| match space {
-            Space::Team { team_uid } => Some(team_uid),
-            _ => None,
-        })
     }
 
     pub fn has_oauth_credentials_for_server(&self, template_uuid: Uuid) -> bool {

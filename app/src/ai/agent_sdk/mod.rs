@@ -15,9 +15,7 @@ use crate::ai::agent_sdk::mcp_config::build_mcp_servers_from_specs;
 use crate::ai::aws_credentials::refresh_aws_credentials;
 use crate::ai::llms::LLMId;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
-use crate::cloud_object::model::persistence::CloudModel;
 use crate::server::server_api::ai::AIClient;
-use crate::workflows::workflow::Workflow;
 use ai::api_keys::{ApiKeyManager, AwsCredentialsRefreshStrategy};
 use anyhow::Context;
 use warp_cli::{
@@ -44,11 +42,65 @@ use warpui::ModelSpawner;
 use warpui::{platform::TerminationMode, AppContext, SingletonEntity};
 
 use crate::{
-    ai::ambient_agents::{task::HarnessConfig, AmbientAgentTaskId},
     auth::AuthStateProvider,
     send_telemetry_sync_from_app_ctx,
-    server::server_api::{ai::AgentConfigSnapshot, ServerApiProvider},
+    server::server_api::ServerApiProvider,
 };
+
+/// Type alias used internally by agent_sdk modules where the deleted
+/// `ambient_agents::AmbientAgentTaskId` previously lived. The cloud-hosted
+/// task plumbing is gone; we keep a uuid alias so the type still resolves.
+pub(crate) type AmbientAgentTaskId = uuid::Uuid;
+
+/// Placeholder for the deleted `cloud_object::Owner`. The Warp Drive sync
+/// infrastructure is gone; we keep a thin enum so the CLI plumbing still
+/// resolves the type name when validating personal/team flags.
+#[derive(Debug, Clone)]
+pub(crate) enum Owner {
+    User { user_uid: String },
+    Team { team_uid: String },
+}
+
+/// Placeholder for the deleted `HarnessConfig`. Only the `harness_type` field
+/// was meaningful for local agent runs.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct HarnessConfig {
+    pub harness_type: warp_cli::agent::Harness,
+}
+
+/// Placeholder for the deleted `AgentConfigSnapshot`. The cloud-hosted task
+/// runner is gone; this stub keeps signatures readable without depending on
+/// the deleted ai_client surface.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AgentConfigSnapshot {
+    pub name: Option<String>,
+    pub environment_id: Option<String>,
+    pub model_id: Option<String>,
+    pub base_prompt: Option<String>,
+    pub mcp_servers: Option<std::collections::HashMap<String, serde_json::Value>>,
+    pub profile_id: Option<String>,
+    pub worker_host: Option<String>,
+    pub skill_spec: Option<String>,
+    pub computer_use_enabled: Option<bool>,
+    pub harness: Option<HarnessConfig>,
+    pub harness_auth_secrets: Option<std::collections::HashMap<String, String>>,
+}
+
+impl AgentConfigSnapshot {
+    pub fn is_empty(&self) -> bool {
+        self.name.is_none()
+            && self.environment_id.is_none()
+            && self.model_id.is_none()
+            && self.base_prompt.is_none()
+            && self.mcp_servers.is_none()
+            && self.profile_id.is_none()
+            && self.worker_host.is_none()
+            && self.skill_spec.is_none()
+            && self.computer_use_enabled.is_none()
+            && self.harness.is_none()
+            && self.harness_auth_secrets.is_none()
+    }
+}
 use driver::AgentDriverError;
 use warp_graphql::object_permissions::OwnerType;
 
@@ -402,14 +454,10 @@ fn resolve_prompt(prompt: &Prompt, ctx: &AppContext) -> Result<String, AgentDriv
     match prompt {
         Prompt::PlainText(prompt_str) => Ok(prompt_str.to_string()),
         Prompt::SavedPrompt(workflow_id) => {
-            let Some(workflow) = CloudModel::as_ref(ctx).get_workflow_by_uid(workflow_id) else {
-                return Err(AgentDriverError::AIWorkflowNotFound(workflow_id.to_owned()));
-            };
-
-            let Workflow::AgentMode { query, .. } = &workflow.model().data else {
-                return Err(AgentDriverError::AIWorkflowNotFound(workflow_id.to_owned()));
-            };
-            Ok(query.to_owned())
+            // Workflow / CloudModel storage has been removed; saved prompts can
+            // no longer be resolved against Warp Drive.
+            let _ = ctx;
+            Err(AgentDriverError::AIWorkflowNotFound(workflow_id.to_owned()))
         }
     }
 }

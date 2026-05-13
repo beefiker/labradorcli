@@ -4,9 +4,7 @@ use std::{any::Any, path::PathBuf};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use command::r#async::Command;
-use itertools::Itertools as _;
 
-use crate::env_vars::{serialize_variables_for_shell, EnvVarValue};
 use crate::terminal::shell::Shell;
 
 use super::{CommandExecutor, CommandOutput, ExecuteCommandOptions};
@@ -35,27 +33,15 @@ impl CommandExecutor for RemoteCommandExecutor {
     async fn execute_command(
         &self,
         command: &str,
-        shell: &Shell,
+        _shell: &Shell,
         current_directory_path: Option<&str>,
-        environment_variables: Option<HashMap<String, String>>,
+        _environment_variables: Option<HashMap<String, String>>,
         _execute_command_options: ExecuteCommandOptions,
     ) -> Result<CommandOutput> {
         // We can't use `.env` and `.current_dir` here to set the PATH and current dir respectively
         // since this is run locally. We just need the subprocess to send the bytes over the
         // ssh connection. That's why we explicitly set the path and cwd as part of command_str.
         let mut command_str = String::new();
-        if let Some(environment_variables) = environment_variables {
-            let env_vars = environment_variables
-                .into_iter()
-                .map(|(key, value)| (key, EnvVarValue::Constant(value)))
-                .collect_vec();
-            let env_vars_str = serialize_variables_for_shell(
-                env_vars.iter().map(|(key, value)| (key.as_str(), value)),
-                shell.shell_type(),
-            );
-            command_str.push_str(&env_vars_str);
-            command_str.push(';');
-        }
         if let Some(current_directory_path) = current_directory_path {
             command_str.push_str(&format!("cd '{current_directory_path}' && "));
         }

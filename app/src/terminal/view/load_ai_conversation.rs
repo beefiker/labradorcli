@@ -34,8 +34,6 @@ use crate::ai::agent::{
     AIAgentAction, AIAgentActionType, AIAgentOutputMessage, AIAgentOutputMessageType,
     CreateDocumentsResult, EditDocumentsResult,
 };
-use crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE;
-use crate::ai::document::ai_document_model::AIDocumentModel;
 use crate::{
     ai::{
         agent::{
@@ -96,9 +94,6 @@ pub enum ConversationRestorationInNewPaneType {
     Historical {
         conversation: AIConversation,
         should_use_live_appearance: bool,
-        /// The ambient agent task ID, if this is an ambient agent conversation.
-        /// Used to display the session ended tombstone.
-        ambient_agent_task_id: Option<crate::ai::ambient_agents::AmbientAgentTaskId>,
     },
 
     /// Fork an existing conversation into this new pane.
@@ -351,96 +346,6 @@ impl TerminalView {
         conversations
     }
 
-    /// Restore AI documents from exchanges by processing CreateDocuments and EditDocuments actions.
-    /// This ensures documents are available before AI blocks are rendered.
-    fn restore_ai_documents_from_exchanges(
-        &self,
-        exchanges: &[&AIAgentExchange],
-        conversation_id: AIConversationId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let document_model = AIDocumentModel::handle(ctx);
-
-        for exchange in exchanges {
-            if let Some(output) = exchange.output_status.output() {
-                for message in &output.get().messages {
-                    if let AIAgentOutputMessage {
-                        message: AIAgentOutputMessageType::Action(action),
-                        ..
-                    } = message
-                    {
-                        match &action.action {
-                            AIAgentActionType::CreateDocuments(CreateDocumentsRequest {
-                                documents,
-                            }) => {
-                                if let Some(result) =
-                                    self.ai_action_model.read(ctx, |action_model, _| {
-                                        action_model.get_action_result(&action.id).cloned()
-                                    })
-                                {
-                                    if let AIAgentActionResultType::CreateDocuments(
-                                        CreateDocumentsResult::Success { created_documents },
-                                    ) = &result.result
-                                    {
-                                        // Create a mapping from document index to title
-                                        let document_titles: Vec<String> =
-                                            documents.iter().map(|doc| doc.title.clone()).collect();
-
-                                        document_model.update(ctx, |doc_model, doc_ctx| {
-                                            for (index, doc_context) in
-                                                created_documents.iter().enumerate()
-                                            {
-                                                let title = document_titles
-                                                    .get(index)
-                                                    .cloned()
-                                                    .unwrap_or_else(|| {
-                                                        DEFAULT_PLANNING_DOCUMENT_TITLE.to_string()
-                                                    });
-
-                                                doc_model.restore_document(
-                                                    doc_context.document_id,
-                                                    conversation_id,
-                                                    title,
-                                                    doc_context.content.clone(),
-                                                    exchange.start_time,
-                                                    doc_ctx,
-                                                );
-                                            }
-                                        });
-                                    }
-                                }
-                            }
-                            AIAgentActionType::EditDocuments { .. } => {
-                                if let Some(result) =
-                                    self.ai_action_model.read(ctx, |action_model, _| {
-                                        action_model.get_action_result(&action.id).cloned()
-                                    })
-                                {
-                                    if let AIAgentActionResultType::EditDocuments(
-                                        EditDocumentsResult::Success { updated_documents },
-                                    ) = &result.result
-                                    {
-                                        document_model.update(ctx, |doc_model, doc_ctx| {
-                                            for doc_context in updated_documents {
-                                                doc_model.restore_document_edit(
-                                                    &doc_context.document_id,
-                                                    doc_context.content.clone(),
-                                                    exchange.start_time,
-                                                    doc_ctx,
-                                                );
-                                            }
-                                        });
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /// Restore conversations from a list of AIBlockCreationParams. If the conversation has more exchanges
     /// than AIBlockCreationParams, (which can happen if we reach the max number of persisted ai blocks),
     /// we still only restore the blocks provided in ai_block_params.
@@ -462,13 +367,6 @@ impl TerminalView {
                 action_model
                     .restore_action_results_from_exchanges(exchanges_for_blocklist(conversation));
             });
-        }
-
-        // Restore AI documents for each conversation
-        for conversation in &conversations {
-            let conversation_id = conversation.id();
-            let exchanges = exchanges_for_blocklist(conversation);
-            self.restore_ai_documents_from_exchanges(&exchanges, conversation_id, ctx);
         }
 
         // Determine the active conversation id from the last AI block being restored
@@ -1063,7 +961,6 @@ impl TerminalView {
                 params.ai_context_model,
                 params.find_model,
                 params.active_session,
-                self.ambient_agent_view_model.clone(),
                 &params.cli_subagent_controller,
                 &params.model_events_handle,
                 self.agent_view_controller.clone(),

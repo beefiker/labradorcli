@@ -37,13 +37,9 @@ use crate::{
         },
     },
     banner::{Banner, BannerTextContent},
-    cloud_object::{CloudObject, Space},
     code::editor::view::{CodeEditorRenderOptions, CodeEditorView},
     persistence::ModelEvent,
-    server::{
-        cloud_objects::update_manager::InitiatedBy,
-        telemetry::{MCPTemplateCreationSource, TelemetryEvent},
-    },
+    server::telemetry::{MCPTemplateCreationSource, TelemetryEvent},
     settings_view::mcp_servers::{
         destructive_mcp_confirmation_dialog::{
             DestructiveMCPConfirmationDialog, DestructiveMCPConfirmationDialogEvent,
@@ -907,12 +903,6 @@ impl TypedActionView for MCPServersEditPageView {
                         TemplatableMCPServerManager::handle(ctx).update(
                             ctx,
                             |templatable_manager, ctx| {
-                                templatable_manager.create_templatable_mcp_server(
-                                    parsed_server.templatable_mcp_server.clone(),
-                                    Space::Personal,
-                                    InitiatedBy::User,
-                                    ctx,
-                                );
                                 if let Some(installation) =
                                     parsed_server.templatable_mcp_server_installation
                                 {
