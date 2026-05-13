@@ -136,96 +136,19 @@ impl AuthManager {
     /// back to Warp after login (or pastes the URL in the app).
     pub fn initialize_user_from_auth_payload(
         &mut self,
-        auth_payload: AuthRedirectPayload,
-        enforce_state_validation: bool,
-        ctx: &mut ModelContext<Self>,
+        _auth_payload: AuthRedirectPayload,
+        _enforce_state_validation: bool,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let AuthRedirectPayload {
-            refresh_token,
-            user_uid,
-            deleted_anonymous_user,
-            state,
-        } = auth_payload.clone();
-
-        if let Some(received_state) = &state {
-            if !self.consume_auth_state(received_state) {
-                if self.should_silently_ignore_stale_redirect(&user_uid) {
-                    log::info!(
-                        "Dropping auth redirect with stale state for already-logged-in user"
-                    );
-                    return;
-                }
-                ctx.emit(AuthManagerEvent::AuthFailed(
-                    UserAuthenticationError::InvalidStateParameter,
-                ));
-                return;
-            }
-        } else if enforce_state_validation {
-            if self.should_silently_ignore_stale_redirect(&user_uid) {
-                log::info!("Dropping auth redirect without state for already-logged-in user");
-                return;
-            }
-            ctx.emit(AuthManagerEvent::AuthFailed(
-                UserAuthenticationError::MissingStateParameter,
-            ));
-            return;
-        }
-
-        let auth_client = self.auth_client.clone();
-
-        if self.auth_state.is_user_anonymous().unwrap_or_default() {
-            let incoming_user_matches_current_user = match user_uid {
-                None => false,
-                Some(incoming_user_uid) => self
-                    .auth_state
-                    .user_id()
-                    .map(|current_user_uid| current_user_uid == incoming_user_uid)
-                    .unwrap_or_default(),
-            };
-            if !incoming_user_matches_current_user && !deleted_anonymous_user.unwrap_or_default() {
-                ctx.emit(AuthManagerEvent::LoginOverrideDetected(auth_payload));
-                return;
-            }
-        }
-
-        let _ = ctx.spawn(
-            async move {
-                auth_client
-                    .fetch_user(
-                        LoginToken::Firebase(FirebaseToken::Refresh(refresh_token)),
-                        false, /* for_refresh */
-                    )
-                    .await
-            },
-            Self::on_user_fetched,
-        );
+        // Local-only fork: no Warp Cloud login flow to consume an auth redirect.
     }
 
     pub fn resume_interrupted_auth_payload(
         &mut self,
-        auth_payload: AuthRedirectPayload,
-        ctx: &mut ModelContext<Self>,
+        _auth_payload: AuthRedirectPayload,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let AuthRedirectPayload {
-            refresh_token,
-            user_uid: _,
-            deleted_anonymous_user: _,
-            state: _,
-        } = auth_payload;
-
-        let auth_client = self.auth_client.clone();
-
-        let _ = ctx.spawn(
-            async move {
-                auth_client
-                    .fetch_user(
-                        LoginToken::Firebase(FirebaseToken::Refresh(refresh_token)),
-                        false, /* for_refresh */
-                    )
-                    .await
-            },
-            Self::on_user_fetched,
-        );
+        // Local-only fork: no Warp Cloud login flow to resume.
     }
 
     #[cfg(target_family = "wasm")]
@@ -840,6 +763,3 @@ impl Entity for AuthManager {
 
 impl SingletonEntity for AuthManager {}
 
-#[cfg(test)]
-#[path = "auth_manager_test.rs"]
-mod auth_manager_test;
