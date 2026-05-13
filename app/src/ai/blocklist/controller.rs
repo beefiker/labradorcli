@@ -59,7 +59,7 @@ use crate::terminal::{
 };
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{send_telemetry_from_ctx, server::telemetry::TelemetryEvent};
+use crate::{server::telemetry::TelemetryEvent};
 use anyhow::anyhow;
 use chrono::{DateTime, Local};
 use itertools::Itertools;

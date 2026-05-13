@@ -28,8 +28,7 @@ use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use warp_core::{
     features::FeatureFlag,
-    report_error, send_telemetry_from_ctx,
-    settings::Setting,
+    report_error,     settings::Setting,
     ui::{
         appearance::Appearance,
         color::contrast::{

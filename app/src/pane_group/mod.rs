@@ -135,7 +135,7 @@ use crate::terminal::view::{
 use crate::terminal::{
     MockTerminalManager, ShellLaunchData, ShellLaunchState,
 };
-use crate::{cmd_or_ctrl_shift, send_telemetry_from_ctx};
+use crate::{cmd_or_ctrl_shift};
 use session_sharing_protocol::sharer::SessionSourceType;
 use settings::Setting as _;
 

@@ -70,7 +70,7 @@ use self::execute::{
 
 use super::BlocklistAIHistoryModel;
 
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
+use crate::{TelemetryEvent};
 
 /// The status of an action from an AI output.
 #[derive(Clone, Debug)]

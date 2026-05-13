@@ -1,4 +1,4 @@
-use warp_core::{features::FeatureFlag, send_telemetry_from_ctx, ui::appearance::Appearance};
+use warp_core::{features::FeatureFlag, ui::appearance::Appearance};
 use warpui::{keymap::Keystroke, EntityId, SingletonEntity, ViewContext};
 
 use crate::{

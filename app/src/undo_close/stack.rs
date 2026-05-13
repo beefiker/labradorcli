@@ -8,8 +8,7 @@ use crate::{
     ai::active_agent_views_model::ActiveAgentViewsModel,
     ai::blocklist::BlocklistAIHistoryModel,
     pane_group::{PaneGroup, PaneId},
-    send_telemetry_from_app_ctx,
-    server::telemetry::{TelemetryEvent, UndoCloseItemType},
+        server::telemetry::{TelemetryEvent, UndoCloseItemType},
     tab::TabData,
     workspace::Workspace,
 };

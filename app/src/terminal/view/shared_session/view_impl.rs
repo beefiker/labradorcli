@@ -30,7 +30,7 @@ use crate::{
     menu::{MenuItem, MenuItemFields},
     terminal::shared_session::presence_manager::{Event as PresenceManagerEvent, PresenceManager},
 };
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
+use crate::{TelemetryEvent};
 use chrono::{DateTime, Local};
 use itertools::Itertools;
 use session_sharing_protocol::common::{

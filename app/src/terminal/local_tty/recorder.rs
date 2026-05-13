@@ -1,5 +1,5 @@
 use crate::{
-    auth::auth_state::AuthState, send_telemetry_on_executor, server::telemetry::TelemetryEvent,
+    auth::auth_state::AuthState, server::telemetry::TelemetryEvent,
     terminal::TerminalModel,
 };
 use async_broadcast::Receiver;

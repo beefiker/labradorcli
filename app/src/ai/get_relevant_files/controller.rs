@@ -23,8 +23,7 @@ use crate::{
         get_relevant_files::api::{FileContext, GetRelevantFiles},
         outline::{OutlineStatus, RepoOutlines},
     },
-    report_error, send_telemetry_from_ctx,
-    server::server_api::{AIApiError, ServerApiProvider},
+    report_error,     server::server_api::{AIApiError, ServerApiProvider},
     TelemetryEvent,
 };
 

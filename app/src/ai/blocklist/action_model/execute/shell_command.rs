@@ -36,7 +36,7 @@ use crate::{
         TerminalModel,
     },
 };
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
+use crate::{TelemetryEvent};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 

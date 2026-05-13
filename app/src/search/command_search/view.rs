@@ -40,8 +40,7 @@ use crate::{
         search_bar::{SearchBar, SearchBarEvent, SearchBarState, SearchResultOrdering},
         QueryFilter,
     },
-    send_telemetry_from_ctx,
-    server::{ids::ServerId, server_api::ai::AIClient, telemetry::TelemetryEvent},
+        server::{ids::ServerId, server_api::ai::AIClient, telemetry::TelemetryEvent},
     settings::AISettings,
     terminal::{
         input::MenuPositioning,

@@ -1,7 +1,6 @@
 use crate::{
     appearance::Appearance,
-    send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
+        server::telemetry::TelemetryEvent,
     settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier},
     themes::theme::Fill,
 };

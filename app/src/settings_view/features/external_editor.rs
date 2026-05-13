@@ -10,8 +10,7 @@ use warpui::{
 
 use crate::{
     appearance::Appearance,
-    report_if_error, send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
+    report_if_error,     server::telemetry::TelemetryEvent,
     settings_view::settings_page::{
         render_body_item, render_dropdown_item, AdditionalInfo, LocalOnlyIconState, ToggleState,
     },

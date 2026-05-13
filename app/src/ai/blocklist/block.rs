@@ -201,8 +201,7 @@ use crate::code_review::comments::{
 use crate::PrivacySettings;
 use crate::{
     ai::agent::{AIAgentInput, ServerOutputId},
-    send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
+        server::telemetry::TelemetryEvent,
     settings::AISettings,
 };
 

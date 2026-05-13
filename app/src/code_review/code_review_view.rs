@@ -169,8 +169,7 @@ use crate::{
     code_review::diff_selector::{DiffSelector, DiffSelectorEvent, DiffTarget},
     editor::InteractionState,
     pane_group::pane::{view, BackingView, PaneEvent},
-    send_telemetry_from_ctx,
-    themes::theme::WarpTheme,
+        themes::theme::WarpTheme,
 };
 
 use vec1::Vec1;

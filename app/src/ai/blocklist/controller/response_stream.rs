@@ -14,8 +14,7 @@ use crate::{
         AIIdentifiers, CancellationReason,
     },
     network::NetworkStatus,
-    report_error, send_telemetry_from_ctx,
-    server::server_api::ServerApiProvider,
+    report_error,     server::server_api::ServerApiProvider,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

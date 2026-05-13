@@ -164,8 +164,7 @@ use crate::{
         },
         QueryFilter,
     },
-    send_telemetry_from_ctx,
-    server::{
+        server::{
         ids::SyncId,
         server_api::ServerApi,
         telemetry::{

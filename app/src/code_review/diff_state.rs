@@ -38,7 +38,7 @@ use super::diff_size_limits::compute_diff_size;
 
 #[cfg(not(target_family = "wasm"))]
 use warp_core::channel::ChannelState;
-use warp_core::{safe_warn, send_telemetry_from_ctx};
+use warp_core::{safe_warn};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {

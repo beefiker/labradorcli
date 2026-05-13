@@ -16,7 +16,7 @@ use crate::remote_server::ssh_transport::SshTransport;
 use crate::server::server_api::ServerApiProvider;
 use crate::terminal::model::session::{IsLegacySSHSession, SessionInfo};
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
+use crate::{TelemetryEvent};
 use remote_server::setup::RemotePlatform;
 
 use super::pty_controller::{EventLoopSender, PtyController};

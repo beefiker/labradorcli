@@ -8,8 +8,7 @@ use warpui::{Entity, ModelContext};
 
 use crate::{
     ai_assistant::utils::{AssistantTranscriptPart, TranscriptPartSubType},
-    send_telemetry_from_ctx,
-    server::{
+        server::{
         server_api::{ai::AIClient, ServerApi},
         telemetry::{TelemetryEvent, WarpAIRequestResult},
     },

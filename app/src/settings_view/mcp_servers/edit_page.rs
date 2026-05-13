@@ -9,8 +9,7 @@ use parking_lot::Mutex;
 use pathfinder_geometry::vector::vec2f;
 use uuid::Uuid;
 use warp_core::{
-    send_telemetry_from_ctx,
-    ui::{appearance::Appearance, theme::color::internal_colors},
+        ui::{appearance::Appearance, theme::color::internal_colors},
 };
 use warp_editor::{
     content::buffer::InitialBufferState, render::element::VerticalExpansionBehavior,

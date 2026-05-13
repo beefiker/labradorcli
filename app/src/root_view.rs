@@ -53,8 +53,7 @@ use crate::{
     app_state::{AppState, PaneUuid, WindowSnapshot},
     autoupdate::{RequestType, UpdateReady},
     pane_group::{NewTerminalOptions, PanesLayout},
-    send_telemetry_from_ctx,
-    server::{server_api::ServerTime, telemetry::TelemetryEvent},
+        server::{server_api::ServerTime, telemetry::TelemetryEvent},
     UpdateQuakeModeEventArg,
 };
 use crate::{
@@ -64,7 +63,7 @@ use crate::{
     server::server_api::ServerApi,
     workspace::{view::OnboardingTutorial, PaneViewLocator, Workspace},
 };
-use crate::{send_telemetry_from_app_ctx, GlobalResourceHandles, GlobalResourceHandlesProvider};
+use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 use anyhow::Result;
 use cfg_if::cfg_if;
 use itertools::Itertools;

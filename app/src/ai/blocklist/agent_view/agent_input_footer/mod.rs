@@ -22,8 +22,7 @@ use crate::{
     },
     features::FeatureFlag,
     network::NetworkStatus,
-    send_telemetry_from_ctx,
-    server::telemetry::{PluginChipTelemetryKind, TelemetryEvent},
+        server::telemetry::{PluginChipTelemetryKind, TelemetryEvent},
     settings::{AISettings, AISettingsChangedEvent},
     settings_view::SettingsSection,
     terminal::{

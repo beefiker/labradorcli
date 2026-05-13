@@ -11,7 +11,7 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 
 use crate::ai::llms::LLMId;
 use crate::ai::mcp::templatable_manager::TemplatableMCPServerManagerEvent;
-use crate::{send_telemetry_from_ctx, LaunchMode, TelemetryEvent};
+use crate::{LaunchMode, TelemetryEvent};
 
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::settings::AgentModeCommandExecutionPredicate;

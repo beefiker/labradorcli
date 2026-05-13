@@ -12,7 +12,7 @@ use crate::{
         blocklist::{action_model::AIAgentActionType, BlocklistAIPermissions},
         mcp::TemplatableMCPServerManager,
     },
-    send_telemetry_from_app_ctx, TelemetryEvent,
+    TelemetryEvent,
 };
 #[cfg(not(target_family = "wasm"))]
 use itertools::Itertools;

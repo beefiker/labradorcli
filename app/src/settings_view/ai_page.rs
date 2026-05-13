@@ -124,7 +124,7 @@ use crate::{
     util::bindings,
     view_components::{Dropdown, DropdownItem},
 };
-use crate::{report_error, report_if_error, send_telemetry_from_ctx};
+use crate::{report_error, report_if_error};
 use crate::{TelemetryEvent, UserWorkspaces};
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use std::borrow::Cow;

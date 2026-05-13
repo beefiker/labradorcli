@@ -46,7 +46,7 @@ use crate::terminal::shared_session::manager::Manager as SharedSessionManager;
 use crate::workspace::{Workspace, WorkspaceAction};
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::{persistence, GlobalResourceHandlesProvider};
-use crate::{report_if_error, send_telemetry_sync_from_app_ctx};
+use crate::{report_if_error};
 
 /// Prefix for API keys used in authentication
 #[cfg_attr(target_family = "wasm", allow(dead_code))]

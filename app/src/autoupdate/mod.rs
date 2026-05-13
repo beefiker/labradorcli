@@ -10,7 +10,7 @@ use crate::features::FeatureFlag;
 use crate::server::server_api::ServerApi;
 use crate::workspace::Workspace;
 use crate::{
-    channel::Channel, report_if_error, send_telemetry_from_ctx, server::datetime_ext::DateTimeExt,
+    channel::Channel, report_if_error, server::datetime_ext::DateTimeExt,
     ChannelState,
 };
 use ::channel_versions::{ParsedVersion, VersionInfo};

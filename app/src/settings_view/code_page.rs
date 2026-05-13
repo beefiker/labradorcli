@@ -15,8 +15,7 @@ use crate::{
     },
     appearance::Appearance,
     code::lsp_telemetry::{LspControlActionType, LspEnablementSource, LspTelemetryEvent},
-    send_telemetry_from_ctx,
-    settings::{AISettings, CodeSettings},
+        settings::{AISettings, CodeSettings},
     terminal::general_settings::GeneralSettings,
     ui_components::{
         avatar::{Avatar, AvatarContent, StatusElementTypes},

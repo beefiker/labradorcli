@@ -10,7 +10,7 @@ use crate::server::telemetry::{LoginEventSource, TelemetryEvent};
 use crate::settings::PrivacySettings;
 use crate::themes::theme::Fill as ThemeFill;
 use crate::util::bindings::CustomAction;
-use crate::{send_telemetry_from_ctx, send_telemetry_sync_from_ctx};
+use crate::{send_telemetry_sync_from_ctx};
 
 use onboarding::slides::{layout, slide_content};
 use onboarding::{OnboardingIntention, AI_FEATURES, WARP_DRIVE_FEATURES};

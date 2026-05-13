@@ -45,8 +45,7 @@ use crate::{
         llms::LLMPreferences,
         AgentTip,
     },
-    send_telemetry_from_app_ctx,
-    server::telemetry::TelemetryEvent,
+        server::telemetry::TelemetryEvent,
     settings::{InputModeSettings, InputSettings},
     settings_view::keybindings::KeybindingChangedNotifier,
     terminal::{

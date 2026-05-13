@@ -17,8 +17,7 @@ use crate::ai::paths::{host_native_absolute_path, join_paths, shell_native_absol
 use crate::terminal::model::session::ExecuteCommandOptions;
 use crate::{
     ai::agent::AIAgentActionResultType,
-    send_telemetry_from_app_ctx,
-    terminal::{
+        terminal::{
         model::session::active_session::ActiveSession, model::session::Session, shell::ShellType,
         ShellLaunchData,
     },

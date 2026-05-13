@@ -9,7 +9,7 @@ use crate::code::editor::{
 use crate::{
     cmd_or_ctrl_shift, code_review::comments::CommentId,
     code_review::telemetry_event::CodeReviewTelemetryEvent, editor::InteractionState,
-    features::FeatureFlag, send_telemetry_from_ctx, util::bindings::CustomAction,
+    features::FeatureFlag, util::bindings::CustomAction,
 };
 use lazy_static::lazy_static;
 use rangemap::RangeSet;

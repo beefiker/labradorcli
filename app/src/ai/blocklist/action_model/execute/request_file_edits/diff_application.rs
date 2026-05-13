@@ -22,8 +22,7 @@ use crate::{
         paths::host_native_absolute_path,
     },
     auth::auth_state::AuthState,
-    safe_debug, safe_warn, send_telemetry_on_executor,
-};
+    safe_debug, safe_warn, };
 
 use super::telemetry::{
     DiffInvalidFileEvent, DiffMatchFailedEvent, MissingLineNumbersEvent,

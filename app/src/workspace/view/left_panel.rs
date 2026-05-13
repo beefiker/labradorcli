@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use warp_core::ui::theme::color::internal_colors;
-use warp_core::{send_telemetry_from_ctx, ui::Icon};
+use warp_core::{ui::Icon};
 use warp_util::path::LineAndColumnArg;
 use warpui::{
     elements::{

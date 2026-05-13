@@ -19,8 +19,7 @@ use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::{
     ai::persisted_workspace::all_working_directories,
-    safe_info, safe_warn, send_telemetry_from_ctx,
-    settings::{
+    safe_info, safe_warn,     settings::{
         AISettings, AISettingsChangedEvent, CodeSettings, CodeSettingsChangedEvent, InputSettings,
         InputSettingsChangedEvent,
     },

@@ -305,7 +305,7 @@ use crate::{
     settings,
     ui_components::blended_colors,
 };
-use crate::{send_telemetry_from_ctx, GlobalResourceHandles};
+use crate::{GlobalResourceHandles};
 
 use futures::Future;
 use itertools::Itertools;

@@ -19,8 +19,7 @@ use crate::{
         },
     },
     features::FeatureFlag,
-    send_telemetry_from_ctx,
-    terminal::model::session::active_session::ActiveSession,
+        terminal::model::session::active_session::ActiveSession,
     TelemetryEvent,
 };
 

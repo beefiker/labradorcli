@@ -90,7 +90,7 @@ use crate::{
     },
     workspaces::user_profiles::UserProfileWithUID,
 };
-use crate::{report_error, report_if_error, safe_info, send_telemetry_from_app_ctx};
+use crate::{report_error, report_if_error, safe_info};
 use lsp::supported_servers::LSPServerType;
 
 diesel::define_sql_function! {

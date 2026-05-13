@@ -40,8 +40,7 @@ use warpui::{platform::TerminationMode, AppContext, SingletonEntity};
 
 use crate::{
     auth::AuthStateProvider,
-    send_telemetry_sync_from_app_ctx,
-    server::server_api::ServerApiProvider,
+        server::server_api::ServerApiProvider,
 };
 
 /// Type alias used internally by agent_sdk modules where the deleted

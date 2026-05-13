@@ -21,8 +21,7 @@ use crate::{
             ACCEPT_PROMPT_SUGGESTION_KEYBINDING, REJECT_PROMPT_SUGGESTION_KEYSTROKE,
         },
     },
-    send_telemetry_from_ctx,
-    server::telemetry::ToggleCodeSuggestionsSettingSource,
+        server::telemetry::ToggleCodeSuggestionsSettingSource,
     settings::AISettings,
     ui_components::{blended_colors, icons::Icon},
     view_components::{

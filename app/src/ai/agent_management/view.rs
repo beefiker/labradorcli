@@ -56,7 +56,7 @@ use crate::view_components::FilterableDropdown;
 use crate::workspace::{ForkedConversationDestination, ToastStack};
 use crate::workspace::{RestoreConversationLayout, WorkspaceAction};
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{send_telemetry_from_ctx, AgentModeEntrypoint};
+use crate::{AgentModeEntrypoint};
 use pathfinder_geometry::vector::vec2f;
 use settings::Setting;
 use warp_cli::agent::Harness;

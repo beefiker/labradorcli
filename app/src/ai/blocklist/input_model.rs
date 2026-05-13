@@ -28,8 +28,7 @@ use warp_completer::completer::CompletionContext;
 
 use crate::{
     input_classifier::InputClassifierModel,
-    report_if_error, send_telemetry_from_ctx,
-    settings::{AISettings, AISettingsChangedEvent, InputBoxType, InputSettings},
+    report_if_error,     settings::{AISettings, AISettingsChangedEvent, InputBoxType, InputSettings},
     terminal::{
         input::decorations::ParsedTokensSnapshot,
         model::{rich_content::RichContentType, session::SessionId},

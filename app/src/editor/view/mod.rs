@@ -38,7 +38,7 @@ use pathfinder_color::ColorU;
 use settings::Setting as _;
 use snapshot::{EditorHeightShrinkDelay, ViewSnapshot};
 use vec1::{vec1, Vec1};
-use warp_core::{safe_error, send_telemetry_from_ctx};
+use warp_core::{safe_error};
 use warp_util::{path::ShellFamily, user_input::UserInput};
 use warpui::platform::keyboard::KeyCode;
 use warpui::ui_components::button::ButtonTooltipPosition;

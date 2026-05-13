@@ -26,8 +26,7 @@ use warpui::{BlurContext, FocusContext};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{
     appearance::Appearance,
-    send_telemetry_from_ctx,
-    server::telemetry::{SaveAsWorkflowModalSource, TelemetryEvent, WarpAIActionType},
+        server::telemetry::{SaveAsWorkflowModalSource, TelemetryEvent, WarpAIActionType},
     ui_components::blended_colors,
 };
 
