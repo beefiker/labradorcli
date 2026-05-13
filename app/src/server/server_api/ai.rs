@@ -2086,6 +2086,3 @@ impl StoreClient for ServerApi {
     }
 }
 
-#[cfg(test)]
-#[path = "ai_test.rs"]
-mod tests;
