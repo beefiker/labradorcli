@@ -82,43 +82,18 @@ impl AgentNotificationsModel {
     /// Marks all notifications from the given terminal view as read.
     pub(crate) fn mark_items_from_terminal_view_read(
         &mut self,
-        terminal_view_id: EntityId,
-        ctx: &mut ModelContext<Self>,
+        _terminal_view_id: EntityId,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        if !FeatureFlag::HOANotifications.is_enabled() {
-            return;
-        }
-        if self
-            .notifications
-            .mark_all_terminal_view_items_as_read(terminal_view_id)
-        {
-            ctx.emit(AgentManagementEvent::NotificationUpdated);
-        }
+        // HOA notifications feature removed; no-op.
     }
 
     fn handle_active_agent_views_changed(
         &mut self,
-        event: &ActiveAgentViewsEvent,
-        ctx: &mut ModelContext<Self>,
+        _event: &ActiveAgentViewsEvent,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        if !FeatureFlag::HOANotifications.is_enabled() {
-            return;
-        }
-
-        match event {
-            ActiveAgentViewsEvent::ConversationClosed { conversation_id } => {
-                // When a conversation is closed, clean up its notifications
-                // (as there's no conversation to navigate to when you click said notifications).
-                if self
-                    .notifications
-                    .remove_by_origin(NotificationOrigin::Conversation(*conversation_id))
-                {
-                    ctx.emit(AgentManagementEvent::NotificationUpdated);
-                }
-            }
-            ActiveAgentViewsEvent::TerminalViewFocused
-            | ActiveAgentViewsEvent::WindowClosed => {}
-        }
+        // HOA notifications feature removed; no-op.
     }
 
     fn handle_cli_agent_session_event(
@@ -126,10 +101,6 @@ impl AgentNotificationsModel {
         event: &CLIAgentSessionsModelEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        if !FeatureFlag::HOANotifications.is_enabled() {
-            return;
-        }
-
         match event {
             CLIAgentSessionsModelEvent::Ended {
                 terminal_view_id, ..
@@ -208,13 +179,11 @@ impl AgentNotificationsModel {
             conversation_id, ..
         } = event
         {
-            if FeatureFlag::HOANotifications.is_enabled() {
-                self.pending_artifacts.remove(conversation_id);
-                self.remove_notification_by_source(
-                    NotificationOrigin::Conversation(*conversation_id),
-                    ctx,
-                );
-            }
+            self.pending_artifacts.remove(conversation_id);
+            self.remove_notification_by_source(
+                NotificationOrigin::Conversation(*conversation_id),
+                ctx,
+            );
             return;
         }
 
@@ -225,12 +194,10 @@ impl AgentNotificationsModel {
             ..
         } = event
         {
-            if FeatureFlag::HOANotifications.is_enabled() {
-                self.pending_artifacts
-                    .entry(*conversation_id)
-                    .or_default()
-                    .push(artifact.clone());
-            }
+            self.pending_artifacts
+                .entry(*conversation_id)
+                .or_default()
+                .push(artifact.clone());
             return;
         }
 
@@ -254,19 +221,6 @@ impl AgentNotificationsModel {
         }
 
         let status = updated_conversation.status().clone();
-        let latest_query = updated_conversation.latest_user_query();
-        if FeatureFlag::HOANotifications.is_enabled() {
-            self.handle_history_event_for_mailbox(
-                &status,
-                *conversation_id,
-                latest_query,
-                *terminal_view_id,
-                ctx,
-            );
-            // The new mailbox path handled the event — skip the legacy toast path below.
-            return;
-        }
-
         if !status.should_trigger_notification() {
             return;
         }

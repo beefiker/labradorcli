@@ -5258,13 +5258,9 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::CLIAgentPluginChipClicked { .. }
             | Self::CLIAgentPluginChipDismissed { .. }
             | Self::CLIAgentPluginOperationSucceeded { .. }
-            | Self::CLIAgentPluginOperationFailed { .. } => {
-                EnablementState::Flag(FeatureFlag::HOANotifications)
-            }
+            | Self::CLIAgentPluginOperationFailed { .. } => EnablementState::Always,
             Self::CLIAgentPluginDetected { .. } => EnablementState::Always,
-            Self::AgentNotificationShown { .. } => {
-                EnablementState::Flag(FeatureFlag::HOANotifications)
-            }
+            Self::AgentNotificationShown { .. } => EnablementState::Always,
             Self::CLIAgentRichInputOpened { .. }
             | Self::CLIAgentRichInputClosed { .. }
             | Self::CLIAgentRichInputSubmitted { .. } => {

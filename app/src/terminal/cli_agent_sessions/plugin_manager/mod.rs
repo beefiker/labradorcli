@@ -232,22 +232,13 @@ pub(crate) fn plugin_manager_for_with_shell(
             shell_type,
             path_env_var,
         ))),
-        CLIAgent::OpenCode
-            if FeatureFlag::OpenCodeNotifications.is_enabled()
-                && FeatureFlag::HOANotifications.is_enabled() =>
-        {
+        CLIAgent::OpenCode if FeatureFlag::OpenCodeNotifications.is_enabled() => {
             Some(Box::new(OpenCodePluginManager))
         }
-        CLIAgent::Codex
-            if FeatureFlag::CodexNotifications.is_enabled()
-                && FeatureFlag::HOANotifications.is_enabled() =>
-        {
+        CLIAgent::Codex if FeatureFlag::CodexNotifications.is_enabled() => {
             Some(Box::new(CodexPluginManager))
         }
-        CLIAgent::Gemini
-            if FeatureFlag::GeminiNotifications.is_enabled()
-                && FeatureFlag::HOANotifications.is_enabled() =>
-        {
+        CLIAgent::Gemini if FeatureFlag::GeminiNotifications.is_enabled() => {
             Some(Box::new(GeminiPluginManager::new(
                 shell_path,
                 shell_type,

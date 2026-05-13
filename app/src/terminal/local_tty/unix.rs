@@ -311,15 +311,10 @@ fn build_host_shell_command(
     // logic if this flag is set.
     builder.env("WARP_IS_LOCAL_SHELL_SESSION", "1");
 
-    // Only advertise the protocol version when the HOA notifications feature is enabled.
-    // Without it, Warp can't render structured CLI agent notifications,
-    // so the plugin should fall back to legacy notifications.
-    if FeatureFlag::HOANotifications.is_enabled() {
-        builder.env(
-            "WARP_CLI_AGENT_PROTOCOL_VERSION",
-            current_protocol_version().to_string(),
-        );
-    }
+    builder.env(
+        "WARP_CLI_AGENT_PROTOCOL_VERSION",
+        current_protocol_version().to_string(),
+    );
 
     if shell_debug_mode {
         builder.env("WARP_SHELL_DEBUG_MODE", "1");
@@ -789,12 +784,10 @@ fn build_docker_sandbox_command(
     );
     builder.env("SSH_SOCKET_DIR", ssh_socket_dir());
     builder.env("WARP_IS_LOCAL_SHELL_SESSION", "1");
-    if FeatureFlag::HOANotifications.is_enabled() {
-        builder.env(
-            "WARP_CLI_AGENT_PROTOCOL_VERSION",
-            current_protocol_version().to_string(),
-        );
-    }
+    builder.env(
+        "WARP_CLI_AGENT_PROTOCOL_VERSION",
+        current_protocol_version().to_string(),
+    );
     if shell_debug_mode {
         builder.env("WARP_SHELL_DEBUG_MODE", "1");
     }

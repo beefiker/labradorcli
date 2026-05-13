@@ -1,4 +1,3 @@
-use warp_core::features::FeatureFlag;
 use warpui::{App, EntityId, ModelHandle};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
@@ -43,7 +42,6 @@ fn make_plan_artifact(doc_uid: &str, title: &str) -> Artifact {
 #[test]
 fn artifact_event_accumulates_into_pending() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::HOANotifications.override_enabled(true);
         let (history, notifications) = setup_app(&mut app);
 
         let conversation_id = AIConversationId::new();
@@ -68,7 +66,6 @@ fn artifact_event_accumulates_into_pending() {
 #[test]
 fn multiple_artifacts_accumulated_across_turns() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::HOANotifications.override_enabled(true);
         let (history, notifications) = setup_app(&mut app);
 
         let conversation_id = AIConversationId::new();
@@ -101,7 +98,6 @@ fn multiple_artifacts_accumulated_across_turns() {
 #[test]
 fn flush_drains_pending_artifacts() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::HOANotifications.override_enabled(true);
         let (history, notifications) = setup_app(&mut app);
 
         let conversation_id = AIConversationId::new();
@@ -130,7 +126,6 @@ fn flush_drains_pending_artifacts() {
 #[test]
 fn flush_returns_empty_vec_when_no_artifacts() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::HOANotifications.override_enabled(true);
         let (_history, notifications) = setup_app(&mut app);
 
         let conversation_id = AIConversationId::new();
@@ -145,7 +140,6 @@ fn flush_returns_empty_vec_when_no_artifacts() {
 #[test]
 fn deletion_cleans_up_pending_artifacts() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::HOANotifications.override_enabled(true);
         let (history, notifications) = setup_app(&mut app);
 
         let conversation_id = AIConversationId::new();
@@ -176,7 +170,6 @@ fn deletion_cleans_up_pending_artifacts() {
 #[test]
 fn separate_conversations_have_independent_pending_artifacts() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::HOANotifications.override_enabled(true);
         let (history, notifications) = setup_app(&mut app);
 
         let conv_a = AIConversationId::new();

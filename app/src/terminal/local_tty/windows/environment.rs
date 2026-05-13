@@ -109,16 +109,6 @@ pub(super) fn get_shell_environment_variables(options: &PtyOptions) -> Vec<u16> 
         },
     );
 
-    if FeatureFlag::HOANotifications.is_enabled() {
-        env.insert(
-            map_key("WARP_CLI_AGENT_PROTOCOL_VERSION".into()),
-            EnvEntry {
-                preferred_key: "WARP_CLI_AGENT_PROTOCOL_VERSION".into(),
-                value: current_protocol_version().to_string().into(),
-            },
-        );
-    }
-
     let ssh_socket_dir = ssh_socket_dir();
     env.insert(
         map_key(SSH_SOCKET_DIR.into()),

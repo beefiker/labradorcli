@@ -820,9 +820,6 @@ impl AgentInputFooter {
             if self.plugin_operation_in_progress {
                 return None;
             }
-            if !FeatureFlag::HOANotifications.is_enabled() {
-                return None;
-            }
 
             let ai_settings = AISettings::as_ref(app);
             if !*ai_settings.show_agent_notifications {
