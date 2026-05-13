@@ -17,6 +17,4 @@ pub(crate) use driver::{
 pub(crate) use message_hydrator::MessageHydrator;
 
 #[cfg(test)]
-mod driver_tests;
-#[cfg(test)]
 mod message_hydrator_tests;

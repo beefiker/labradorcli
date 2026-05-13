@@ -435,7 +435,7 @@ fn test_move_by_word() {
             editor.cursor_at(CharOffset::from(1), ctx);
             editor.add_cursor_at(14.into(), ctx);
 
-            editor.forward_word_with_unit(true, word_unit(ctx), ctx);
+            editor.forward_word_with_unit(true, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), ctx);
         });
 
         editor.read(&app, |editor, ctx| {
@@ -455,7 +455,7 @@ fn test_move_by_word() {
         });
 
         editor.update(&mut app, |editor, ctx| {
-            editor.backward_word_with_unit(false, word_unit(ctx), ctx);
+            editor.backward_word_with_unit(false, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), ctx);
         });
 
         editor.read(&app, |editor, ctx| {
