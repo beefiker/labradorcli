@@ -22533,7 +22533,7 @@ impl TerminalView {
         cli_agent: Option<crate::server::telemetry::CLIAgentType>,
         ctx: &mut ViewContext<Self>,
     ) {
-        use crate::server::telemetry::{FileTreeSource, TelemetryEvent};
+        use crate::server::telemetry::{FileTreeSource};
 
         self.toggle_left_panel_file_tree(false, ctx);
     }

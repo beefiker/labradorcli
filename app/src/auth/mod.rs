@@ -36,7 +36,7 @@ use warpui::{AppContext, SingletonEntity};
 
 use crate::focus_running_window_and_show_native_modal;
 use crate::palette::PaletteMode;
-use crate::server::telemetry::{PaletteSource, TelemetryEvent};
+use crate::server::telemetry::{PaletteSource};
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::{
     CloudPreferencesSettings, PrivacySettings, CRASH_REPORTING_ENABLED_DEFAULTS_KEY,

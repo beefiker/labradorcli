@@ -125,7 +125,7 @@ use crate::{
     view_components::{Dropdown, DropdownItem},
 };
 use crate::{report_error, report_if_error};
-use crate::{TelemetryEvent, UserWorkspaces};
+use crate::{UserWorkspaces};
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use std::borrow::Cow;
 use std::cell::RefCell;

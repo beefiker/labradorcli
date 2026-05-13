@@ -112,7 +112,7 @@ use crate::resource_center::{
 };
 use crate::server::ids::ObjectUid;
 use warp_server_client::ids::SyncId;
-use crate::server::telemetry::{AnonymousUserSignupEntrypoint, PaletteSource, TelemetryEvent};
+use crate::server::telemetry::{AnonymousUserSignupEntrypoint, PaletteSource};
 use crate::session_management::SessionNavigationData;
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
 use crate::terminal::general_settings::{GeneralSettings, GeneralSettingsChangedEvent};

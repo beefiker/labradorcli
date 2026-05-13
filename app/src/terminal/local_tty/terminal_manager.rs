@@ -71,7 +71,7 @@ use crate::features::FeatureFlag;
 use crate::pane_group::TerminalViewResources;
 use crate::persistence::ModelEvent;
 
-use crate::server::telemetry::{TelemetryAgentViewEntryOrigin, TelemetryEvent};
+use crate::server::telemetry::{TelemetryAgentViewEntryOrigin};
 use crate::settings::DebugSettings;
 use crate::settings::{PrivacySettings, SshSettings};
 

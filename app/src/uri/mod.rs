@@ -9,7 +9,7 @@ use crate::ai::agent::api::ServerConversationToken;
 use crate::launch_configs::launch_config::LaunchConfig;
 use crate::linear::{LinearAction, LinearIssueWork};
 use crate::root_view::{open_new_window_get_handles, OpenLaunchConfigArg};
-use crate::server::telemetry::{LaunchConfigUiLocation, TelemetryEvent};
+use crate::server::telemetry::{LaunchConfigUiLocation};
 use crate::util::openable_file_type::{is_file_openable_in_warp, is_markdown_file};
 use crate::workspace::ToastStack;
 use crate::workspace::{Workspace, WorkspaceAction, WorkspaceRegistry};
