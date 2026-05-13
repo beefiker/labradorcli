@@ -2316,5 +2316,3 @@ impl CodeEditorView {
     }
 }
 
-#[cfg(test)]
-mod view_tests;

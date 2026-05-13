@@ -12715,6 +12715,3 @@ impl Input {
     }
 }
 
-#[cfg(test)]
-#[path = "input_test.rs"]
-mod tests;

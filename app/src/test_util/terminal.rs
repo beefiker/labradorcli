@@ -48,7 +48,6 @@ use crate::{
         alt_screen_reporting::AltScreenReporting, keys::TerminalKeybindings,
         resizable_data::ResizableData, History, TerminalView,
     },
-    workflows::local_workflows::LocalWorkflows,
     workspace::{sync_inputs::SyncedInputState, ActiveSession},
     workspaces::{
         team_tester::TeamTesterStatus, update_manager::TeamUpdateManager,

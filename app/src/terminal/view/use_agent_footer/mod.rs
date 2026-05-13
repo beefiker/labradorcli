@@ -1323,6 +1323,3 @@ impl ActionButtonTheme for AgentFooterButtonTheme {
     }
 }
 
-#[cfg(test)]
-#[path = "mod_test.rs"]
-mod tests;

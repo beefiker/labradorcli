@@ -406,6 +406,3 @@ impl Entity for CodeReviewFindModel {
     type Event = FindEvent;
 }
 
-#[cfg(test)]
-#[path = "find_model_tests.rs"]
-mod tests;

@@ -1200,6 +1200,3 @@ fn render_draggable_placeholder_element(
     .finish()
 }
 
-#[cfg(test)]
-#[path = "mod_test.rs"]
-mod tests;

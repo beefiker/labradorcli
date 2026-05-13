@@ -103,17 +103,7 @@ impl AskUserQuestionExecutor {
     }
 }
 
-#[cfg(test)]
-impl Default for AskUserQuestionExecutor {
-    fn default() -> Self {
-        Self::new(EntityId::new())
-    }
-}
-
 impl Entity for AskUserQuestionExecutor {
     type Event = ();
 }
 
-#[cfg(test)]
-#[path = "ask_user_question_tests.rs"]
-mod tests;

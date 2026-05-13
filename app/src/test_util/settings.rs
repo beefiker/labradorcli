@@ -14,7 +14,6 @@ pub fn initialize_settings_for_tests_with_mode(
     is_sandboxed: bool,
 ) {
     use crate::{
-        drive::settings::WarpDriveSettings,
         search::command_search::settings::CommandSearchSettings,
         settings::{
             app_icon::AppIconSettings, init_and_register_user_preferences,
@@ -91,7 +90,6 @@ pub fn initialize_settings_for_tests_with_mode(
     ThemeSettings::register(app);
     UndoCloseSettings::register(app);
     VimBannerSettings::register(app);
-    WarpDriveSettings::register(app);
     WindowSettings::register(app);
     SharedSessionSettings::register(app);
     CodeSettings::register(app);
