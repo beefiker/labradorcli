@@ -869,57 +869,45 @@ impl ServerApi {
         }
     }
 
-    /// Synchronously sends a [`TelemetryEvent`] to the Rudderstack API. Prefer not to call this
-    /// directly, use the macros defined in crate::server::telemetry::macros. If telemetry is
-    /// disabled, this is a no-op.
+    /// No-op replacement for the original Rudderstack `track` send. dwarf is
+    /// a local-only CLI terminal and does not phone home to any analytics
+    /// backend.
     pub async fn send_telemetry_event(
         &self,
-        event: impl TelemetryEvent,
-        settings_snapshot: PrivacySettingsSnapshot,
+        _event: impl TelemetryEvent,
+        _settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<()> {
-        let user_id = self.auth_state.user_id();
-        let anonymous_id = self.auth_state.anonymous_id();
-        self.telemetry_api
-            .send_telemetry_event(user_id, anonymous_id, event, settings_snapshot)
-            .await
+        Ok(())
     }
 
-    /// Drains all queued [`TelemetryEvent`]s into Rudderstack requests containing the corresponding
-    /// batch of events. Events are queued using the [`send_telemetry_from_ctx`] or
-    /// [`send_telemetry_from_app_ctx`] macros. If telemetry is disabled for the user, this flushes
-    /// the UI framework event queue and does nothing with them (no request is made).
-    ///
-    /// Returns the number of events that were flushed.
+    /// No-op replacement for the original Rudderstack queue flusher. dwarf
+    /// keeps an in-memory event queue for compatibility but never sends it
+    /// over the network.
     pub async fn flush_telemetry_events(
         &self,
-        settings_snapshot: PrivacySettingsSnapshot,
+        _settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<usize> {
-        self.telemetry_api.flush_events(settings_snapshot).await
+        Ok(0)
     }
 
-    /// Sends a batched Rudder request containing events written to the file at `path`. This is a
-    /// no-op if telemetry is disabled.
+    /// No-op replacement for the original Rudderstack file-flush. dwarf
+    /// never writes telemetry to disk so there is nothing to forward.
     pub async fn flush_persisted_events_to_rudder(
         &self,
-        path: &Path,
-        settings_snapshot: PrivacySettingsSnapshot,
+        _path: &Path,
+        _settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<()> {
-        self.telemetry_api
-            .flush_persisted_events_to_rudder(path, settings_snapshot)
-            .await
+        Ok(())
     }
 
-    /// Writes all queued [`TelemetryEvent`]s to a file, limiting the number of written
-    /// events to `max_events`. Events are queued using the [`send_telemetry_from_ctx`] or
-    /// [`send_telemetry_from_app_ctx`] macros. If telemetry is disabled, no events are written to
-    /// disk.
+    /// No-op replacement for the original on-quit persistence. dwarf does
+    /// not retain telemetry events between sessions.
     pub fn persist_telemetry_events(
         &self,
-        max_event_count: usize,
-        settings_snapshot: PrivacySettingsSnapshot,
+        _max_event_count: usize,
+        _settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<()> {
-        self.telemetry_api
-            .flush_and_persist_events(max_event_count, settings_snapshot)
+        Ok(())
     }
 
     /// Hits the /ai/generate_input_suggestions endpoint to get the predicted next action, based on past context.

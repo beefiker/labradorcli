@@ -1007,6 +1007,3 @@ impl Entity for UserWorkspaces {
 /// Mark UserWorkspaces as global application state.
 impl SingletonEntity for UserWorkspaces {}
 
-#[cfg(test)]
-#[path = "user_workspaces_tests.rs"]
-mod user_workspaces_tests;
