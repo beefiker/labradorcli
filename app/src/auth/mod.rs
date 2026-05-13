@@ -1,21 +1,14 @@
 pub mod anonymous_id;
 pub mod auth_manager;
-mod auth_override_warning_body;
-pub mod auth_override_warning_modal;
 pub mod auth_state;
 mod auth_view_body;
 pub mod auth_view_modal;
 mod auth_view_shared_helpers;
 pub mod credentials;
-mod login_error_modal;
 mod login_failure_notification;
 pub mod login_slide;
-pub mod needs_sso_link_view;
-pub mod paste_auth_token_modal;
 pub mod user;
 pub mod user_uid;
-#[cfg(target_family = "wasm")]
-pub mod web_handoff;
 
 use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
@@ -55,9 +48,7 @@ pub const API_KEY_PREFIX: &str = "wk-";
 pub fn init(app: &mut AppContext) {
     auth_view_modal::init(app);
     auth_view_body::init(app);
-    auth_override_warning_body::init(app);
     login_slide::init(app);
-    paste_auth_token_modal::init(app);
 }
 
 /// If the app has running processes or dirty objects, we'll show a confirmation modal before logging out.
