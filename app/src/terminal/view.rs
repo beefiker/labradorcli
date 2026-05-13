@@ -23791,10 +23791,6 @@ impl TypedActionView for TerminalView {
                 self.is_cloud_mode_details_panel_open = !self.is_cloud_mode_details_panel_open;
                 ctx.notify();
             }
-            CancelAmbientAgentTask => {
-                // Ambient agent tasks have been removed from this fork.
-                ctx.notify();
-            }
             ToggleUsageFooter => {
                 self.toggle_usage_footer(ctx);
             }
