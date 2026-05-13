@@ -383,7 +383,3 @@ impl Input {
         }
     }
 }
-
-#[cfg(test)]
-#[path = "decorations_tests.rs"]
-mod tests;
