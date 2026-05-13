@@ -1234,10 +1234,9 @@ impl BlockListElement {
                         .clone(),
                     &self.warp_theme,
                     &self.ui_builder,
-                    move |ctx: &mut EventContext, _, _| {
-                        ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForBlock(
-                            block_index,
-                        ));
+                    move |_ctx: &mut EventContext, _, _| {
+                        let _ = block_index;
+                        // Workflow modal removed in this fork.
                     },
                 )
             } else {
@@ -1254,10 +1253,9 @@ impl BlockListElement {
                         .clone(),
                     &self.warp_theme,
                     &self.ui_builder,
-                    move |ctx: &mut EventContext, _, _| {
-                        ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForBlock(
-                            block_index,
-                        ));
+                    move |_ctx: &mut EventContext, _, _| {
+                        let _ = block_index;
+                        // Workflow modal removed in this fork.
                     },
                 )
             };

@@ -452,10 +452,7 @@ impl CommandSearchView {
                 ExecuteHistory(_) | RunAIQuery(_) => true,
 
                 AcceptHistory(_)
-                | AcceptWorkflow(_)
-                | AcceptNotebook(_)
                 | OpenWarpAI
-                | AcceptEnvVarCollection(_)
                 | TranslateUsingWarpAI
                 | AcceptAIQuery(_) => false,
             };

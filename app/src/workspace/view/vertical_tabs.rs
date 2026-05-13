@@ -3027,7 +3027,6 @@ impl PaneGroup {
             IPaneType::CodeDiff => TypedPane::CodeDiff,
             IPaneType::Settings => TypedPane::Settings,
             IPaneType::AIFact => TypedPane::AIFact,
-            IPaneType::AIDocument => TypedPane::AIDocument,
             IPaneType::ExecutionProfileEditor => TypedPane::ExecutionProfileEditor,
             IPaneType::GetStarted
             | IPaneType::NetworkLog

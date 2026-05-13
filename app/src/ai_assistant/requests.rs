@@ -241,6 +241,13 @@ impl Requests {
             .collect()
     }
 
+    /// Returns how many additional AI Assistant requests the current user can make.
+    /// Free-tier quotas were removed in this fork, so we report a large constant
+    /// number to keep the UI working unchanged.
+    pub fn num_remaining_reqs(&self) -> usize {
+        usize::MAX
+    }
+
     pub fn request_status(&self) -> &RequestStatus {
         &self.request_status
     }

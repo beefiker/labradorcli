@@ -19,7 +19,7 @@ use crate::{
             conversation::{AIConversationId, ConversationStatus},
             LifecycleEventType, StartAgentExecutionMode,
         },
-        ambient_agents::{task::HarnessConfig, AgentConfigSnapshot},
+        agent_sdk::{AgentConfigSnapshot, HarnessConfig},
         blocklist::{
             agent_view::AgentViewEntryOrigin, orchestration_events::OrchestrationEventService,
             BlocklistAIHistoryModel,
@@ -27,14 +27,13 @@ use crate::{
         llms::LLMPreferences,
         skills::SkillManager,
     },
-    app_state::{AmbientAgentPaneSnapshot, LeafContents, TerminalPaneSnapshot},
+    app_state::{LeafContents, TerminalPaneSnapshot},
     pane_group::child_agent::{
         create_error_child_agent_conversation, create_hidden_child_agent_conversation,
         HiddenChildAgentConversation,
     },
     pane_group::{self, Direction, Event::OpenConversationHistory, PaneGroup},
     persistence::{BlockCompleted, ModelEvent},
-    server::server_api::ai::SpawnAgentRequest,
     session_management::SessionNavigationData,
     terminal::cli_agent_sessions::CLIAgentSessionsModel,
     terminal::{
@@ -412,18 +411,6 @@ impl PaneContent for TerminalPane {
         let current_input_config = view.input_config(app.as_ref());
 
         if view.model.lock().shared_session_status().is_viewer() {
-            // We save and restore ambient agent sessions
-            // (restoring the shared session if it's still open and the conversation transcript otherwise).
-            if let Some(ambient_model) = view.ambient_agent_view_model() {
-                let ambient_model = ambient_model.as_ref(app);
-                let task_id = ambient_model.task_id();
-
-                return LeafContents::AmbientAgent(AmbientAgentPaneSnapshot {
-                    uuid: self.uuid.clone(),
-                    task_id,
-                });
-            }
-
             LeafContents::Terminal(TerminalPaneSnapshot {
                 uuid: self.uuid.clone(),
                 cwd: None,
@@ -437,28 +424,19 @@ impl PaneContent for TerminalPane {
                 active_conversation_id: None,
             })
         } else if view.model.lock().is_conversation_transcript_viewer() {
-            // Conversation transcript viewers (opened from the conversation list)
-            // can be restored via the ambient agent task if one exists.
-            let task_id = view.model.lock().ambient_agent_task_id();
-            if task_id.is_some() {
-                LeafContents::AmbientAgent(AmbientAgentPaneSnapshot {
-                    uuid: self.uuid.clone(),
-                    task_id,
-                })
-            } else {
-                LeafContents::Terminal(TerminalPaneSnapshot {
-                    uuid: self.uuid.clone(),
-                    cwd: None,
-                    is_active,
-                    is_read_only: false,
-                    shell_launch_data: None,
-                    input_config: None,
-                    llm_model_override: None,
-                    active_profile_id: None,
-                    conversation_ids_to_restore: vec![],
-                    active_conversation_id: None,
-                })
-            }
+            // Ambient agent task restoration was removed; just snapshot as a terminal.
+            LeafContents::Terminal(TerminalPaneSnapshot {
+                uuid: self.uuid.clone(),
+                cwd: None,
+                is_active,
+                is_read_only: false,
+                shell_launch_data: None,
+                input_config: None,
+                llm_model_override: None,
+                active_profile_id: None,
+                conversation_ids_to_restore: vec![],
+                active_conversation_id: None,
+            })
         } else {
             let llm_model_override =
                 LLMPreferences::as_ref(app).get_base_llm_override(self.terminal_view(app).id());
@@ -750,19 +728,6 @@ fn handle_terminal_view_event(
             Event::OnboardingTutorialCompleted => {
                 ctx.emit(pane_group::Event::OnboardingTutorialCompleted);
             }
-            Event::OpenWorkflowModalWithCommand(command) => {
-                ctx.emit(pane_group::Event::OpenWorkflowModalWithCommand(
-                    command.clone(),
-                ));
-            }
-            Event::OpenWorkflowModalWithCloudWorkflow(workflow_id) => {
-                ctx.emit(pane_group::Event::OpenCloudWorkflowForEdit(*workflow_id));
-            }
-            Event::OpenWorkflowModalWithTemporary(workflow) => {
-                ctx.emit(pane_group::Event::OpenWorkflowModalWithTemporary(
-                    workflow.clone(),
-                ));
-            }
             Event::OpenPromptEditor => {
                 ctx.emit(pane_group::Event::OpenPromptEditor);
             }
@@ -868,8 +833,8 @@ fn handle_terminal_view_event(
             Event::RoleRequestCancelled(role_request_id) => {
                 group.remove_shared_session_role_request(role_request_id.clone(), ctx);
             }
-            Event::OpenWarpDriveObjectInPane(uid) => {
-                ctx.emit(pane_group::Event::OpenWarpDriveObjectInPane(uid.clone()));
+            Event::OpenWarpDriveObjectInPane(_uid) => {
+                // Dwarf Drive object panes have been removed from this fork.
             }
             Event::OpenSuggestedAgentModeWorkflowModal { workflow_and_id } => {
                 ctx.emit(pane_group::Event::OpenSuggestedAgentModeWorkflowModal {
@@ -1292,7 +1257,9 @@ fn handle_terminal_view_event(
                                 None
                             } else {
                                 match <Harness as clap::ValueEnum>::from_str(&harness_type, true) {
-                                    Ok(harness) => Some(HarnessConfig::from_harness_type(harness)),
+                                    Ok(harness) => Some(HarnessConfig {
+                                        harness_type: harness,
+                                    }),
                                     Err(_) => {
                                         log::warn!(
                                             "Unknown harness type from StartAgentV2 proto: {harness_type:?}; omitting harness override so the server picks its default"
@@ -1301,46 +1268,18 @@ fn handle_terminal_view_event(
                                     }
                                 }
                             };
-                            let spawn_request = SpawnAgentRequest {
-                                prompt: request.prompt,
-                                config: Some(AgentConfigSnapshot {
-                                    environment_id,
-                                    model_id: (!model_id.is_empty()).then_some(model_id),
-                                    worker_host: (!worker_host.is_empty()).then_some(worker_host),
-                                    computer_use_enabled: Some(computer_use_enabled),
-                                    harness: harness_override,
-                                    ..Default::default()
-                                }),
-                                title: (!title.is_empty()).then_some(title),
-                                team: None,
-                                skill: None,
-                                attachments: vec![],
-                                interactive: Some(true),
-                                parent_run_id: Some(parent_run_id),
+                            // Cloud-hosted child agent spawning was removed; drop the request.
+                            let _ = (
+                                environment_id,
+                                model_id,
+                                worker_host,
+                                computer_use_enabled,
+                                harness_override,
+                                title,
+                                parent_run_id,
                                 runtime_skills,
-                                referenced_attachments: vec![],
-                            };
-
-                            new_terminal_view.update(ctx, |terminal_view, ctx| {
-                                terminal_view.enter_agent_view(
-                                    None,
-                                    Some(conversation_id),
-                                    AgentViewEntryOrigin::CloudAgent,
-                                    ctx,
-                                );
-                                if let Some(ambient_agent_view_model) =
-                                    terminal_view.ambient_agent_view_model()
-                                {
-                                    ambient_agent_view_model.update(ctx, |model, ctx| {
-                                        model.set_conversation_id(Some(conversation_id));
-                                        model.spawn_agent_with_request(spawn_request, ctx);
-                                    });
-                                } else {
-                                    log::error!(
-                                        "Remote StartAgent child pane missing ambient agent view model"
-                                    );
-                                }
-                            });
+                                new_terminal_view,
+                            );
 
                             group
                                 .child_agent_panes

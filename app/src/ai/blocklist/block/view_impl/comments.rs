@@ -184,15 +184,7 @@ fn comment_icon(is_addressed: bool, appearance: &Appearance) -> Box<dyn Element>
 }
 
 fn comment_text(comment_element_state: &CommentElementState) -> Box<dyn Element> {
-    let editor_child_view =
-        Container::new(ChildView::new(&comment_element_state.rich_text_editor).finish())
-            .with_padding_top(4.)
-            .finish();
-    if comment_element_state.is_expanded {
-        editor_child_view
-    } else {
-        ConstrainedBox::new(editor_child_view)
-            .with_max_height(COMMENT_CHIP_MAX_HEIGHT)
-            .finish()
-    }
+    // Rich-text comment editing has been removed in this fork.
+    let _ = comment_element_state;
+    warpui::elements::Empty::new().finish()
 }

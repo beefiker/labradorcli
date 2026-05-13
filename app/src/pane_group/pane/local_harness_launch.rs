@@ -5,12 +5,9 @@ use uuid::Uuid;
 use warp_cli::agent::Harness;
 use warp_managed_secrets::ManagedSecretValue;
 
-use crate::ai::{
-    agent_sdk::{
-        driver::AgentDriverError, task_env_vars, validate_cli_installed, ClaudeHarness,
-        ThirdPartyHarness,
-    },
-    ambient_agents::{task::HarnessConfig, AgentConfigSnapshot, AmbientAgentTaskId},
+use crate::ai::agent_sdk::{
+    driver::AgentDriverError, task_env_vars, validate_cli_installed, AgentConfigSnapshot,
+    AmbientAgentTaskId, ClaudeHarness, HarnessConfig, ThirdPartyHarness,
 };
 use crate::server::server_api::ai::AIClient;
 use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
@@ -61,7 +58,9 @@ fn local_child_task_config(harness: Harness) -> Option<AgentConfigSnapshot> {
     match harness {
         Harness::OpenCode | Harness::Codex | Harness::Unknown => None,
         Harness::Claude => Some(AgentConfigSnapshot {
-            harness: Some(HarnessConfig::from_harness_type(harness)),
+            harness: Some(HarnessConfig {
+                harness_type: harness,
+            }),
             ..Default::default()
         }),
     }
@@ -125,20 +124,10 @@ pub(super) async fn prepare_local_harness_child_launch(
         }
     };
 
-    let task_id = ai_client
-        .create_agent_task(
-            prompt.clone(),
-            None,
-            parent_run_id.clone(),
-            local_child_task_config(harness),
-        )
-        .await
-        .map_err(|error| {
-            format!(
-                "Failed to create local {} child task: {error}",
-                harness.display_name()
-            )
-        })?;
+    // Cloud-hosted task creation has been removed from this fork. Generate
+    // a local UUID so downstream env-var plumbing still has a stable id.
+    let _ = (ai_client, parent_run_id.clone());
+    let task_id: AmbientAgentTaskId = uuid::Uuid::new_v4();
 
     Ok(PreparedLocalHarnessLaunch {
         command,

@@ -131,11 +131,9 @@ impl AIConversationMetadata {
         server_conversation_metadata: ServerAIConversationMetadata,
     ) -> Self {
         let title = server_conversation_metadata.title.clone();
-        let last_modified_at = server_conversation_metadata
-            .metadata
-            .metadata_last_updated_ts
-            .utc()
-            .naive_utc();
+        // Server-side conversation metadata no longer exposes a last-updated
+        // timestamp; fall back to the current wall clock.
+        let last_modified_at = chrono::Utc::now().naive_utc();
         let credits_spent = Some(server_conversation_metadata.usage.credits_spent);
         let server_conversation_token = Some(
             server_conversation_metadata
@@ -908,7 +906,7 @@ impl BlocklistAIHistoryModel {
         &mut self,
         conversation_id: AIConversationId,
         run_id: String,
-        task_id: Option<crate::ai::ambient_agents::AmbientAgentTaskId>,
+        task_id: Option<crate::ai::agent_sdk::AmbientAgentTaskId>,
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -1435,9 +1433,6 @@ impl BlocklistAIHistoryModel {
                 log::warn!("Failed to mark exchange as cancelled: {e}");
             }
         }
-        AIDocumentModel::handle(ctx).update(ctx, |model, ctx| {
-            model.clear_streaming_documents_for_conversation(&conversation_id, ctx);
-        });
     }
 
     pub fn mark_response_stream_completed_with_error(

@@ -14,7 +14,6 @@ use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChange
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::input::{MenuPositioning, MenuPositioningProvider};
 use crate::terminal::model_events::ModelEventDispatcher;
-use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 use crate::util::bindings::keybinding_name_to_display_string;
@@ -291,8 +290,6 @@ pub struct DisplayChip {
     agent_view_controller: ModelHandle<AgentViewController>,
     is_shared_session_viewer: bool,
     is_in_agent_view: bool,
-    /// Optional because `DisplayChip` sometimes should be disabled, depending on if it is in an ambient agent view.
-    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
     /// Cached display string for the code review keybinding.
     code_review_keybinding: Option<String>,
     /// The terminal view this chip belongs to, used to check CLI agent session state.
@@ -431,8 +428,6 @@ pub struct DisplayChipConfig {
     pub model_events: ModelHandle<ModelEventDispatcher>,
     pub is_shared_session_viewer: bool,
     pub agent_view_controller: ModelHandle<AgentViewController>,
-    /// Optional because `DisplayChip` sometimes should be disabled, depending on if it is in an ambient agent view.
-    pub ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
 }
 
 #[derive(Debug, Clone)]
@@ -734,13 +729,6 @@ impl DisplayChip {
             }
         });
 
-        // Subscribe to ambient agent model changes to re-render when the state changes
-        if let Some(ref ambient_agent_model) = config.ambient_agent_view_model {
-            ctx.subscribe_to_model(ambient_agent_model, |_, _, _, ctx| {
-                ctx.notify();
-            });
-        }
-
         // Cache the code review keybinding and subscribe to changes.
         let code_review_keybinding =
             keybinding_name_to_display_string(TOGGLE_RIGHT_PANEL_BINDING_NAME, ctx);
@@ -772,7 +760,6 @@ impl DisplayChip {
             is_shared_session_viewer: config.is_shared_session_viewer,
             agent_view_controller: config.agent_view_controller.clone(),
             is_in_agent_view,
-            ambient_agent_view_model: config.ambient_agent_view_model,
             code_review_keybinding,
             terminal_view_id: config.terminal_view_id,
         }
@@ -1188,16 +1175,9 @@ impl DisplayChip {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
 
-        // Check if we're in an ambient agent conversation.
-        // If so, the directory chip should be non-interactive.
-        let is_in_active_ambient_agent = self
-            .ambient_agent_view_model
-            .as_ref()
-            .map(|model| {
-                let m = model.as_ref(app);
-                m.is_ambient_agent() && !m.is_configuring_ambient_agent()
-            })
-            .unwrap_or(false);
+        // Ambient agent infrastructure has been removed; directory chip is
+        // always interactive in this fork.
+        let is_in_active_ambient_agent = false;
 
         let mut stack = Stack::new();
 

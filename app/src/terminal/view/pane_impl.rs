@@ -259,10 +259,6 @@ impl TerminalView {
         let should_render_ambient_agent_indicator = {
             let model = self.model.lock();
             model.is_shared_ambient_agent_session()
-                || matches!(
-                    model.conversation_transcript_viewer_status(),
-                    Some(ConversationTranscriptViewerStatus::ViewingAmbientConversation(_))
-                )
         };
         let pane_indicator = if should_render_ambient_agent_indicator {
             Some(self.render_ambient_agent_indicator(app))
@@ -370,13 +366,7 @@ impl TerminalView {
         let mut icon_button_count: u32 = 0;
 
         if FeatureFlag::CloudMode.is_enabled() {
-            let is_waiting_for_session = self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|model| model.as_ref(app).is_waiting_for_session());
-            let button_element = if is_waiting_for_session {
-                Some(self.render_ambient_agent_cancel_button(app))
-            } else if self.can_show_cloud_mode_details_ui(app) {
+            let button_element = if self.can_show_cloud_mode_details_ui(app) {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
                     Some(self.render_cloud_mode_details_toggle_button(app))
@@ -694,26 +684,9 @@ impl BackingView for TerminalView {
 
 impl TerminalView {
     /// Render the cancel button for cancelling the ambient agent task while it's loading.
-    fn render_ambient_agent_cancel_button(&self, app: &AppContext) -> Box<dyn Element> {
-        let appearance = Appearance::as_ref(app);
-        let theme = appearance.theme();
-        let ui_builder = appearance.ui_builder().clone();
-
-        icon_button_with_color(
-            appearance,
-            icons::Icon::StopFilled,
-            false, /* active */
-            self.ambient_agent_cancel_mouse_state.clone(),
-            blended_colors::text_sub(theme, theme.background()).into(),
-        )
-        .with_tooltip(move || ui_builder.tool_tip("Cancel".to_string()).build().finish())
-        .build()
-        .on_click(|ctx, _, _| {
-            ctx.dispatch_typed_action::<PaneHeaderAction<TerminalAction, TerminalAction>>(
-                PaneHeaderAction::CustomAction(TerminalAction::CancelAmbientAgentTask),
-            );
-        })
-        .finish()
+    /// Ambient agent tasks have been removed; render nothing.
+    fn render_ambient_agent_cancel_button(&self, _app: &AppContext) -> Box<dyn Element> {
+        warpui::elements::Empty::new().finish()
     }
 
     /// Render the info button for toggling the cloud mode details panel.
@@ -920,12 +893,9 @@ impl TerminalView {
         ))
     }
 
-    pub fn is_ambient_agent_session(&self, ctx: &AppContext) -> bool {
-        FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|model| model.as_ref(ctx).is_ambient_agent())
+    pub fn is_ambient_agent_session(&self, _ctx: &AppContext) -> bool {
+        // Ambient agent sessions have been removed from this fork.
+        false
     }
 
     fn selected_conversation_for_user_facing_chrome<'a>(

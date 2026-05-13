@@ -140,9 +140,8 @@ impl AIFactView {
         self.update_page(AIFactPage::Rules, ctx);
         match event {
             RuleEditorViewEvent::Add { name, content } => {
-                self.rule_view.update(ctx, |rule_view, ctx| {
-                    rule_view.add_ai_rule(name.clone(), content.clone(), ctx);
-                });
+                // AI rule editing was tied to cloud-synced rules; the path is gone.
+                let _ = (name, content);
             }
             RuleEditorViewEvent::Edit {
                 name,
@@ -150,20 +149,10 @@ impl AIFactView {
                 sync_id,
                 revision_ts,
             } => {
-                self.rule_view.update(ctx, |rule_view, ctx| {
-                    rule_view.edit_ai_rule(
-                        name.clone(),
-                        content.clone(),
-                        *sync_id,
-                        revision_ts.clone(),
-                        ctx,
-                    );
-                });
+                let _ = (name, content, sync_id, revision_ts);
             }
             RuleEditorViewEvent::Delete { sync_id } => {
-                self.rule_view.update(ctx, |rule_view, ctx| {
-                    rule_view.delete_ai_rule(*sync_id, ctx);
-                });
+                let _ = sync_id;
             }
             _ => {}
         }

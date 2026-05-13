@@ -88,7 +88,6 @@ impl ConversationListViewModel {
                     .is_none_or(|status| status == SessionStatus::Available)
             })
             .map(|item| match item {
-                ConversationOrTask::Task(task) => ConversationOrTaskId::TaskId(task.task_id),
                 ConversationOrTask::Conversation(conv) => {
                     ConversationOrTaskId::ConversationId(conv.nav_data.id)
                 }
@@ -128,9 +127,6 @@ impl ConversationListViewModel {
                 .iter()
                 .filter_map(|id| {
                     let item = match id {
-                        ConversationOrTaskId::TaskId(task_id) => {
-                            conversations_model.get_task(task_id)
-                        }
                         ConversationOrTaskId::ConversationId(conv_id) => {
                             conversations_model.get_conversation(conv_id)
                         }
@@ -171,7 +167,6 @@ impl ConversationListViewModel {
     ) -> Option<ConversationOrTask<'a>> {
         let model = self.conversations_model.as_ref(ctx);
         match id {
-            ConversationOrTaskId::TaskId(task_id) => model.get_task(task_id),
             ConversationOrTaskId::ConversationId(conv_id) => model.get_conversation(conv_id),
         }
     }

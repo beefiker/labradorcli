@@ -64,7 +64,7 @@ pub struct SuggestedRuleModal {
 impl SuggestedRuleModal {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         let view = ctx.add_typed_action_view(SuggestedRuleView::new);
-        let modal = ctx.add_view(|_| Modal::new(view));
+        let modal = ctx.add_view(|ctx| Modal::new(None, view, ctx));
         Self { _modal: modal }
     }
 

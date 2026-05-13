@@ -29,7 +29,55 @@ use warpui::elements::{
 use warpui::platform::Cursor;
 use warpui::text_layout::ClipConfig;
 use warpui::units::Pixels;
-use warpui::{AppContext, Element, EventContext, SingletonEntity, View, ViewContext, ViewHandle};
+use warpui::{AppContext, Element, Entity, EventContext, SingletonEntity, View, ViewContext, ViewHandle};
+
+/// Placeholder for the now-deleted `notebooks::editor::view::RichTextEditorView`.
+/// The comment composer UI was removed from this fork; we keep the type alive
+/// as an empty View so the surrounding rendering helpers compile.
+pub(crate) struct RichTextEditorView;
+
+impl Entity for RichTextEditorView {
+    type Event = EditorViewEvent;
+}
+
+impl View for RichTextEditorView {
+    fn ui_name() -> &'static str {
+        "RichTextEditorView"
+    }
+    fn render(&self, _app: &AppContext) -> Box<dyn Element> {
+        use warpui::elements::Empty;
+        Empty::new().finish()
+    }
+}
+
+impl RichTextEditorView {
+    /// Placeholder: the rich-text editor was removed from this fork, so the
+    /// backing model handle is no longer available.
+    pub fn model(&self) -> Option<&()> {
+        None
+    }
+
+    pub fn selected_text(&self, _app: &AppContext) -> Option<String> {
+        None
+    }
+
+    pub fn clear_text_selection(&mut self, _ctx: &mut ViewContext<Self>) {}
+}
+
+fn create_readonly_comment_markdown_editor<V: View>(
+    _content: &str,
+    _disable_scrolling: bool,
+    _max_width: Option<Pixels>,
+    ctx: &mut ViewContext<V>,
+) -> ViewHandle<RichTextEditorView> {
+    ctx.add_view(|_| RichTextEditorView)
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum EditorViewEvent {
+    TextSelectionChanged,
+    Focused,
+}
 
 /// Configuration for making the comment header clickable.
 pub(crate) struct HeaderClickHandler {
@@ -357,11 +405,8 @@ impl CommentViewCard {
         repo_path: Option<&Path>,
         ctx: &mut ViewContext<V>,
     ) {
-        self.comment_editor.update(ctx, |editor, ctx| {
-            editor.model().update(ctx, |model, ctx| {
-                model.reset_with_markdown(&new_source.content, ctx);
-            });
-        });
+        // The underlying rich-text model is gone in this fork; nothing to reset.
+        let _ = ctx;
         self.source = new_source;
         self.title = Self::compute_title(&self.source, repo_path);
     }

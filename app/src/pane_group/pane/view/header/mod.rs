@@ -1,4 +1,3 @@
-use sharing::SharedPaneContent;
 use std::fmt::Debug;
 
 use crate::{
@@ -131,7 +130,6 @@ pub struct PaneHeader<P: BackingView> {
     overflow_menu:
         ViewHandle<Menu<PaneHeaderAction<P::PaneHeaderOverflowMenuAction, P::CustomAction>>>,
     toolbelt_buttons: Vec<ToolbeltButton>,
-    shared_content: SharedPaneContent,
     open_overlay: OpenOverlay,
     is_visible_in_pane_group: bool, // If this pane header is being dragged along the tab bar, then it is not visible in the pane group
     toolbelt_feature_popup: ViewHandle<FeaturePopup>,
@@ -147,8 +145,6 @@ impl<P: BackingView> PaneHeader<P> {
         ctx.subscribe_to_view(&overflow_menu, move |me, _, event, ctx| {
             me.handle_overflow_menu_action(event, ctx);
         });
-
-        let shared_content = SharedPaneContent::new(ctx);
 
         let toolbelt_feature_popup = ctx.add_view(|_| {
             FeaturePopup::new_feature(NewFeaturePopupLabel::FromString(
@@ -168,7 +164,6 @@ impl<P: BackingView> PaneHeader<P> {
             focus_handle: None,
             mouse_state_handles: Default::default(),
             overflow_menu,
-            shared_content,
             open_overlay: Default::default(),
             toolbelt_buttons: Default::default(),
             is_visible_in_pane_group: true,
@@ -374,6 +369,37 @@ enum OpenOverlay {
 }
 
 impl<P: BackingView> PaneHeader<P> {
+    /// Sharing dialog/controls were tied to the deleted shared-session cloud
+    /// service. Return `false` so the controls stay hidden in this fork.
+    pub fn is_sharing_dialog_enabled(&self, _app: &AppContext) -> bool {
+        false
+    }
+
+    pub fn has_shareable_shared_session(&self, _app: &AppContext) -> bool {
+        false
+    }
+
+    pub fn set_shareable_object<T>(&mut self, _value: T, _ctx: &mut ViewContext<Self>) {}
+
+    /// Sharing controls are gone; render nothing.
+    pub fn render_sharing_controls(
+        &self,
+        _container: &mut Flex,
+        _appearance: &Appearance,
+        _icon_color: Option<warp_core::ui::theme::Fill>,
+        _button_size: Option<f32>,
+        _app: &AppContext,
+    ) {
+    }
+
+    /// Sharing a pane is no longer supported; this is a no-op.
+    pub fn share_pane_contents(
+        &mut self,
+        _source: SharingDialogSource,
+        _ctx: &mut ViewContext<Self>,
+    ) {
+    }
+
     fn overflow_button_position_id(&self) -> String {
         format!(
             "pane_header_overflow_button:{}",
@@ -527,17 +553,7 @@ impl<P: BackingView> PaneHeader<P> {
                 }
             }
             OpenOverlay::SharingDialog => {
-                if self.is_sharing_dialog_enabled(app) {
-                    stack.add_positioned_overlay_child(
-                        ChildView::new(self.sharing_dialog()).finish(),
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(-8., 0.),
-                            ParentOffsetBounds::WindowByPosition,
-                            ParentAnchor::BottomRight,
-                            ChildAnchor::TopRight,
-                        ),
-                    );
-                }
+                // Sharing dialog removed in this fork.
             }
             OpenOverlay::None => {}
         }

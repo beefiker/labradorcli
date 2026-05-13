@@ -16,7 +16,6 @@ use crate::ai::blocklist::block::view_impl::common::{
     BLOCKED_ACTION_MESSAGE_FOR_READING_FILES, BLOCKED_ACTION_MESSAGE_FOR_SEARCHING_CODEBASE,
 };
 use crate::ai::blocklist::inline_action::aws_bedrock_credentials_error::AwsBedrockCredentialsErrorView;
-use crate::ai::blocklist::inline_action::create_or_edit_document::CreateOrEditDocumentAction;
 use crate::ai::blocklist::secret_redaction::SecretRedactionState;
 use crate::ai::blocklist::view_util::format_credits;
 use crate::ai::skills::SkillOpenOrigin;
@@ -1822,14 +1821,9 @@ fn maybe_render_edit_document(
         return None;
     };
 
-    let document = updated_documents.first()?;
-    let action = CreateOrEditDocumentAction::new(
-        document.document_id,
-        document.document_version,
-        props.state_handles.ai_document_handle.clone(),
-        app,
-    )?;
-    Some(action.render(app))
+    // AI document inline action UI has been removed.
+    let _ = updated_documents;
+    None
 }
 
 fn maybe_render_create_document(
@@ -1861,14 +1855,9 @@ fn maybe_render_create_document(
         return None;
     };
 
-    let document = created_documents.first()?;
-    let action = CreateOrEditDocumentAction::new(
-        document.document_id,
-        document.document_version,
-        props.state_handles.ai_document_handle.clone(),
-        app,
-    )?;
-    Some(action.render(app))
+    // AI document inline action UI has been removed.
+    let _ = created_documents;
+    None
 }
 
 fn render_stopped_output(props: Props, app: &AppContext) -> Box<dyn Element> {

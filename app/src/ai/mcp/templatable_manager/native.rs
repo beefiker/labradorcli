@@ -993,6 +993,15 @@ impl TemplatableMCPServerManager {
         self.deduplicate_updates(installation_uuid, options)
     }
 
+    /// Cloud-hosted templatable MCP server templates are no longer synced in
+    /// this fork; this is now a no-op.
+    pub fn update_templatable_mcp_server(
+        &mut self,
+        _server: TemplatableMCPServer,
+        _ctx: &mut ModelContext<Self>,
+    ) {
+    }
+
     pub fn update_templatable_mcp_server_installation(
         &mut self,
         installation_uuid: Uuid,

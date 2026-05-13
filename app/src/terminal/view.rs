@@ -429,7 +429,7 @@ use crate::server::telemetry::{
     self, AgentModeAttachContextMethod, AgentModeEntrypoint, AgentModeRewindEntrypoint,
     AnonymousUserSignupEntrypoint, InteractionSource, LinkOpenMethod, NotificationAgentVariant,
     PaletteSource, PromptSuggestionViewType, SecretInteraction, SlowBootstrapInfo,
-    ToggleBlockFilterSource, WorkflowTelemetryMetadata,
+    ToggleBlockFilterSource,
 };
 use crate::server::{
     server_api::ServerApi,
@@ -3009,10 +3009,6 @@ impl TerminalView {
         let active_session = ctx.add_model(|ctx| {
             ActiveSession::new(sessions.clone(), model_events_handle.clone(), ctx)
         });
-        let ambient_agent_view_model: Option<ModelHandle<()>> = is_cloud_mode.then(|| {
-            ctx.add_model(|_ctx| ())
-        });
-
         let ephemeral_message_model = ctx.add_model(|_| EphemeralMessageModel::new());
 
         let agent_view_controller = ctx.add_model(|_| {
@@ -3087,7 +3083,6 @@ impl TerminalView {
                                         *origin,
                                         me.agent_view_controller.clone(),
                                         &me.sessions,
-                                        me.ambient_agent_view_model.as_ref(),
                                         me.model.clone(),
                                         &me.model_events_handle,
                                         should_show_init_callout,
@@ -3366,7 +3361,6 @@ impl TerminalView {
                 model.clone(),
                 ai_controller.clone(),
                 &model_events_handle,
-                ambient_agent_view_model.clone(),
                 terminal_view_id,
                 ctx,
             )
@@ -3506,17 +3500,8 @@ impl TerminalView {
         ctx.subscribe_to_model(&ai_controller, |me, handle, event, ctx| {
             me.handle_ai_controller_event(handle, event, ctx);
             // Refresh cloud mode details panel when agent output completes (may include new artifacts)
-            if matches!(
-                event,
-                BlocklistAIControllerEvent::FinishedReceivingOutput { .. }
-            ) && me.is_cloud_mode_details_panel_open
-                && me
-                    .ambient_agent_view_model
-                    .as_ref()
-                    .is_some_and(|model| model.as_ref(ctx).is_ambient_agent())
-            {
-                me.fetch_and_update_cloud_mode_details_panel(ctx);
-            }
+            // Ambient agent details panel was removed; nothing to update here.
+            let _ = (me, event, ctx);
         });
 
         // Subscribe to agent conversations model for task status updates
@@ -3538,17 +3523,8 @@ impl TerminalView {
                         | AgentConversationsModelEvent::ConversationUpdated
                         | AgentConversationsModelEvent::ConversationArtifactsUpdated { .. }
                 );
-                // Only refresh panel if it's currently open (avoids unnecessary work)
-                if should_refresh_details_panel
-                    && me.is_cloud_mode_details_panel_open
-                    && me
-                        .ambient_agent_view_model
-                        .as_ref()
-                        .is_some_and(|model| model.as_ref(ctx).is_ambient_agent())
-                {
-                    me.fetch_and_update_cloud_mode_details_panel(ctx);
-                    ctx.notify();
-                }
+                // Cloud-mode details panel was removed; nothing to refresh.
+                let _ = (should_refresh_details_panel, me, ctx);
             },
         );
 
@@ -3610,7 +3586,6 @@ impl TerminalView {
                 None, // current_repo_path - will be set when CWD is determined
                 model_events_handle.clone(),
                 agent_view_controller.clone(),
-                ambient_agent_view_model.clone(),
                 active_session.clone(),
                 ephemeral_message_model.clone(),
                 ctx,
@@ -3641,12 +3616,6 @@ impl TerminalView {
             }
             BlocklistAIStatusBarEvent::Stop => me.ctrl_c(ctx),
         });
-        if let Some(ambient_agent_view_model) = ambient_agent_view_model.as_ref() {
-            ctx.subscribe_to_model(ambient_agent_view_model, |me, _, event, ctx| {
-                me.handle_ambient_agent_event(event, ctx);
-            });
-        }
-
         let ai_render_context = Rc::new(RefCell::new(BlocklistAIRenderContext {
             block_ids: HashMap::from_iter([
                 (
@@ -4050,9 +4019,8 @@ impl TerminalView {
                     ctx.notify();
                 }
                 ConversationDetailsPanelEvent::OpenPlanNotebook { notebook_uid } => {
-                    // Convert NotebookId -> SyncId -> ObjectUid (String)
-                    let object_uid = SyncId::from(*notebook_uid).uid();
-                    ctx.emit(Event::OpenWarpDriveObjectInPane(object_uid));
+                    // Dwarf Drive notebook panes have been removed from this fork.
+                    let _ = notebook_uid;
                 }
             }
         });
@@ -4187,7 +4155,6 @@ impl TerminalView {
             agent_view_back_button,
             orchestration_pill_bar,
             is_using_conversation_for_pane_header_title: false,
-            ambient_agent_view_model,
             cloud_mode_details_panel,
             is_cloud_mode_details_panel_open: false,
             has_auto_opened_cloud_mode_details_panel: false,
@@ -5183,7 +5150,6 @@ impl TerminalView {
                         self.ai_context_model.clone(),
                         self.find_model.clone(),
                         self.active_session.clone(),
-                        self.ambient_agent_view_model.clone(),
                         &self.cli_subagent_controller,
                         &self.model_events_handle,
                         self.agent_view_controller.clone(),
@@ -6602,10 +6568,9 @@ impl TerminalView {
             .active_conversation_id()
     }
 
-    pub fn ambient_agent_view_model(
-        &self,
-    ) -> Option<&ModelHandle<()>> {
-        self.ambient_agent_view_model.as_ref()
+    pub fn ambient_agent_view_model(&self) -> Option<&ModelHandle<()>> {
+        // Ambient agent UI has been removed from this fork.
+        None
     }
 
     fn ambient_agent_task_id_for_details_panel_from_model(
@@ -10352,7 +10317,8 @@ impl TerminalView {
                         }
                     }
 
-                    self.maybe_insert_setup_command_blocks(block_id, ctx);
+                    // Setup command blocks were tied to cloud mode setup; removed.
+                    let _ = block_id;
 
                     self.set_current_state(TerminalViewState::LongRunning, ctx);
                     ctx.emit(Event::BlockStarted {
@@ -14612,17 +14578,8 @@ impl TerminalView {
             }
         }
 
-        // Then check if there's selected text in the cloud mode error screen
-        let error_selected_text = self
-            .ambient_agent_view_model
-            .as_ref()
-            .map(|model| model.as_ref(ctx).ui_state.error_selected_text.clone());
-        if let Some(error_selected_text) = error_selected_text {
-            if let Some(text) = error_selected_text.read().clone().filter(|t| !t.is_empty()) {
-                ctx.clipboard().write(ClipboardContent::plain_text(text));
-                return;
-            }
-        }
+        // Cloud mode error screen has been removed from this fork.
+
 
         let semantic_selection = SemanticSelection::as_ref(ctx);
         if let Some(selected) = self.model.lock().selection_to_string(
@@ -15648,11 +15605,10 @@ impl TerminalView {
 
     pub fn open_workflow_modal_with_existing(
         &mut self,
-        workflow_id: SyncId,
-        ctx: &mut ViewContext<Self>,
+        _workflow_id: SyncId,
+        _ctx: &mut ViewContext<Self>,
     ) {
-        ctx.emit(Event::OpenWorkflowModalWithCloudWorkflow(workflow_id));
-        ctx.notify();
+        // Cloud-hosted workflows have been removed from this fork.
     }
 
     /// Helper method to build alt screen context menu items.
@@ -18925,10 +18881,9 @@ impl TerminalView {
         {
             active_init_environment_block_handle
                 .update(ctx, |block, ctx| block.try_steal_focus(ctx));
-        } else if let Some(env_var_collection_block_handle) =
-            self.active_env_var_collection_block(ctx)
-        {
-            ctx.focus(env_var_collection_block_handle);
+        } else if self.active_env_var_collection_block(ctx).is_some() {
+            // Env var collection block focus path was removed; fall through.
+            self.focus_input_box(ctx);
         } else {
             self.focus_input_box(ctx);
         }
@@ -19376,7 +19331,8 @@ impl TerminalView {
                 }
             },
             InputEvent::EnterCloudAgentView { initial_prompt } => {
-                self.enter_cloud_agent_view(initial_prompt.clone(), ctx);
+                let _ = initial_prompt;
+                // Cloud agent view has been removed from this fork.
             }
             InputEvent::CreateDockerSandbox => {
                 if !FeatureFlag::LocalDockerSandbox.is_enabled() {
@@ -19442,13 +19398,8 @@ impl TerminalView {
                     if is_long_running && self.can_pop_nested_cloud_agent_view(ctx) {
                         self.exit_agent_view(ctx);
                     } else if !is_long_running {
-                        // During first-time setup, always exit directly without confirmation
-                        // since the setup overlay would obscure any confirmation dialog.
-                        let is_in_setup = self
-                            .ambient_agent_view_model
-                            .as_ref()
-                            .is_some_and(|model| model.as_ref(ctx).is_in_setup());
-                        if !is_in_setup && !self.input.as_ref(ctx).buffer_text(ctx).is_empty() {
+                        // Ambient agent setup overlay has been removed from this fork.
+                        if !self.input.as_ref(ctx).buffer_text(ctx).is_empty() {
                             self.agent_view_controller.update(ctx, |session, ctx| {
                                 session.exit_agent_view_with_required_confirmation(
                                     ExitConfirmationTrigger::Escape,
@@ -19584,12 +19535,7 @@ impl TerminalView {
                 });
             }
             InputEvent::OpenSettings(section) => {
-                if !matches!(
-                    section,
-                    SettingsSection::BillingAndUsage
-                        | SettingsSection::CloudEnvironments
-                        | SettingsSection::WarpDrive
-                ) {
+                if !matches!(section, SettingsSection::CloudEnvironments) {
                     ctx.emit(Event::OpenSettings(*section));
                 }
             }
@@ -20572,7 +20518,6 @@ impl TerminalView {
                 self.ai_context_model.clone(),
                 self.find_model.clone(),
                 self.active_session.clone(),
-                self.ambient_agent_view_model.clone(),
                 &self.cli_subagent_controller,
                 &self.model_events_handle,
                 self.agent_view_controller.clone(),
@@ -24491,44 +24436,7 @@ impl TypedActionView for TerminalView {
                 }
             }
             ToggleAIDocumentPane => {
-                if let Some(conversation) =
-                    BlocklistAIHistoryModel::as_ref(ctx).active_conversation(self.id())
-                {
-                    let conversation_id = conversation.id();
-                    let doc_model = AIDocumentModel::as_ref(ctx);
-                    let is_plan_for_this_conversation_open = self
-                        .agent_view_controller
-                        .as_ref(ctx)
-                        .pane_group_id()
-                        .is_some_and(|pane_group_id| {
-                            doc_model.is_document_visible_by_conversation_in_pane_group(
-                                &conversation_id,
-                                pane_group_id,
-                            )
-                        });
-                    if is_plan_for_this_conversation_open {
-                        ctx.emit(Event::HideAIDocumentPanes);
-                    } else {
-                        let docs = doc_model.get_all_documents_for_conversation(conversation_id);
-                        match docs.len() {
-                            0 => {} // No plans — nothing to do.
-                            1 => {
-                                let (document_id, doc) = &docs[0];
-                                ctx.emit(Event::OpenAIDocumentPane {
-                                    document_id: *document_id,
-                                    document_version: doc.version,
-                                    is_auto_open: false,
-                                });
-                            }
-                            _ => {
-                                // Multiple plans — open the plan picker menu.
-                                self.input.update(ctx, |input, ctx| {
-                                    input.open_plan_menu(conversation_id, ctx);
-                                });
-                            }
-                        }
-                    }
-                }
+                // AI document panes were removed in this fork.
             }
             ToggleTodoPopup => {
                 self.is_todo_popup_visible = !self.is_todo_popup_visible;
@@ -24734,10 +24642,7 @@ impl TypedActionView for TerminalView {
                 }
             }
             EnterCloudAgentView => {
-                let mut draft_text = self.input.as_ref(ctx).buffer_text(ctx);
-                draft_text.truncate(draft_text.trim_end().len());
-                let initial_prompt = (!draft_text.trim().is_empty()).then_some(draft_text);
-                self.enter_cloud_agent_view(initial_prompt, ctx);
+                // Cloud agent view has been removed from this fork.
             }
             StartNewAgentConversation => {
                 self.input.update(ctx, |input, ctx| {
@@ -24764,19 +24669,11 @@ impl TypedActionView for TerminalView {
                 self.handle_aws_cli_not_installed_banner_action(*action, ctx);
             }
             ToggleCloudModeDetailsPanel => {
-                let will_open = !self.is_cloud_mode_details_panel_open;
-                self.is_cloud_mode_details_panel_open = will_open;
-                if will_open {
-                    self.fetch_and_update_cloud_mode_details_panel(ctx);
-                }
+                self.is_cloud_mode_details_panel_open = !self.is_cloud_mode_details_panel_open;
                 ctx.notify();
             }
             CancelAmbientAgentTask => {
-                if let Some(ambient_agent_view_model) = self.ambient_agent_view_model.as_ref() {
-                    ambient_agent_view_model.update(ctx, |model, ctx| {
-                        model.cancel_task(ctx);
-                    });
-                }
+                // Ambient agent tasks have been removed from this fork.
                 ctx.notify();
             }
             ToggleUsageFooter => {
@@ -24930,16 +24827,7 @@ impl View for TerminalView {
             self.render_grid_tooltip(&mut stack, &model, appearance, app);
         }
 
-        if !FeatureFlag::CloudModeSetupV2.is_enabled() {
-            // Show progress steps while waiting for an ambient agent to start.
-            if self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|model| model.as_ref(app).agent_progress().is_some())
-            {
-                stack.add_child(self.render_ambient_agent_progress(appearance, app));
-            }
-        }
+        // Ambient agent progress UI has been removed from this fork.
 
         // For shared session viewers, we want to show a "Request edit access"
         // button near the input if the input (or the button) are being hovered.

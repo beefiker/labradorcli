@@ -101,6 +101,9 @@ pub struct RequestParams {
     pub input: Vec<AIAgentInput>,
     pub conversation_token: Option<ServerConversationToken>,
     pub forked_from_conversation_token: Option<ServerConversationToken>,
+    /// Legacy ambient agent task linkage. Always None in this fork; kept for the
+    /// outgoing request metadata until the field is removed server-side.
+    pub ambient_agent_task_id: Option<crate::ai::agent_sdk::AmbientAgentTaskId>,
     pub tasks: Vec<warp_multi_agent_api::Task>,
     pub existing_suggestions: Option<Suggestions>,
     pub metadata: Option<RequestMetadata>,
@@ -260,7 +263,7 @@ impl RequestParams {
             .flatten()
             .and_then(|s| s.parse().ok())
             .unwrap_or_default();
-        let is_ambient_agent = conversation.ambient_agent_task_id.is_some();
+        let is_ambient_agent = false;
         let computer_use_enabled = FeatureFlag::AgentModeComputerUse.is_enabled()
             && BlocklistAIPermissions::as_ref(app)
                 .get_computer_use_setting(app, terminal_view_id)
@@ -301,7 +304,7 @@ impl RequestParams {
             input: request_input.all_inputs().cloned().collect(),
             conversation_token: conversation.server_conversation_token,
             forked_from_conversation_token: conversation.forked_from_conversation_token,
-            ambient_agent_task_id: conversation.ambient_agent_task_id,
+            ambient_agent_task_id: None,
             tasks: conversation.tasks,
             existing_suggestions: conversation.existing_suggestions,
             context_window_limit,

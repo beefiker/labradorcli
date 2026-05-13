@@ -66,7 +66,9 @@ pub fn resolve_owner(team_flag: bool, user_flag: bool, ctx: &AppContext) -> anyh
         let team_id = UserWorkspaces::as_ref(ctx)
             .current_team_uid()
             .ok_or_else(|| anyhow::anyhow!("User is not on a team"))?;
-        return Ok(Owner::Team { team_uid: team_id });
+        return Ok(Owner::Team {
+            team_uid: team_id.to_string(),
+        });
     }
 
     if user_flag {
@@ -74,12 +76,16 @@ pub fn resolve_owner(team_flag: bool, user_flag: bool, ctx: &AppContext) -> anyh
             .get()
             .user_id()
             .ok_or_else(|| anyhow::anyhow!("User should be logged in"))?;
-        return Ok(Owner::User { user_uid: user_id });
+        return Ok(Owner::User {
+            user_uid: user_id.to_string(),
+        });
     }
 
     // Default: try team first, fall back to user
     if let Some(team_uid) = UserWorkspaces::as_ref(ctx).current_team_uid() {
-        return Ok(Owner::Team { team_uid });
+        return Ok(Owner::Team {
+            team_uid: team_uid.to_string(),
+        });
     }
 
     log::warn!("Tried to default to creating team object, team could not be found.");
@@ -87,7 +93,9 @@ pub fn resolve_owner(team_flag: bool, user_flag: bool, ctx: &AppContext) -> anyh
         .get()
         .user_id()
         .ok_or_else(|| anyhow::anyhow!("User should be logged in"))?;
-    Ok(Owner::User { user_uid: user_id })
+    Ok(Owner::User {
+        user_uid: user_id.to_string(),
+    })
 }
 
 /// Refresh workspace metadata before executing an operation.
@@ -115,13 +123,12 @@ where
 }
 
 /// Refresh Dwarf Drive before executing an operation.
+/// Dwarf Drive has been removed from this fork; this is a no-op that resolves
+/// immediately.
 pub fn refresh_warp_drive(
-    ctx: &AppContext,
+    _ctx: &AppContext,
 ) -> impl Future<Output = anyhow::Result<()>> + Send + 'static {
-    UpdateManager::as_ref(ctx)
-        .initial_load_complete()
-        .with_timeout(WARP_DRIVE_SYNC_TIMEOUT)
-        .map_err(|_| anyhow::anyhow!("Timed out waiting for Dwarf Drive to sync"))
+    async { Ok(()) }
 }
 
 /// Fetch the conversation's server metadata and validate that its harness matches the caller's

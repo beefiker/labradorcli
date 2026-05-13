@@ -1648,7 +1648,6 @@ impl BlocklistAIController {
                 forked_from_conversation_token: conversation
                     .forked_from_server_conversation_token()
                     .cloned(),
-                ambient_agent_task_id: self.ambient_agent_task_id,
                 existing_suggestions: None,
             };
             (conversation_id, task_id, conversation_data)
@@ -1664,7 +1663,6 @@ impl BlocklistAIController {
                 tasks: vec![],
                 server_conversation_token: None,
                 forked_from_conversation_token: None,
-                ambient_agent_task_id: self.ambient_agent_task_id,
                 existing_suggestions: None,
             };
             (conversation_id, task_id, conversation_data)
@@ -1898,7 +1896,6 @@ impl BlocklistAIController {
             tasks: active_tasks,
             server_conversation_token: conversation_server_token,
             forked_from_conversation_token: conversation_forked_from_token,
-            ambient_agent_task_id: self.ambient_agent_task_id,
             existing_suggestions: history_model
                 .as_ref(ctx)
                 .existing_suggestions_for_conversation(conversation_id)

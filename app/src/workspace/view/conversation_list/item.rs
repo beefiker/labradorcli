@@ -38,7 +38,6 @@ fn conversation_item_position_id(id: &ConversationOrTaskId) -> String {
         ConversationOrTaskId::ConversationId(conv_id) => {
             format!("conversation_list_item_{conv_id}")
         }
-        ConversationOrTaskId::TaskId(task_id) => format!("conversation_list_task_{task_id}"),
     }
 }
 
@@ -390,9 +389,6 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
 /// - For tasks: the source (Linear, Slack, CLI, etc.)
 fn format_item_subtext(conversation: &ConversationOrTask, app: &AppContext) -> Option<String> {
     match conversation {
-        ConversationOrTask::Task(task) => {
-            task.source.as_ref().map(|s| s.display_name().to_string())
-        }
         ConversationOrTask::Conversation(metadata) => {
             // If this conversation is active (with an expanded agent view),
             // we use the terminal session's live working directory.

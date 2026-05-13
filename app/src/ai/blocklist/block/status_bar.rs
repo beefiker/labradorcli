@@ -9,13 +9,7 @@ use super::{
         WarpingIndicatorProps, WarpingProps, LOAD_OUTPUT_MESSAGE, WAITING_FOR_USER_INPUT_MESSAGE,
     },
 };
-use crate::{
-    ai::agent_tips::AITipModel,
-    terminal::{
-        input::buffer_model::InputBufferUpdateEvent,
-        view::ambient_agent::is_cloud_agent_pre_first_exchange,
-    },
-};
+use crate::{ai::agent_tips::AITipModel, terminal::input::buffer_model::InputBufferUpdateEvent};
 use crate::{
     ai::blocklist::agent_view::{
         agent_view_bg_fill, child_agent_status_card::ChildAgentStatusCard, AgentMessageBar,
@@ -59,7 +53,6 @@ use crate::{
         input::SET_INPUT_MODE_TERMINAL_ACTION_NAME,
         model::block::LONG_RUNNING_COMMAND_DURATION_MS,
         model_events::{ModelEvent, ModelEventDispatcher},
-        view::ambient_agent::{AmbientAgentViewModel, AmbientAgentViewModelEvent},
         warpify::render::LEFT_STRIPE_WIDTH,
         TerminalModel, CANCEL_COMMAND_KEYBINDING, TOGGLE_AUTOEXECUTE_MODE_KEYBINDING,
         TOGGLE_HIDE_CLI_RESPONSES_KEYBINDING, TOGGLE_QUEUE_NEXT_PROMPT_KEYBINDING,
@@ -113,7 +106,6 @@ pub struct BlocklistAIStatusBar {
     terminal_model: Arc<FairMutex<TerminalModel>>,
     shimmering_text_handle: ShimmeringTextStateHandle,
     state_handles: StateHandles,
-    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
 
     autoexecute_keystroke: Option<Keystroke>,
     queue_next_prompt_keystroke: Option<Keystroke>,
@@ -155,7 +147,6 @@ impl BlocklistAIStatusBar {
         model_event_dispatcher: &ModelHandle<ModelEventDispatcher>,
         terminal_model: Arc<FairMutex<TerminalModel>>,
         shortcut_view_model: ModelHandle<AgentShortcutViewModel>,
-        ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
         input_suggestions_model: ModelHandle<InputSuggestionsModeModel>,
         slash_command_model: ModelHandle<SlashCommandModel>,
         ephemeral_message_model: ModelHandle<EphemeralMessageModel>,
@@ -356,23 +347,6 @@ impl BlocklistAIStatusBar {
         let child_agent_status_card = ctx.add_typed_action_view(|ctx| {
             ChildAgentStatusCard::new(agent_view_controller.clone(), ctx)
         });
-        if let Some(ambient_agent_view_model) = ambient_agent_view_model.as_ref() {
-            ctx.subscribe_to_model(ambient_agent_view_model, |me, _, event, ctx| match event {
-                AmbientAgentViewModelEvent::DispatchedAgent
-                | AmbientAgentViewModelEvent::ProgressUpdated => {
-                    me.update_agent_tip(ctx);
-                    ctx.notify();
-                }
-                AmbientAgentViewModelEvent::SessionReady { .. }
-                | AmbientAgentViewModelEvent::Failed { .. }
-                | AmbientAgentViewModelEvent::NeedsGithubAuth
-                | AmbientAgentViewModelEvent::Cancelled => {
-                    ctx.notify();
-                }
-                _ => (),
-            });
-        }
-
         Self {
             active_exchange_model: None,
             shimmering_text_handle: ShimmeringTextStateHandle::new(),
@@ -395,7 +369,6 @@ impl BlocklistAIStatusBar {
             summarization_timer_handle: None,
             summarization_start_time: None,
             last_read_refresh_handle: None,
-            ambient_agent_view_model,
             current_tip: None,
             ephemeral_message_model,
             agent_message_bar,
@@ -876,98 +849,11 @@ impl BlocklistAIStatusBar {
         ))
     }
 
-    fn render_cloud_mode_setup_status(&self, app: &AppContext) -> Option<Box<dyn Element>> {
-        if !FeatureFlag::CloudModeSetupV2.is_enabled() {
-            return None;
-        }
-
-        let ambient_agent_model = self
-            .ambient_agent_view_model
-            .as_ref()
-            .map(|ambient_agent_view_model| ambient_agent_view_model.as_ref(app))?;
-
-        let progress = ambient_agent_model.agent_progress()?;
-        let progress_text = if progress.harness_started_at.is_some() {
-            "Starting Environment (Step 3/3)"
-        } else if progress.claimed_at.is_some() {
-            "Creating Environment (Step 2/3)"
-        } else {
-            "Connecting to Host (Step 1/3)"
-        };
-        Some(render_warping_indicator_base(
-            WarpingIndicatorProps {
-                icon: None,
-                warping_indicator_text: MaybeShimmeringText::Shimmering {
-                    text: progress_text.into(),
-                    shimmering_text_handle: self.shimmering_text_handle.clone(),
-                },
-                non_shimmering_text: None,
-                non_shimmering_suffix: None,
-                buttons: None,
-                is_passive_code_diff: false,
-                secondary_element: self.render_tip(app),
-            },
-            app,
-        ))
+    fn render_cloud_mode_setup_status(&self, _app: &AppContext) -> Option<Box<dyn Element>> {
+        None
     }
 
-    fn render_cloud_mode_setup_terminal_message(&self, app: &AppContext) -> Option<Message> {
-        if !FeatureFlag::CloudModeSetupV2.is_enabled() {
-            return None;
-        }
-
-        let ambient_agent_model = self
-            .ambient_agent_view_model
-            .as_ref()
-            .map(|ambient_agent_view_model| ambient_agent_view_model.as_ref(app))?;
-        let theme = Appearance::as_ref(app).theme();
-        let error_color = theme.ansi_fg_red();
-
-        if let Some(auth_url) = ambient_agent_model.github_auth_url() {
-            return Some(Message::new(vec![
-                MessageItem::Icon {
-                    icon: CoreIcon::Triangle,
-                    color: Some(error_color),
-                },
-                MessageItem::Text {
-                    content: "Missing GitHub authentication. ".into(),
-                    color: Some(error_color),
-                },
-                MessageItem::hyperlink(
-                    "Authenticate GitHub",
-                    auth_url.to_owned(),
-                    self.state_handles.github_auth_link.clone(),
-                ),
-            ]));
-        }
-
-        if let Some(error_message) = ambient_agent_model.error_message() {
-            return Some(Message::new(vec![
-                MessageItem::Icon {
-                    icon: CoreIcon::Triangle,
-                    color: Some(error_color),
-                },
-                MessageItem::Text {
-                    content: error_message.to_owned().into(),
-                    color: Some(error_color),
-                },
-            ]));
-        }
-
-        if ambient_agent_model.is_cancelled() {
-            let color = theme.disabled_text_color(theme.background()).into_solid();
-            return Some(Message::new(vec![
-                MessageItem::Icon {
-                    icon: CoreIcon::StopFilled,
-                    color: Some(color),
-                },
-                MessageItem::Text {
-                    content: "Cloud agent run cancelled".into(),
-                    color: Some(color),
-                },
-            ]));
-        }
-
+    fn render_cloud_mode_setup_terminal_message(&self, _app: &AppContext) -> Option<Message> {
         None
     }
 }
@@ -1149,33 +1035,6 @@ impl View for BlocklistAIStatusBar {
         let status_element =
             if let Some(cloud_mode_setup_status) = self.render_cloud_mode_setup_status(app) {
                 cloud_mode_setup_status
-            } else if FeatureFlag::CloudModeSetupV2.is_enabled()
-                && self
-                    .ambient_agent_view_model
-                    .as_ref()
-                    .is_some_and(|ambient_agent_view_model| {
-                        is_cloud_agent_pre_first_exchange(
-                            Some(ambient_agent_view_model),
-                            &self.agent_view_controller,
-                            app,
-                        )
-                    })
-            {
-                render_warping_indicator_base(
-                    WarpingIndicatorProps {
-                        icon: None,
-                        warping_indicator_text: MaybeShimmeringText::Shimmering {
-                            text: "Setting up environment".into(),
-                            shimmering_text_handle: self.shimmering_text_handle.clone(),
-                        },
-                        non_shimmering_text: None,
-                        non_shimmering_suffix: None,
-                        buttons: None,
-                        is_passive_code_diff: false,
-                        secondary_element: self.render_tip(app),
-                    },
-                    app,
-                )
             } else if self
                 .terminal_model
                 .lock()
@@ -1219,15 +1078,6 @@ impl View for BlocklistAIStatusBar {
                     .is_none(),
             ) {
                 warping_indicator
-            } else if self.ambient_agent_view_model.as_ref().is_some_and(
-                |ambient_agent_view_model| {
-                    ambient_agent_view_model
-                        .as_ref(app)
-                        .is_waiting_for_session()
-                },
-            ) {
-                // Don't render warping indicator - the loading screen is shown in the main view
-                return Empty::new().finish();
             } else if agent_view_controller.is_active() {
                 return Flex::column()
                     .with_child(ChildView::new(&self.child_agent_status_card).finish())

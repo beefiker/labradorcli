@@ -1,7 +1,7 @@
 use super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::agent::conversation::{AIConversation, AIConversationId, ConversationStatus};
 use crate::ai::agent::{AIAgentOutputStatus, FinishedAIAgentOutput, RenderableAIError};
-use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::server::server_api::ai::{AIClient, TaskStatusUpdate};
 use crate::server::server_api::ServerApiProvider;
 use crate::terminal::cli_agent_sessions::{

@@ -3118,11 +3118,9 @@ impl RootView {
         true
     }
 
-    pub fn add_file_pane(&mut self, path: &PathBuf, ctx: &mut ViewContext<Self>) -> bool {
-        if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
-            handle.update(ctx, |workspace, ctx| {
-                workspace.add_tab_for_file_notebook(Some(path.to_owned()), ctx);
-            });
+    pub fn add_file_pane(&mut self, _path: &PathBuf, ctx: &mut ViewContext<Self>) -> bool {
+        if let AuthOnboardingState::Terminal(_) = &self.auth_onboarding_state {
+            // File-notebook tabs have been removed from this fork.
             let window_id = ctx.window_id();
             ctx.windows().show_window_and_focus_app(window_id);
             ctx.notify();
@@ -3159,17 +3157,10 @@ impl RootView {
     /// Shows the user the settings view of their newly joined team
     /// within the app.
     pub fn handle_team_intent_link_action(&mut self, _: &(), ctx: &mut ViewContext<Self>) -> bool {
-        // Force-open warp drive.
+        // Dwarf Drive has been removed; just focus the window.
         let window_id = ctx.window_id();
-        if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
-            ctx.dispatch_typed_action_for_view(
-                window_id,
-                handle.id(),
-                &WorkspaceAction::OpenWarpDrive,
-            );
+        if let AuthOnboardingState::Terminal(_) = &self.auth_onboarding_state {
             ctx.windows().show_window_and_focus_app(window_id);
-        } else {
-            log::error!("Auth not complete before trying to open warp drive");
         }
 
         // Use the team tester model to notify relevant subscribers to refresh their data.

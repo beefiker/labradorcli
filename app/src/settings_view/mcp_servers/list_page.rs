@@ -267,9 +267,8 @@ impl MCPServersListPageView {
         if !UserWorkspaces::as_ref(ctx).has_teams() {
             return false;
         }
-        if TemplatableMCPServerManager::get_first_team_space_id(ctx).is_none() {
-            return false;
-        }
+        // Team space ids were tied to cloud-hosted templatable servers; never available in this fork.
+        return false;
         match item_id {
             ServerCardItemId::TemplatableMCP(_)
             | ServerCardItemId::TemplatableMCPInstallation(_) => {

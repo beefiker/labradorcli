@@ -676,10 +676,6 @@ impl<'a> TabComponent<'a> {
             .map(|model| {
                 let model = model.lock();
                 model.is_shared_ambient_agent_session()
-                    || matches!(
-                        model.conversation_transcript_viewer_status(),
-                        Some(ConversationTranscriptViewerStatus::ViewingAmbientConversation(_))
-                    )
             })
             .unwrap_or(false);
         let active_pane_has_unsaved_code_changes = tab

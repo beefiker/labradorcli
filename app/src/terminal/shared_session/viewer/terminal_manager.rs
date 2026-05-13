@@ -1532,7 +1532,6 @@ impl crate::terminal::TerminalManager for TerminalManager {
         let terminal_view_id = self.view.id();
         ActiveAgentViewsModel::handle(app).update(app, |model, ctx| {
             model.unregister_agent_view_controller(terminal_view_id, ctx);
-            model.unregister_ambient_session(terminal_view_id, ctx);
         });
 
         if let NetworkState::Active(ref network) = self.network_state {

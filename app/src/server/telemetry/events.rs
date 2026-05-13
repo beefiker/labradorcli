@@ -1620,7 +1620,7 @@ pub enum TelemetryEvent {
         error_payload: Value,
     },
     UpdateSortingChoice {
-        sorting_choice: DriveSortOrder,
+        sorting_choice: String,
     },
     UndoClose {
         item_type: UndoCloseItemType,
@@ -2608,12 +2608,10 @@ pub enum TelemetryEvent {
     ComputerUseApproved {
         conversation_id: AIConversationId,
         is_autoexecuted: bool,
-        ambient_agent_task_id: Option<AmbientAgentTaskId>,
     },
     /// Emitted when a RequestComputerUse action is cancelled/rejected.
     ComputerUseCancelled {
         conversation_id: AIConversationId,
-        ambient_agent_task_id: Option<AmbientAgentTaskId>,
     },
     /// Emitted when a warp://linear deeplink is opened.
     LinearIssueLinkOpened,
@@ -3001,7 +2999,6 @@ impl TelemetryEvent {
                 Some(json!({ "entrypoint": entrypoint }))
             }
             TelemetryEvent::MCPServerAdded { metadata } => Some(json!({
-                "object_id": metadata.object_id,
                 "name": metadata.name,
                 "transport_type": metadata.transport_type,
                 "mcp_server": metadata.mcp_server,
@@ -4280,18 +4277,12 @@ impl TelemetryEvent {
             TelemetryEvent::ComputerUseApproved {
                 conversation_id,
                 is_autoexecuted,
-                ambient_agent_task_id,
             } => Some(json!({
                 "conversation_id": conversation_id,
                 "is_autoexecuted": is_autoexecuted,
-                "ambient_agent_task_id": ambient_agent_task_id.map(|id| id.to_string()),
             })),
-            TelemetryEvent::ComputerUseCancelled {
-                conversation_id,
-                ambient_agent_task_id,
-            } => Some(json!({
+            TelemetryEvent::ComputerUseCancelled { conversation_id } => Some(json!({
                 "conversation_id": conversation_id,
-                "ambient_agent_task_id": ambient_agent_task_id.map(|id| id.to_string()),
             })),
             TelemetryEvent::FreeTierLimitHitInterstitialDisplayed => None,
             TelemetryEvent::FreeTierLimitHitInterstitialUpgradeButtonClicked => None,

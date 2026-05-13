@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::code::editor::view::{CodeEditorEvent, CodeEditorView};
-use crate::code_review::comment_rendering::CommentViewCard;
+use crate::code_review::comment_rendering::{CommentViewCard, EditorViewEvent, RichTextEditorView};
 use crate::code_review::comments::{
     AttachedReviewComment, AttachedReviewCommentTarget, CommentId, CommentOrigin,
     ReviewCommentBatch, ReviewCommentBatchEvent,
@@ -74,17 +74,11 @@ fn outdated_section_header_text(count: usize) -> Cow<'static, str> {
 /// This function takes a comment editor view that has already been created with markdown content
 /// and extracts the HTML representation from its buffer.
 fn markdown_to_html(
-    editor_view: &ViewHandle<RichTextEditorView>,
-    ctx: &AppContext,
+    _editor_view: &ViewHandle<RichTextEditorView>,
+    _ctx: &AppContext,
 ) -> Option<String> {
-    editor_view.read(ctx, |view, ctx| {
-        let model = view.model();
-        model.read(ctx, |model, ctx| {
-            let buffer = model.content();
-            let range = CharOffset::from(1)..buffer.as_ref(ctx).max_charoffset();
-            buffer.as_ref(ctx).ranges_as_html(vec1![range], ctx)
-        })
-    })
+    // The rich-text editor model is gone in this fork; rendering is disabled.
+    None
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -371,7 +365,7 @@ impl CommentListView {
                     comment,
                     false, /* always_use_static_diff */
                     false, /* disable_scrolling */
-                    Some(Pixels::new(DEFAULT_COMMENT_MAX_WIDTH)),
+                    Some(Pixels::new(400.0)),
                     Some(&self.repo_path),
                     ctx,
                 );

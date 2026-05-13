@@ -26,7 +26,7 @@ use warp_managed_secrets::{client::SecretOwner, ManagedSecretManager, ManagedSec
 use warpui::{platform::TerminationMode, AppContext, SingletonEntity as _};
 
 use crate::{
-    ai::agent_sdk::Owner, auth::UserUid, server::ids::ServerId,
+    ai::agent_sdk::Owner,
     util::time_format::format_approx_duration_from_now_utc,
 };
 
@@ -239,7 +239,7 @@ fn create_secret_with_input(
             let secret_owner = match owner {
                 Owner::User { .. } => SecretOwner::CurrentUser,
                 Owner::Team { team_uid } => SecretOwner::Team {
-                    team_uid: team_uid.uid(),
+                    team_uid: team_uid.clone(),
                 },
             };
 
@@ -288,10 +288,10 @@ fn delete_secret(ctx: &mut AppContext, args: DeleteSecretArgs) -> Result<()> {
                 }
             };
 
-            let secret_owner = match owner {
+            let secret_owner = match &owner {
                 Owner::User { .. } => SecretOwner::CurrentUser,
                 Owner::Team { team_uid } => SecretOwner::Team {
-                    team_uid: team_uid.uid(),
+                    team_uid: team_uid.clone(),
                 },
             };
 
@@ -306,7 +306,7 @@ fn delete_secret(ctx: &mut AppContext, args: DeleteSecretArgs) -> Result<()> {
                     return;
                 }
 
-                let scope = match owner {
+                let scope = match &owner {
                     Owner::User { .. } => "personal",
                     Owner::Team { .. } => "team",
                 };
@@ -395,7 +395,7 @@ fn update_secret(ctx: &mut AppContext, args: UpdateSecretArgs) -> Result<()> {
             let secret_owner = match owner {
                 Owner::User { .. } => SecretOwner::CurrentUser,
                 Owner::Team { team_uid } => SecretOwner::Team {
-                    team_uid: team_uid.uid(),
+                    team_uid: team_uid.clone(),
                 },
             };
 
@@ -482,10 +482,10 @@ fn list_secrets(
                 let secret_infos = secrets.into_iter().map(|secret| {
                     let owner = match secret.owner.type_ {
                         SpaceType::User => Owner::User {
-                            user_uid: UserUid::new(secret.owner.uid.inner()),
+                            user_uid: secret.owner.uid.inner().to_string(),
                         },
                         SpaceType::Team => Owner::Team {
-                            team_uid: ServerId::from_string_lossy(secret.owner.uid.inner()),
+                            team_uid: secret.owner.uid.inner().to_string(),
                         },
                     };
 

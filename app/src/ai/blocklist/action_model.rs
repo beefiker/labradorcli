@@ -69,7 +69,6 @@ use self::execute::{
 };
 
 use super::BlocklistAIHistoryModel;
-use crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE;
 
 use crate::{send_telemetry_from_ctx, TelemetryEvent};
 
@@ -252,7 +251,7 @@ pub struct BlocklistAIActionModel {
     is_view_only: bool,
 
     /// The ID of the ambient agent task which owns this action model, if any.
-    ambient_agent_task_id: Option<crate::ai::ambient_agents::AmbientAgentTaskId>,
+    ambient_agent_task_id: Option<crate::ai::agent_sdk::AmbientAgentTaskId>,
 }
 
 impl BlocklistAIActionModel {
@@ -412,13 +411,10 @@ impl BlocklistAIActionModel {
 
     pub fn set_ambient_agent_task_id(
         &mut self,
-        id: Option<crate::ai::ambient_agents::AmbientAgentTaskId>,
-        ctx: &mut ModelContext<Self>,
+        id: Option<crate::ai::agent_sdk::AmbientAgentTaskId>,
+        _ctx: &mut ModelContext<Self>,
     ) {
         self.ambient_agent_task_id = id;
-        self.executor.update(ctx, |executor, ctx| {
-            executor.set_ambient_agent_task_id(id, ctx);
-        });
     }
 
     fn blocked_action_for_conversation(
@@ -1048,10 +1044,7 @@ impl BlocklistAIActionModel {
             AIAgentActionType::RequestComputerUse(_)
         ) {
             send_telemetry_from_ctx!(
-                TelemetryEvent::ComputerUseCancelled {
-                    conversation_id,
-                    ambient_agent_task_id: self.ambient_agent_task_id,
-                },
+                TelemetryEvent::ComputerUseCancelled { conversation_id },
                 ctx
             );
         }
@@ -1220,84 +1213,14 @@ impl BlocklistAIActionModel {
         }
     }
 
-    /// In shared-session viewer (view-only) mode, ensure document-related action results
-    /// are backed by documents in the local `AIDocumentModel` and that their
-    /// `DocumentContext` versions match. For CreateDocuments, restore missing documents
-    /// (using titles from the original action); for EditDocuments, apply edits to local
-    /// documents and align versions, so headers and "View" buttons stay accurate.
+    /// Previously synced view-only documents with a local AIDocumentModel; that
+    /// model is gone. The function is retained as a no-op to keep callers stable.
     fn maybe_sync_view_only_documents_with_local_model(
         &self,
-        conversation_id: AIConversationId,
-        result: &mut AIAgentActionResult,
-        ctx: &mut ModelContext<Self>,
+        _conversation_id: AIConversationId,
+        _result: &mut AIAgentActionResult,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        if !self.is_view_only {
-            return;
-        }
-
-        match &mut result.result {
-            AIAgentActionResultType::CreateDocuments(CreateDocumentsResult::Success {
-                created_documents,
-            }) => {
-                let history = BlocklistAIHistoryModel::handle(ctx);
-                let Some(conversation) = history.as_ref(ctx).conversation(&conversation_id) else {
-                    return;
-                };
-                let titles = conversation.get_document_titles_for_action(&result.id);
-
-                let doc_model = AIDocumentModel::handle(ctx);
-                doc_model.update(ctx, |doc_model, doc_ctx| {
-                    for (index, doc_context) in created_documents.iter_mut().enumerate() {
-                        // If a user is re-opening a shared session that they previously closed in the current warp session,
-                        // we should delete the previously created document so that the verseion history doesn't get messed up.
-                        doc_model.delete_document(&doc_context.document_id);
-
-                        let title = titles
-                            .as_ref()
-                            .and_then(|t| t.get(index))
-                            .cloned()
-                            .unwrap_or_else(|| DEFAULT_PLANNING_DOCUMENT_TITLE.to_string());
-
-                        doc_model.restore_document(
-                            doc_context.document_id,
-                            conversation_id,
-                            &title,
-                            doc_context.content.clone(),
-                            Local::now(),
-                            doc_ctx,
-                        );
-                    }
-                });
-            }
-            AIAgentActionResultType::EditDocuments(EditDocumentsResult::Success {
-                updated_documents,
-            }) => {
-                let doc_model = AIDocumentModel::handle(ctx);
-                doc_model.update(ctx, |doc_model, doc_ctx| {
-                    for doc_context in updated_documents.iter_mut() {
-                        if doc_model
-                            .get_current_document(&doc_context.document_id)
-                            .is_none()
-                        {
-                            // You can't make edits to a doc that does not exist.
-                            continue;
-                        }
-
-                        if let Some(new_version) = doc_model.restore_document_edit(
-                            &doc_context.document_id,
-                            doc_context.content.clone(),
-                            Local::now(),
-                            doc_ctx,
-                        ) {
-                            // Align the header's version with the locally restored doc
-                            // so the viewer sees the correct bumped version.
-                            doc_context.document_version = new_version;
-                        }
-                    }
-                });
-            }
-            _ => {}
-        }
     }
 }
 

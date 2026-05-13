@@ -246,6 +246,7 @@ impl ActiveAgentViewsModel {
         if is_new {
             match state.active_conversation_id {
                 Some(ConversationOrTaskId::ConversationId(id)) => Some(id),
+                None => None,
             }
         } else {
             None

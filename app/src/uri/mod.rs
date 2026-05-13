@@ -254,13 +254,7 @@ impl UriHost {
                 if let Some(settings_sub_page) = settings_sub_page {
                     match settings_sub_page.as_str() {
                         "billing_and_usage" => {
-                            dispatch_action_in_new_or_existing_window(
-                                primary_window_id,
-                                "root_view:open_settings_page_in_existing_window",
-                                "root_view:open_settings_page_in_new_window",
-                                &SettingsSection::BillingAndUsage,
-                                ctx,
-                            );
+                            // Billing and usage settings have been removed from this fork.
                         }
                         "environments" => {
                             dispatch_action_in_new_or_existing_window(
@@ -732,9 +726,6 @@ impl Action {
                 let focused_conversation = primary_window_id
                     .and_then(|wid| active_agent_views.get_focused_conversation(wid));
                 let mut terminal_view_id = match focused_conversation {
-                    Some(ConversationOrTaskId::TaskId(task_id)) => {
-                        active_agent_views.get_terminal_view_id_for_ambient_task(task_id)
-                    }
                     Some(ConversationOrTaskId::ConversationId(conversation_id)) => {
                         active_agent_views
                             .get_terminal_view_id_for_conversation(conversation_id, ctx)

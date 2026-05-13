@@ -31,7 +31,6 @@ use crate::{
         blocklist::secret_redaction::find_secrets_in_text,
         mcp::{
             parsing::{prettify_json, resolve_json, ParsedTemplatableMCPServerResult},
-            templatable::CloudTemplatableMCPServer,
             MCPServer, TemplatableMCPServer, TemplatableMCPServerInstallation,
             TemplatableMCPServerManager, TransportType,
         },
@@ -83,7 +82,6 @@ pub enum MCPServersEditPageViewAction {
 
 #[allow(clippy::large_enum_variant)]
 pub enum ServerModel {
-    CloudTemplatableMCPServer(CloudTemplatableMCPServer),
     LocalTemplatableMCPInstallation(TemplatableMCPServerInstallation),
     None,
 }
@@ -91,9 +89,6 @@ pub enum ServerModel {
 impl ServerModel {
     pub fn name(&self) -> Option<String> {
         match self {
-            ServerModel::CloudTemplatableMCPServer(cloud_templatable_server) => {
-                Some(cloud_templatable_server.display_name())
-            }
             ServerModel::LocalTemplatableMCPInstallation(templatable_mcp_server_installation) => {
                 Some(
                     templatable_mcp_server_installation
@@ -223,22 +218,8 @@ impl MCPServersEditPageView {
     ) {
         self.server_card_item_id = item_id;
         match item_id {
-            Some(ServerCardItemId::TemplatableMCP(template_uuid)) => {
-                let cloud_templatable_mcp_server = TemplatableMCPServerManager::as_ref(ctx)
-                    .get_cloud_templatable_mcp_server(template_uuid);
-
-                if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-                    self.server_model = ServerModel::CloudTemplatableMCPServer(
-                        cloud_templatable_mcp_server.clone(),
-                    );
-                    let templatable_mcp_server = &cloud_templatable_mcp_server.model().string_model;
-                    let json = templatable_mcp_server.to_user_json();
-
-                    self.json_editor.update(ctx, |view, ctx| {
-                        let state = InitialBufferState::plain_text(&json);
-                        view.reset(state, ctx);
-                    });
-                }
+            Some(ServerCardItemId::TemplatableMCP(_template_uuid)) => {
+                // Cloud-hosted templatable MCP servers were removed; nothing to load.
             }
             Some(ServerCardItemId::TemplatableMCPInstallation(installation_uuid)) => {
                 let installation = TemplatableMCPServerManager::as_ref(ctx)

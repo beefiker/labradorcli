@@ -1141,18 +1141,7 @@ fn conversation_is_cloud_oz_for_slash_command(
         return false;
     };
 
-    let Some(task) = AgentConversationsModel::as_ref(ctx).get_task_data(&task_id) else {
-        // Permissive: not yet fetched. Matches the data-source default so the command isn't
-        // wrongly blocked while the task fetch is in flight.
-        return true;
-    };
-
-    match task
-        .agent_config_snapshot
-        .as_ref()
-        .and_then(|s| s.harness.as_ref())
-    {
-        Some(_) => false,
-        None => true,
-    }
+    // Cloud-hosted task data lookups are gone; permissively allow the command.
+    let _ = (ctx, task_id);
+    true
 }

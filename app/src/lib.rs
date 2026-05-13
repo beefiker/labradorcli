@@ -1661,7 +1661,7 @@ fn initialize_app(
 
         CodebaseIndexManager::new(
             indices_to_restore,
-            DEFAULT_MAX_INDICES,
+            Some(DEFAULT_MAX_INDICES),
             DEFAULT_MAX_FILES_PER_REPO,
             DEFAULT_EMBEDDING_BATCH_SIZE,
             server_api_provider.as_ref(ctx).get(),

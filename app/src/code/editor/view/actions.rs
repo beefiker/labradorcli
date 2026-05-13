@@ -909,10 +909,10 @@ impl TypedActionView for CodeEditorView {
                 );
             }),
             DeleteWordLeft => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Backwards, TextUnit::Word, false, ctx);
+                model.delete(TextDirection::Backwards, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), false, ctx);
             }),
             DeleteWordRight => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Forwards, TextUnit::Word, false, ctx);
+                model.delete(TextDirection::Forwards, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), false, ctx);
             }),
             CutLineLeft => self.model.update(ctx, |model, ctx| {
                 model.delete(TextDirection::Backwards, TextUnit::LineBoundary, true, ctx);
@@ -921,10 +921,10 @@ impl TypedActionView for CodeEditorView {
                 model.delete(TextDirection::Forwards, TextUnit::LineBoundary, true, ctx);
             }),
             CutWordLeft => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Backwards, TextUnit::Word, true, ctx);
+                model.delete(TextDirection::Backwards, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), true, ctx);
             }),
             CutWordRight => self.model.update(ctx, |model, ctx| {
-                model.delete(TextDirection::Forwards, TextUnit::Word, true, ctx);
+                model.delete(TextDirection::Forwards, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), true, ctx);
             }),
             MoveUp => self.model.update(ctx, |model, ctx| model.move_up(ctx)),
             MoveDown => self.model.update(ctx, |model, ctx| model.move_down(ctx)),
@@ -1071,7 +1071,7 @@ impl TypedActionView for CodeEditorView {
                         model.open_comment_line(line_info, ctx);
                     });
 
-                    ctx.focus(&self.active_comment_editor);
+                    // Active comment editor view has been removed in this fork.
                     ctx.notify();
                 }
             }

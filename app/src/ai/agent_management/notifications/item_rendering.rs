@@ -463,15 +463,14 @@ pub(crate) fn handle_notification_artifact_buttons_event(
 ) {
     match event {
         ArtifactButtonsRowEvent::OpenPlan { notebook_uid } => {
+            let _ = notebook_uid;
             send_telemetry_from_ctx!(
                 AgentManagementTelemetryEvent::ArtifactClicked {
                     artifact_type: ArtifactType::Plan
                 },
                 ctx
             );
-            ctx.dispatch_typed_action(&WorkspaceAction::OpenNotebook {
-                id: (*notebook_uid).into(),
-            });
+            // Notebook panes have been removed from this fork.
         }
         ArtifactButtonsRowEvent::CopyBranch { branch } => {
             send_telemetry_from_ctx!(

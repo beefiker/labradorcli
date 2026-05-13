@@ -332,6 +332,12 @@ impl HistoryEntry {
         }
     }
 
+    /// Workflow linkage was tied to the deleted cloud workflows; this fork
+    /// reports no linked workflow data.
+    pub fn linked_workflow_data(&self) -> Option<LinkedWorkflowData> {
+        None
+    }
+
     /// Indicates that at least one of the optional rich history fields is Some.
     pub fn has_metadata(&self) -> bool {
         // Destructure this so that we _must_ update this method when new metadata fields are added

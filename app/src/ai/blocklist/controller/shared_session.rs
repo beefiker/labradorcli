@@ -629,24 +629,12 @@ impl BlocklistAIController {
         let server_api = ServerApiProvider::as_ref(ctx).get();
         let attachment_ids: Vec<String> = file_downloads.iter().map(|(id, _)| id.clone()).collect();
 
-        // Fetch presigned download URLs from the server, download files to disk,
-        // then build the attachment map from only the successfully downloaded files.
+        // Server-side task attachment downloads have been removed; nothing to fetch.
+        let _ = (&ai_client, &attachment_ids);
         ctx.spawn(
             async move {
-                let download_urls = match ai_client
-                    .download_task_attachments(&task_id, &attachment_ids)
-                    .await
-                {
-                    Ok(resp) => resp
-                        .attachments
-                        .into_iter()
-                        .map(|att| (att.attachment_id, att.download_url))
-                        .collect::<std::collections::HashMap<_, _>>(),
-                    Err(e) => {
-                        log::error!("Failed to get download URLs for task {task_id}: {e}");
-                        return vec![];
-                    }
-                };
+                let download_urls: std::collections::HashMap<String, String> =
+                    std::collections::HashMap::new();
 
                 if let Err(e) = async_fs::create_dir_all(&attachment_dir).await {
                     log::error!("Failed to create attachments directory: {e}");

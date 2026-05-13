@@ -36,7 +36,7 @@ use crate::{
     },
     ai_assistant::{
         execution_context::WarpAiExecutionContext, requests::GenerateDialogueResult,
-        utils::TranscriptPart, AIGeneratedCommand, GenerateCommandsFromNaturalLanguageError,
+        utils::TranscriptPart, GenerateCommandsFromNaturalLanguageError,
     },
     server::graphql::{
         default_request_options, get_request_context, get_user_facing_error_message,
@@ -623,12 +623,6 @@ struct ListAgentsResponse {
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 pub trait AIClient: 'static + Send + Sync {
-    async fn generate_commands_from_natural_language(
-        &self,
-        prompt: String,
-        ai_execution_context: Option<WarpAiExecutionContext>,
-    ) -> Result<Vec<AIGeneratedCommand>, GenerateCommandsFromNaturalLanguageError>;
-
     async fn generate_dialogue_answer(
         &self,
         transcript: Vec<TranscriptPart>,
@@ -817,44 +811,6 @@ fn into_file_artifact_record(
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 impl AIClient for ServerApi {
-    async fn generate_commands_from_natural_language(
-        &self,
-        prompt: String,
-        // TODO: use relevant context from RequestContext and deprecate usage of ai_execution_context
-        _ai_execution_context: Option<WarpAiExecutionContext>,
-    ) -> Result<Vec<AIGeneratedCommand>, GenerateCommandsFromNaturalLanguageError> {
-        let default_err = GenerateCommandsFromNaturalLanguageError::Other;
-
-        let variables = GenerateCommandsVariables {
-            input: GenerateCommandsInput { prompt },
-            request_context: get_request_context(),
-        };
-
-        let operation = GenerateCommands::build(variables);
-        let response = self
-            .send_graphql_request(
-                operation,
-                Some(Duration::from_secs(AI_ASSISTANT_REQUEST_TIMEOUT_SECONDS)),
-            )
-            .await
-            .map_err(|_| default_err)?;
-
-        match response.generate_commands {
-            GenerateCommandsResult::GenerateCommandsOutput(output) => match output.status {
-                GenerateCommandsStatus::GenerateCommandsSuccess(success) => {
-                    Ok(success.commands.into_iter().map(Into::into).collect_vec())
-                }
-                GenerateCommandsStatus::GenerateCommandsFailure(failure) => {
-                    Err(failure.type_.into())
-                }
-                GenerateCommandsStatus::Unknown => {
-                    Err(GenerateCommandsFromNaturalLanguageError::Other)
-                }
-            },
-            _ => Err(GenerateCommandsFromNaturalLanguageError::Other),
-        }
-    }
-
     async fn generate_dialogue_answer(
         &self,
         transcript: Vec<TranscriptPart>,
@@ -890,14 +846,11 @@ impl AIClient for ServerApi {
                     Ok(GenerateDialogueResult::Success {
                         answer: success.answer,
                         truncated: success.truncated,
-                        request_limit_info: success.request_limit_info.into(),
                         transcript_summarized: success.transcript_summarized,
                     })
                 }
-                GenerateDialogueStatus::GenerateDialogueFailure(failure) => {
-                    Ok(GenerateDialogueResult::Failure {
-                        request_limit_info: failure.request_limit_info.into(),
-                    })
+                GenerateDialogueStatus::GenerateDialogueFailure(_failure) => {
+                    Ok(GenerateDialogueResult::Failure)
                 }
                 GenerateDialogueStatus::Unknown => Err(anyhow!("failed to generate AI dialogue")),
             },

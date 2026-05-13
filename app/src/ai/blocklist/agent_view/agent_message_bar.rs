@@ -28,7 +28,6 @@ use crate::ai::mcp::{
     templatable_manager::{FigmaMcpStatus, TemplatableMCPServerManagerEvent},
     TemplatableMCPServerManager,
 };
-use crate::ai::request_usage_model::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::terminal::input::buffer_model::{InputBufferModel, InputBufferUpdateEvent};
 use crate::terminal::input::message_bar::attached_context::{
@@ -176,12 +175,6 @@ impl AgentMessageBar {
             }
         });
 
-        ctx.subscribe_to_model(&AIDocumentModel::handle(ctx), |_, _, event, ctx| {
-            if matches!(event, AIDocumentModelEvent::DocumentVisibilityChanged(_)) {
-                ctx.notify();
-            }
-        });
-
         ctx.subscribe_to_model(&context_model, |me, _, event, ctx| {
             if let BlocklistAIContextEvent::UpdatedPendingContext { .. } = event {
                 me.update_figma_detected(ctx);
@@ -213,11 +206,6 @@ impl AgentMessageBar {
             );
         }
 
-        ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |_, _, event, ctx| {
-            if matches!(event, AIRequestUsageModelEvent::RequestUsageUpdated) {
-                ctx.notify();
-            }
-        });
 
         Self {
             agent_view_controller,
@@ -555,10 +543,8 @@ impl MessageProvider<AgentMessageArgs<'_>> for ZeroStateMessageProducer {
             AgentViewState::Active { origin, .. } if origin.is_cloud_agent()
         );
 
-        let plan_count = AIDocumentModel::as_ref(app)
-            .get_all_documents_for_conversation(active_conversation.id())
-            .len();
-        let has_plan = plan_count > 0;
+        // AI document plans have been removed from this fork.
+        let has_plan = false;
         let has_conversation_been_updated_since_agent_view_entry =
             *original_conversation_length != active_conversation.exchange_count();
 
@@ -599,36 +585,7 @@ impl MessageProvider<AgentMessageArgs<'_>> for ZeroStateMessageProducer {
             ));
         }
 
-        if has_plan {
-            let is_plan_for_this_conversation_open = agent_view_controller
-                .pane_group_id()
-                .is_some_and(|pane_group_id| {
-                    AIDocumentModel::as_ref(app).is_document_visible_by_conversation_in_pane_group(
-                        &active_conversation.id(),
-                        pane_group_id,
-                    )
-                });
-
-            // If changing this text, ensure the logic is consistent with how TerminalAction::ToggleAIDocumentPane is handled.
-            items.push(MessageItem::clickable(
-                vec![
-                    MessageItem::keystroke(
-                        Keystroke::parse("cmdorctrl-alt-p").expect("keystroke should parse"),
-                    ),
-                    MessageItem::text(if is_plan_for_this_conversation_open {
-                        "to hide plan"
-                    } else if plan_count > 1 {
-                        "to view plans"
-                    } else {
-                        "to view plan"
-                    }),
-                ],
-                |ctx| {
-                    ctx.dispatch_typed_action(TerminalAction::ToggleAIDocumentPane);
-                },
-                mouse_states.toggle_plan.clone(),
-            ));
-        }
+        let _ = has_plan;
         if fork_from_last_known_good_state_exchange_id(active_conversation, terminal_model)
             .is_some()
         {

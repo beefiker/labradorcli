@@ -527,15 +527,6 @@ impl ConversationListView {
                     ctx
                 );
             }
-            ConversationOrTaskId::TaskId(task_id) => {
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::CloudRunOpened {
-                        task_id: task_id.to_string(),
-                        opened_from: OpenedFrom::ConversationList,
-                    },
-                    ctx
-                );
-            }
         }
     }
 
@@ -880,33 +871,14 @@ impl TypedActionView for ConversationListView {
                     });
 
                     let conversation_id = *conversation_id;
-                    let is_ambient_agent_conversation =
-                        matches!(conversation_id, ConversationOrTaskId::TaskId(_));
 
-                    let mut delete_item = MenuItemFields::new("Delete")
+                    let delete_item = MenuItemFields::new("Delete")
                         .with_override_text_color(Appearance::as_ref(ctx).theme().ansi_fg_red())
                         .with_on_select_action(ConversationListViewAction::DeleteFromOverflowMenu {
                             conversation_id,
-                        })
-                        .with_disabled(is_ambient_agent_conversation);
-                    if is_ambient_agent_conversation {
-                        delete_item = delete_item
-                            .with_tooltip("Ambient agent conversations cannot be deleted");
-                    }
+                        });
 
-                    // Check if conversation is shareable:
-                    // - For tasks: check if there's an associated conversation_id
-                    // - For conversations: check if synced to cloud
                     let is_shareable = match conversation_id {
-                        ConversationOrTaskId::TaskId(task_id) => {
-                            if let Some(ConversationOrTask::Task(task)) =
-                                AgentConversationsModel::as_ref(ctx).get_task(&task_id)
-                            {
-                                task.conversation_id.is_some()
-                            } else {
-                                false
-                            }
-                        }
                         ConversationOrTaskId::ConversationId(conv_id) => {
                             BlocklistAIHistoryModel::as_ref(ctx)
                                 .can_conversation_be_shared(&conv_id)
@@ -927,8 +899,8 @@ impl TypedActionView for ConversationListView {
                     };
 
                     let fork_items: Option<[MenuItem<ConversationListViewAction>; 2]> =
-                        // Forking from a closed ambient agent conversation is not supported at this point.
-                        if !is_ambient_agent_conversation {
+                        // Ambient agent conversations have been removed; forking is always supported now.
+                        if true {
                             Some([
                                 MenuItemFields::new("Fork in new pane")
                                     .with_on_select_action(

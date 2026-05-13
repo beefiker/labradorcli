@@ -599,14 +599,9 @@ impl ConversationDetailsPanel {
                 display_status,
                 ..
             } => {
-                let task_id = *task_id.as_ref()?;
-                let display_status = display_status.as_ref()?;
-                Some(ActionButtonsConfig::for_task(
-                    task_id,
-                    display_status,
-                    open_action,
-                    data.copy_link_url.clone(),
-                ))
+                let _ = (task_id, display_status);
+                // Task panel mode is dead; cloud tasks no longer exist.
+                None
             }
             PanelMode::Conversation {
                 ai_conversation_id, ..
@@ -669,17 +664,6 @@ impl ConversationDetailsPanel {
                 if let Some(action) = &self.data.open_action {
                     ctx.dispatch_typed_action(action);
                 }
-            }
-            AgentDetailsButtonEvent::CancelTask { task_id } => {
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::CloudRunCancelled {
-                        task_id: task_id.to_string(),
-                    },
-                    ctx
-                );
-
-                let _ = task_id;
-                let _ = ctx;
             }
             AgentDetailsButtonEvent::ForkConversation { conversation_id } => {
                 send_telemetry_from_ctx!(

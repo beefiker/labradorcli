@@ -114,13 +114,8 @@ impl TerminalManager for MockTerminalManager {
         _detach_type: crate::pane_group::pane::DetachType,
         app: &mut AppContext,
     ) {
-        // If this is a conversation transcript viewer, unregister the ambient session.
-        if self.model.lock().is_conversation_transcript_viewer() {
-            let terminal_view_id = self.view.id();
-            ActiveAgentViewsModel::handle(app).update(app, |model, ctx| {
-                model.unregister_ambient_session(terminal_view_id, ctx);
-            });
-        }
+        // Ambient sessions are no longer tracked; nothing to unregister.
+        let _ = app;
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

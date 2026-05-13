@@ -119,14 +119,12 @@ fn should_show_artifacts(artifacts: &[Artifact]) -> bool {
 /// Identifies a card item - either a task ID or a conversation ID
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ManagementCardItemId {
-    Task(AmbientAgentTaskId),
     Conversation(AIConversationId),
 }
 
 impl ManagementCardItemId {
     fn as_key(&self) -> String {
         match self {
-            ManagementCardItemId::Task(id) => format!("task_{id}"),
             ManagementCardItemId::Conversation(id) => format!("conv_{id}"),
         }
     }
@@ -777,7 +775,6 @@ impl AgentManagementView {
             })
             .map(|t| {
                 let item_id = match t {
-                    ConversationOrTask::Task(task) => ManagementCardItemId::Task(task.task_id),
                     ConversationOrTask::Conversation(conversation) => {
                         ManagementCardItemId::Conversation(conversation.nav_data.id)
                     }
@@ -786,12 +783,6 @@ impl AgentManagementView {
 
                 let copy_link_url = t.session_or_conversation_link(ctx);
                 let mut config = match t {
-                    ConversationOrTask::Task(task) => ActionButtonsConfig::for_task(
-                        task.task_id,
-                        &t.display_status(ctx),
-                        None, // Don't show open button in card hover
-                        copy_link_url,
-                    ),
                     ConversationOrTask::Conversation(conversation) => {
                         ActionButtonsConfig::for_conversation(
                             conversation.nav_data.id,
@@ -915,17 +906,6 @@ impl AgentManagementView {
                 // Open button only shown in details panel, not in management view cards.
                 // We open the cards directly via clicking on them.
             }
-            AgentDetailsButtonEvent::CancelTask { task_id } => {
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::CloudRunCancelled {
-                        task_id: task_id.to_string(),
-                    },
-                    ctx
-                );
-
-                let _ = task_id;
-                let _ = ctx;
-            }
             AgentDetailsButtonEvent::ForkConversation { conversation_id } => {
                 send_telemetry_from_ctx!(
                     AgentManagementTelemetryEvent::ConversationForked {
@@ -962,15 +942,6 @@ impl AgentManagementView {
                         send_telemetry_from_ctx!(
                             AgentManagementTelemetryEvent::ConversationLinkCopied {
                                 conversation_id: conversation_id.to_string(),
-                                copied_from: OpenedFrom::ManagementView,
-                            },
-                            ctx
-                        );
-                    }
-                    ManagementCardItemId::Task(task_id) => {
-                        send_telemetry_from_ctx!(
-                            AgentManagementTelemetryEvent::SessionLinkCopied {
-                                task_id: task_id.to_string(),
                                 copied_from: OpenedFrom::ManagementView,
                             },
                             ctx
@@ -1095,16 +1066,6 @@ impl AgentManagementView {
         let model = AgentConversationsModel::as_ref(ctx);
 
         let data = match item_id {
-            ManagementCardItemId::Task(task_id) => {
-                let Some(task_wrapper) = model.get_task(task_id) else {
-                    return;
-                };
-                // Agent management view should always open in a new tab
-                let open_action =
-                    task_wrapper.get_open_action(Some(RestoreConversationLayout::NewTab), ctx);
-                let copy_link_url = task_wrapper.session_or_conversation_link(ctx);
-                ConversationDetailsData::from_task(*task_id, open_action, copy_link_url, ctx)
-            }
             ManagementCardItemId::Conversation(conversation_id) => {
                 let Some(conversation) = model.get_conversation(conversation_id) else {
                     return;
@@ -1429,7 +1390,6 @@ impl AgentManagementView {
 
         let model = AgentConversationsModel::as_ref(app);
         let card_data = match &card_state.item_id {
-            ManagementCardItemId::Task(task_id) => model.get_task(task_id),
             ManagementCardItemId::Conversation(conv_id) => model.get_conversation(conv_id),
         };
         let Some(card_data) = card_data else {
@@ -1627,9 +1587,7 @@ impl AgentManagementView {
         // Build metadata parts conditionally
         let mut metadata_parts = Vec::new();
 
-        if let Some(source) = card_data.source() {
-            metadata_parts.push(format!("Source: {}", source.display_name()));
-        }
+        // Conversation source field was tied to cloud tasks which are gone.
 
         if FeatureFlag::AgentHarness.is_enabled() {
             if let Some(harness) = card_data.harness() {
@@ -2169,7 +2127,6 @@ impl TypedActionView for AgentManagementView {
             AgentManagementViewAction::OpenSession { item_id } => {
                 let model = AgentConversationsModel::as_ref(ctx);
                 let card_data = match item_id {
-                    ManagementCardItemId::Task(task_id) => model.get_task(task_id),
                     ManagementCardItemId::Conversation(conv_id) => model.get_conversation(conv_id),
                 };
                 let Some(card_data) = card_data else {
@@ -2186,15 +2143,6 @@ impl TypedActionView for AgentManagementView {
                         send_telemetry_from_ctx!(
                             AgentManagementTelemetryEvent::ConversationOpened {
                                 conversation_id: conversation_id.to_string(),
-                                opened_from: OpenedFrom::ManagementView,
-                            },
-                            ctx
-                        );
-                    }
-                    ManagementCardItemId::Task(task_id) => {
-                        send_telemetry_from_ctx!(
-                            AgentManagementTelemetryEvent::CloudRunOpened {
-                                task_id: task_id.to_string(),
                                 opened_from: OpenedFrom::ManagementView,
                             },
                             ctx

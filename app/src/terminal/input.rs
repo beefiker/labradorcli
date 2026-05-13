@@ -66,7 +66,6 @@ use crate::terminal::input::models::{
     local_auth_setup_for_model_id, InlineModelSelectorEvent, InlineModelSelectorTab,
     InlineModelSelectorView,
 };
-use crate::terminal::input::plans::{InlinePlanMenuEvent, InlinePlanMenuView};
 use crate::terminal::input::profiles::{InlineProfileSelectorEvent, InlineProfileSelectorView};
 use crate::terminal::input::prompts::{InlinePromptsMenuEvent, InlinePromptsMenuView};
 use crate::terminal::input::repos::{InlineReposMenuEvent, InlineReposMenuView};
@@ -172,7 +171,7 @@ use crate::{
         telemetry::{
             AICommandSearchEntrypoint, AgentModeAutoDetectionFalsePositivePayload,
             AgentModeAutoDetectionSettingOrigin, AnonymousUserSignupEntrypoint, CommandXRayTrigger,
-            EnvVarTelemetryMetadata, TelemetryEvent, WorkflowTelemetryMetadata,
+            TelemetryEvent,
         },
     },
     session_management::SessionNavigationPromptElements,
@@ -1544,9 +1543,6 @@ pub struct Input {
     /// Inline conversation menu for selecting AI conversations.
     inline_conversation_menu_view: ViewHandle<InlineConversationMenuView>,
 
-    /// Inline plan menu for selecting among multiple plans.
-    inline_plan_menu_view: ViewHandle<InlinePlanMenuView>,
-
     /// Inline repos switcher menu.
     inline_repos_menu_view: ViewHandle<InlineReposMenuView>,
 
@@ -2908,20 +2904,6 @@ impl Input {
             });
         }
 
-        let inline_plan_menu_view = ctx.add_view(|ctx| {
-            InlinePlanMenuView::new(
-                AIConversationId::default(),
-                suggestions_mode_model.clone(),
-                agent_view_controller.clone(),
-                &inline_terminal_menu_positioner,
-                &buffer_model,
-                ctx,
-            )
-        });
-        ctx.subscribe_to_view(&inline_plan_menu_view, |me, _, event, ctx| {
-            me.handle_plan_menu_event(event, ctx);
-        });
-
         let rewind_menu_view = ctx.add_view(|ctx| {
             RewindMenuView::new(
                 AIConversationId::default(),
@@ -3077,7 +3059,6 @@ impl Input {
             inline_slash_commands_view,
             cloud_mode_v2_slash_commands_view,
             inline_conversation_menu_view,
-            inline_plan_menu_view,
             inline_repos_menu_view,
             inline_model_selector_view,
             inline_profile_selector_view,
@@ -3843,34 +3824,6 @@ impl Input {
             model.set_mode(InputSuggestionsMode::PlanMenu { conversation_id }, ctx);
         });
         ctx.notify();
-    }
-
-    fn handle_plan_menu_event(&mut self, event: &InlinePlanMenuEvent, ctx: &mut ViewContext<Self>) {
-        match event {
-            InlinePlanMenuEvent::OpenPlan {
-                document_id,
-                document_version,
-            } => {
-                ctx.emit(Event::OpenAIDocumentPane {
-                    document_id: *document_id,
-                    document_version: *document_version,
-                });
-                if self.suggestions_mode_model.as_ref(ctx).is_plan_menu() {
-                    self.suggestions_mode_model.update(ctx, |model, ctx| {
-                        model.set_mode(InputSuggestionsMode::Closed, ctx);
-                    });
-                    ctx.notify();
-                }
-            }
-            InlinePlanMenuEvent::Dismissed => {
-                if self.suggestions_mode_model.as_ref(ctx).is_plan_menu() {
-                    self.suggestions_mode_model.update(ctx, |model, ctx| {
-                        model.close_and_restore_buffer(ctx);
-                    });
-                    ctx.notify();
-                }
-            }
-        }
     }
 
     fn open_conversation_menu(&mut self, ctx: &mut ViewContext<Self>) {
@@ -5822,12 +5775,9 @@ impl Input {
             .active_block_mut()
             .set_home_dir(home_dir);
 
-        let env_var_collection_id = self.env_var_collection_state.selected_env_vars;
-        self.model
-            .lock()
-            .block_list_mut()
-            .active_block_mut()
-            .set_cloud_env_var_state(env_var_collection_id);
+        // Env-var collection state was removed in this fork.
+        let env_var_collection_id: Option<()> = None;
+        let _ = env_var_collection_id;
 
         // Record whether NLD was overridden (input type manually locked) at submission time.
         let nld_overridden = self.ai_input_model.as_ref(ctx).is_input_type_locked();
@@ -6721,13 +6671,8 @@ impl Input {
                 });
                 true
             }
-            InputSuggestionsMode::PlanMenu { .. } => {
-                self.inline_plan_menu_view.update(ctx, |view, ctx| {
-                    view.select_up(ctx);
-                });
-                true
-            }
-            InputSuggestionsMode::HistoryUp { .. }
+            InputSuggestionsMode::PlanMenu { .. }
+            | InputSuggestionsMode::HistoryUp { .. }
             | InputSuggestionsMode::CompletionSuggestions { .. }
             | InputSuggestionsMode::StaticWorkflowEnumSuggestions { .. }
             | InputSuggestionsMode::DynamicWorkflowEnumSuggestions { .. }
@@ -6880,7 +6825,7 @@ impl Input {
                 .update(ctx, |input_suggestions, ctx| {
                     input_suggestions.exit(true, ctx);
                 });
-        } else if self.workflows_state.selected_workflow_state.is_some() {
+        } else if false {
             self.clear_current_workflow(ctx);
         } else if !matches!(vim_mode, None | Some(VimMode::Normal)) {
             self.editor.update(ctx, |editor, editor_ctx| {
@@ -7046,13 +6991,8 @@ impl Input {
                 });
                 true
             }
-            InputSuggestionsMode::PlanMenu { .. } => {
-                self.inline_plan_menu_view.update(ctx, |view, ctx| {
-                    view.select_down(ctx);
-                });
-                true
-            }
-            InputSuggestionsMode::HistoryUp { .. }
+            InputSuggestionsMode::PlanMenu { .. }
+            | InputSuggestionsMode::HistoryUp { .. }
             | InputSuggestionsMode::CompletionSuggestions { .. }
             | InputSuggestionsMode::StaticWorkflowEnumSuggestions { .. }
             | InputSuggestionsMode::DynamicWorkflowEnumSuggestions { .. }
@@ -8178,7 +8118,7 @@ impl Input {
                         self.maybe_generate_autosuggestion(ctx);
 
                         if buffer_text.is_empty()
-                            && self.workflows_state.selected_workflow_state.is_some()
+                            && false
                         {
                             self.clear_current_workflow(ctx);
                         }
@@ -8735,14 +8675,6 @@ impl Input {
                             file_path.to_string()
                         };
                         self.replace_at_symbol_with_text(&file_path, ctx);
-                    }
-                    AIContextMenuSearchableAction::InsertDriveObject {
-                        object_type,
-                        object_uid,
-                    } => {
-                        // For InsertDriveObject, format as <object_type:uid> and replace the "@" and any filter text
-                        let drive_object_text = format!("<{object_type}:{object_uid}>");
-                        self.replace_at_symbol_with_text(&drive_object_text, ctx);
                     }
                     AIContextMenuSearchableAction::InsertPlan { ai_document_uid } => {
                         // For InsertPlan, format as <plan:uid> and replace the "@" and any filter text
@@ -10746,10 +10678,6 @@ impl Input {
             self.inline_repos_menu_view
                 .update(ctx, |view, ctx| view.accept_selected_item(false, ctx));
             return;
-        } else if self.suggestions_mode_model.as_ref(ctx).is_plan_menu() {
-            self.inline_plan_menu_view
-                .update(ctx, |view, ctx| view.accept_selected_item(ctx));
-            return;
         } else if self.suggestions_mode_model.as_ref(ctx).is_slash_commands() {
             if self.is_cloud_mode_input_v2_composing(ctx) {
                 if let Some(view) = self.cloud_mode_v2_slash_commands_view.clone() {
@@ -12645,9 +12573,7 @@ impl View for Input {
 
     fn on_focus(&mut self, focus_ctx: &FocusContext, ctx: &mut ViewContext<Self>) {
         if focus_ctx.is_self_focused() {
-            if self.is_voltron_open {
-                ctx.focus(&self.voltron_view);
-            } else if self.prompt_render_helper.has_open_chip_menu(ctx) {
+            if self.prompt_render_helper.has_open_chip_menu(ctx) {
                 // Focus the PromptDisplay, which will in turn focus any open chip menu
                 ctx.focus(self.prompt_render_helper.prompt_view());
             } else if self.agent_input_footer.as_ref(ctx).has_open_chip_menu(ctx) {
@@ -12723,11 +12649,6 @@ impl View for Input {
             ctx.set.insert(flags::CODE_SUGGESTIONS_FLAG);
         }
 
-        if let Some(workflow) = self.workflows_state.selected_workflow_state.clone() {
-            if workflow.should_show_more_info_view {
-                ctx.set.insert("WorkflowInfoBox");
-            }
-        }
 
         let is_profile_model_selector_open = self.should_show_universal_developer_input(app)
             && self

@@ -39,20 +39,9 @@ impl ConversationDataSource {
             }
         }
 
-        // Source 2: cloud agent tasks. Every ambient agent conversation has a
-        // corresponding task, so this covers all cloud conversations.
-        let agent_model = AgentConversationsModel::as_ref(app);
-        for task in agent_model.tasks_iter() {
-            if let Some(conv_id) = &task.conversation_id {
-                if seen_tokens.insert(conv_id.clone()) {
-                    items.push(ConversationContextItem {
-                        title: task.title.clone(),
-                        server_conversation_token: conv_id.clone(),
-                        last_updated: task.updated_at,
-                    });
-                }
-            }
-        }
+        // Cloud agent tasks are no longer enumerated in this fork.
+        let _ = app;
+        let _ = &seen_tokens;
 
         items
     }

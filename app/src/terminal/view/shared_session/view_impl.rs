@@ -648,12 +648,7 @@ impl TerminalView {
         self.update_pane_configuration(ctx);
 
         self.update_shared_session_pane_header(ctx);
-        // Shared ambient agent sessions should auto-open the details panel once (same behavior as local cloud mode).
-        if FeatureFlag::CloudMode.is_enabled()
-            && matches!(source_type, SessionSourceType::AmbientAgent { .. })
-        {
-            self.maybe_auto_open_cloud_mode_details_panel(ctx);
-        }
+        // Cloud mode details panel was removed in this fork; nothing to auto-open.
 
         send_telemetry_from_ctx!(
             TelemetryEvent::JoinedSharedSession {

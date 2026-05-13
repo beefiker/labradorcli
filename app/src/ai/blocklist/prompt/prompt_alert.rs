@@ -384,11 +384,7 @@ impl View for PromptAlertView {
             );
 
         if suggest_buy_credits {
-            text_fragments.push(FormattedTextFragment::plain_text("  "));
-            text_fragments.push(FormattedTextFragment::hyperlink_action(
-                "Open settings",
-                WorkspaceAction::ShowSettingsPage(SettingsSection::BillingAndUsage),
-            ));
+            // Billing and usage settings page has been removed from this fork.
         } else {
             self.action_hyperlink(&state, &mut text_fragments, app);
         }

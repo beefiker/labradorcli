@@ -475,7 +475,8 @@ impl ServerApi {
             .as_ref()
             .map(|id| id.to_string());
 
-        let agent_source = self.agent_source.as_ref().map(|s| s.as_str().to_string());
+        let agent_source: Option<String> = None;
+        let _ = &self.agent_source;
 
         Ok(workload_token
             .map(|token| (AMBIENT_WORKLOAD_TOKEN_HEADER, token))

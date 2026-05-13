@@ -136,21 +136,7 @@ impl Input {
             false,
         ));
 
-        if let Some(selected_workflow_state) = self.workflows_state.selected_workflow_state.as_ref()
-        {
-            if selected_workflow_state.should_show_more_info_view {
-                add_workflow_info_overlay(
-                    &mut stack,
-                    selected_workflow_state,
-                    self.size_info(app).pane_height_px().as_f32(),
-                    menu_positioning,
-                );
-            }
-        }
-
-        if self.is_voltron_open && self.is_pane_focused(app) {
-            add_voltron_overlay(&mut stack, &self.voltron_view, menu_positioning);
-        }
+        // Workflow info overlay and Voltron overlay have been removed.
 
         if self.is_pane_focused(app) {
             add_input_suggestions_overlays(self, &mut stack, appearance, menu_positioning, app);
@@ -249,8 +235,6 @@ impl Input {
             column.add_child(ChildView::new(&self.inline_history_menu_view).finish());
         } else if self.suggestions_mode_model.as_ref(app).is_repos_menu() {
             column.add_child(ChildView::new(&self.inline_repos_menu_view).finish());
-        } else if self.suggestions_mode_model.as_ref(app).is_plan_menu() {
-            column.add_child(ChildView::new(&self.inline_plan_menu_view).finish());
         }
 
         if self
@@ -381,39 +365,7 @@ impl Input {
             }
         }
 
-        if let Some(selected_workflow_state) = self.workflows_state.selected_workflow_state.as_ref()
-        {
-            if selected_workflow_state.should_show_more_info_view {
-                let prompt_position = self.prompt_save_position_id();
-                let workflows_info_view = Container::new(
-                    ChildView::new(&selected_workflow_state.more_info_view).finish(),
-                )
-                .finish();
-                stack.add_positioned_overlay_child(
-                    ConstrainedBox::new(workflows_info_view)
-                        .with_max_width(CLOUD_MODE_V2_MAX_WIDTH)
-                        .with_max_height(self.size_info(app).pane_height_px().as_f32() * 0.35)
-                        .finish(),
-                    OffsetPositioning::from_axes(
-                        PositioningAxis::relative_to_stack_child(
-                            &prompt_position,
-                            PositionedElementOffsetBounds::WindowByPosition,
-                            OffsetType::Pixel(0.),
-                            AnchorPair::new(XAxisAnchor::Left, XAxisAnchor::Left),
-                        ),
-                        PositioningAxis::relative_to_stack_child(
-                            &prompt_position,
-                            PositionedElementOffsetBounds::Unbounded,
-                            OffsetType::Pixel(0.),
-                            AnchorPair::new(YAxisAnchor::Top, YAxisAnchor::Bottom),
-                        ),
-                    ),
-                );
-            }
-        }
-        if self.is_voltron_open && self.is_pane_focused(app) {
-            add_voltron_overlay(&mut stack, &self.voltron_view, menu_positioning);
-        }
+        // Workflows info overlay and Voltron overlay have been removed.
         if self.is_pane_focused(app) {
             add_input_suggestions_overlays(self, &mut stack, appearance, menu_positioning, app);
         }

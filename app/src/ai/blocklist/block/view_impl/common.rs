@@ -2294,7 +2294,7 @@ fn is_supported_blocklist_image_source(source: &str) -> bool {
 }
 
 fn visual_section_height(app: &AppContext) -> f32 {
-    rich_text_styles(Appearance::as_ref(app), FontSettings::as_ref(app))
+    crate::code::editor::view::rich_text_styles(Appearance::as_ref(app), FontSettings::as_ref(app))
         .base_line_height()
         .as_f32()
         * BLOCKLIST_VISUAL_SECTION_HEIGHT_LINE_MULTIPLIER
@@ -2320,8 +2320,8 @@ fn render_table_section(
     }
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
-    let table_appearance = markdown_table_appearance(appearance);
-    let notebook_styles = rich_text_styles(appearance, FontSettings::as_ref(app));
+    let table_appearance = markdown_table_appearance_placeholder(appearance);
+    let notebook_styles = crate::code::editor::view::rich_text_styles(appearance, FontSettings::as_ref(app));
     let table_font_family = appearance.ai_font_family();
     let table_font_size = appearance.monospace_font_size();
     let body_font_weight = appearance.monospace_font_weight();
@@ -2423,7 +2423,7 @@ fn render_table_section(
             header_background: table_appearance.header_background,
             row_background: warpui::elements::RowBackground {
                 primary: table_appearance.cell_background,
-                alternating: table_appearance.alternate_row_background,
+                alternating: Some(table_appearance.alternate_row_background),
             },
             fixed_header: false,
             vertical_sizing: TableVerticalSizing::ExpandToContent,
@@ -3532,6 +3532,40 @@ pub(crate) fn render_scrollable_collapsible_content(
             })
             .finish(),
     )
+}
+
+/// Stand-in for `notebooks::editor::markdown_table_appearance`, which lived in
+/// the deleted notebooks editor crate. Provides theme-aware defaults so the
+/// table renderer keeps working until a proper replacement is wired in.
+struct MarkdownTableAppearance {
+    pub header_text_color: ColorU,
+    pub text_color: ColorU,
+    pub border_color: ColorU,
+    pub cell_padding: f32,
+    pub outer_border: bool,
+    pub column_dividers: bool,
+    pub row_dividers: bool,
+    pub header_background: ColorU,
+    pub cell_background: ColorU,
+    pub alternate_row_background: ColorU,
+}
+
+fn markdown_table_appearance_placeholder(appearance: &Appearance) -> MarkdownTableAppearance {
+    let theme = appearance.theme();
+    let bg = theme.background().into_solid();
+    let fg = theme.foreground().into_solid();
+    MarkdownTableAppearance {
+        header_text_color: fg,
+        text_color: fg,
+        border_color: warp_core::ui::theme::color::internal_colors::neutral_3(theme),
+        cell_padding: 8.0,
+        outer_border: true,
+        column_dividers: true,
+        row_dividers: true,
+        header_background: warp_core::ui::theme::color::internal_colors::neutral_2(theme),
+        cell_background: bg,
+        alternate_row_background: warp_core::ui::theme::color::internal_colors::neutral_2(theme),
+    }
 }
 
 #[cfg(test)]

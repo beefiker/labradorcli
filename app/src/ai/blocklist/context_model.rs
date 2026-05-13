@@ -8,6 +8,8 @@ use std::{
     sync::Arc,
 };
 
+use ai::document::AIDocumentId;
+
 use crate::ai::{
     agent::{AnyFileContent, FileContext},
     block_context::BlockContext,
@@ -27,7 +29,6 @@ use crate::{
             conversation::{AIConversation, AIConversationId},
             AIAgentAttachment, AIAgentContext, ImageContext,
         },
-        document::ai_document_model::AIDocumentId,
         llms::{LLMPreferences, LLMPreferencesEvent},
         outline::RepoOutlines,
     },

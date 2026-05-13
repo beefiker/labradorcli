@@ -96,7 +96,7 @@ impl Serialize for HarnessFilter {
 impl<'de> Deserialize<'de> for HarnessFilter {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let raw = String::deserialize(deserializer)?;
-        Ok(Harness::from_str(&raw, false)
+        Ok(<Harness as clap::ValueEnum>::from_str(&raw, false)
             .ok()
             .map(HarnessFilter::Specific)
             .unwrap_or(HarnessFilter::All))

@@ -2283,6 +2283,15 @@ pub fn code_text_styles(
     rich_text_styles_placeholder()
 }
 
+/// Replacement for the deleted `notebooks::editor::rich_text_styles`. Returns
+/// a placeholder that panics on use, matching `code_text_styles` above.
+pub fn rich_text_styles(
+    _appearance: &Appearance,
+    _font_settings: &FontSettings,
+) -> RichTextStyles {
+    rich_text_styles_placeholder()
+}
+
 fn rich_text_styles_placeholder() -> RichTextStyles {
     // The underlying `RichTextStyles` constructor lived in the deleted
     // `notebooks::editor` module. There is no surviving constructor; calling

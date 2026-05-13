@@ -117,9 +117,7 @@ impl AgentNotificationsModel {
                 }
             }
             ActiveAgentViewsEvent::TerminalViewFocused
-            | ActiveAgentViewsEvent::WindowClosed
-            | ActiveAgentViewsEvent::AmbientSessionOpened { .. }
-            | ActiveAgentViewsEvent::AmbientSessionClosed { .. } => {}
+            | ActiveAgentViewsEvent::WindowClosed => {}
         }
     }
 

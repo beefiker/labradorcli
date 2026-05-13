@@ -3566,7 +3566,7 @@ impl Workspace {
         ctx: &mut ViewContext<Self>,
     ) {
         let show_warp_home = !ContextFlag::CreateNewSession.is_enabled();
-        let mut placeholder_pane = None;
+        let placeholder_pane: Option<crate::pane_group::PaneId> = None;
         let open_warp_drive = if !show_warp_home {
             if self.should_trigger_get_started_onboarding(ctx) {
                 self.trigger_get_started_onboarding(ctx);
@@ -3585,12 +3585,7 @@ impl Workspace {
             }
             false
         } else {
-            let home_pane = super::home::create_home_pane(ctx);
-            placeholder_pane = Some(home_pane.as_pane().id());
-            self.add_tab_from_existing_pane(home_pane, 0, ctx);
-
-            // If we can't start a terminal session to run the onboarding flow, show the Warp Home
-            // placeholder along with Dwarf Drive.
+            // The Dwarf Home placeholder pane has been removed; nothing to add.
             true
         };
         let _ = (open_warp_drive, show_warp_home, placeholder_pane);
@@ -11842,6 +11837,9 @@ impl Workspace {
             }
             pane_group::Event::AttachPathAsContext { path } => {
                 self.attach_path_as_context(path.clone(), ctx);
+            }
+            pane_group::Event::AttachPlanAsContext { .. } => {
+                // AI document planning is no longer supported in this fork.
             }
             pane_group::Event::CDToDirectory { path } => {
                 self.cd_to_directory(path.clone(), ctx);

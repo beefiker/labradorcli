@@ -26,13 +26,8 @@ pub fn render_rich_history(entry: &HistoryEntry, ctx: &AppContext) -> Box<dyn El
 
     let mut flex_column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
-    if let Some(workflow) = entry.linked_workflow(ctx) {
-        flex_column.add_child(render_row_with_icon_and_paragraph(
-            "bundled/svg/workflow.svg",
-            workflow.name().to_owned(),
-            appearance,
-        ))
-    }
+    // Linked workflow rendering removed (workflows decoupled from history).
+    let _ = ctx;
 
     if let Some(exit_code) = entry.exit_code {
         let icon = if exit_code.was_successful() {

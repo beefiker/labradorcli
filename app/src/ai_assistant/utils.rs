@@ -318,10 +318,12 @@ pub fn render_request_limit_info(
     let text_color: ColorU =
         blended_colors::text_sub(appearance.theme(), appearance.theme().background());
 
-    let num_requests_used = request_model.as_ref(app).num_requests_used();
-    let num_requests_remaining = request_model.as_ref(app).num_remaining_reqs();
-    let request_limit = request_model.as_ref(app).request_limit();
-    let next_refresh_time = request_model.as_ref(app).serialized_time_until_refresh();
+    // Request quotas were removed in this fork; report placeholder values.
+    let _ = request_model;
+    let num_requests_used: usize = 0;
+    let num_requests_remaining: usize = usize::MAX;
+    let request_limit: String = "∞".to_string();
+    let next_refresh_time: String = String::new();
 
     // Always show the remaining requests count.
     let mut row = Flex::row()
@@ -367,7 +369,7 @@ pub fn render_request_limit_info(
     }
 
     // Show the next refresh time if it's valid.
-    if let Some(next_refresh_time) = next_refresh_time {
+    if !next_refresh_time.is_empty() {
         row.add_child(
             Container::new(
                 Text::new_inline(

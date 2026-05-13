@@ -77,7 +77,7 @@ pub(crate) struct AgentConfigSnapshot {
     pub environment_id: Option<String>,
     pub model_id: Option<String>,
     pub base_prompt: Option<String>,
-    pub mcp_servers: Option<std::collections::HashMap<String, serde_json::Value>>,
+    pub mcp_servers: Option<serde_json::Map<String, serde_json::Value>>,
     pub profile_id: Option<String>,
     pub worker_host: Option<String>,
     pub skill_spec: Option<String>,
@@ -807,20 +807,9 @@ impl AgentDriverRunner {
             Some(config)
         };
 
-        let task_id = match server_api
-            .create_agent_task(prompt, environment, None, task_config)
-            .await
-        {
-            Ok(id) => {
-                log::info!("Created task: {id}");
-                Some(id)
-            }
-            Err(e) => {
-                log::error!("Failed to create task: {e}");
-                // Continue without a task_id rather than failing entirely
-                None
-            }
-        };
+        // Cloud-hosted agent task creation has been removed from this fork.
+        let _ = (server_api, prompt, environment, task_config);
+        let task_id: Option<AmbientAgentTaskId> = None;
 
         foreground
             .spawn(move |_, ctx| {
@@ -865,7 +854,7 @@ impl AgentDriverRunner {
             })
             .await?;
 
-        let parsed_task_id = match task_id_str.parse() {
+        let parsed_task_id: Option<AmbientAgentTaskId> = match task_id_str.parse() {
             Ok(id) => Some(id),
             Err(e) => {
                 log::error!("Failed to parse task ID: {e}");
@@ -873,19 +862,12 @@ impl AgentDriverRunner {
             }
         };
 
-        // Fetch secrets, task metadata, regular attachments, and handoff snapshot
-        // attachments in parallel. The handoff snapshot fetch is independent of the
-        // other three calls and only shares the download dir (a cloned PathBuf).
+        // Cloud-hosted ambient agent task metadata lookups have been removed
+        // from this fork. We keep the surrounding driver wiring intact but
+        // never fetch any task metadata.
         let attachments_download_dir = attachments_download_dir(&driver_options.working_dir);
-        let task_ai_client = ai_client.clone();
         let task_metadata = async {
-            match parsed_task_id {
-                Some(task_id) => task_ai_client
-                    .get_ambient_agent_task(&task_id)
-                    .await
-                    .map(Some),
-                None => Ok(None),
-            }
+            Ok::<Option<()>, anyhow::Error>(None)
         };
 
         let _ = parsed_task_id;
@@ -928,22 +910,12 @@ impl AgentDriverRunner {
                 }
             }
         };
-        let (parent_run_id, task_conversation_id, task_harness) = match task_metadata_result {
-            Ok(Some(task_metadata)) => {
-                // The task's harness is stored on the snapshot; if absent, it's the default Oz.
-                let task_harness = task_metadata
-                    .agent_config_snapshot
-                    .as_ref()
-                    .and_then(|c| c.harness.as_ref())
-                    .map(|h| h.harness_type)
-                    .unwrap_or_default();
-                (
-                    task_metadata.parent_run_id,
-                    task_metadata.conversation_id,
-                    Some(task_harness),
-                )
-            }
-            Ok(None) => (None, None, None),
+        let (parent_run_id, task_conversation_id, task_harness): (
+            Option<String>,
+            Option<String>,
+            Option<warp_cli::agent::Harness>,
+        ) = match task_metadata_result {
+            Ok(_) => (None, None, None),
             Err(err) => {
                 log::warn!("Failed to fetch task metadata: {err:#}");
                 (None, None, None)

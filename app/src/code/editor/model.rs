@@ -1676,12 +1676,12 @@ impl CodeEditorModel {
 
     // TODO(CLD-1593)
     pub fn forward_word(&mut self, select: bool, ctx: &mut ModelContext<Self>) {
-        self.forward_word_with_unit(select, TextUnit::Word, ctx)
+        self.forward_word_with_unit(select, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), ctx)
     }
 
     // TODO(CLD-1593)
     pub fn backward_word(&mut self, select: bool, ctx: &mut ModelContext<Self>) {
-        self.backward_word_with_unit(select, TextUnit::Word, ctx)
+        self.backward_word_with_unit(select, TextUnit::Word(warpui::text::word_boundaries::WordBoundariesPolicy::Default), ctx)
     }
 
     /// Returns the word under or immediately after the primary cursor on the current line,

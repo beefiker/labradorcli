@@ -413,17 +413,6 @@ impl BlocklistAIActionExecutor {
         &self.ask_user_question_executor
     }
 
-    pub fn set_ambient_agent_task_id(
-        &self,
-        id: Option<AmbientAgentTaskId>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.request_computer_use_executor
-            .update(ctx, |executor, _| {
-                executor.set_ambient_agent_task_id(id);
-            });
-    }
-
     pub fn preprocess_action(
         &self,
         action: &AIAgentAction,

@@ -56,7 +56,6 @@ pub fn update_command_history(
                 username: Some(session.user().to_owned()),
                 hostname: Some(session.hostname().to_owned()),
                 session_id: Some(session_id),
-                cloud_workflow_id: event.workflow_id.to_owned(),
                 workflow_command: event.workflow_command.to_owned(),
                 git_branch: active_block
                     .git_branch()

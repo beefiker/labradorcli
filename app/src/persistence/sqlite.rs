@@ -2333,7 +2333,23 @@ fn insert_command(
             diesel::delete(commands.filter(id.eq(oldest_command_id))).execute(conn)?;
         }
 
-        let new_command: NewCommand = command_metadata.into();
+        let new_command = NewCommand {
+            command: command_metadata.command,
+            exit_code: None,
+            start_ts: command_metadata.start_ts.map(|t| t.naive_utc()),
+            completed_ts: None,
+            pwd: command_metadata.pwd,
+            shell: command_metadata.shell,
+            username: command_metadata.username,
+            hostname: command_metadata.hostname,
+            session_id: command_metadata
+                .session_id
+                .map(|s| u64::from(s) as i64),
+            git_branch: command_metadata.git_branch,
+            cloud_workflow_id: None,
+            workflow_command: command_metadata.workflow_command,
+            is_agent_executed: Some(command_metadata.is_agent_executed),
+        };
         diesel::insert_into(schema::commands::dsl::commands)
             .values(new_command)
             .execute(conn)?;

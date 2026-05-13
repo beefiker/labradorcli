@@ -109,22 +109,8 @@ impl Input {
             false,
         ));
 
-        if let Some(selected_workflow_state) = self.workflows_state.selected_workflow_state.as_ref()
-        {
-            if selected_workflow_state.should_show_more_info_view {
-                add_workflow_info_overlay(
-                    &mut stack,
-                    selected_workflow_state,
-                    self.size_info(app).pane_height_px().as_f32(),
-                    menu_positioning,
-                );
-            }
-        }
-
+        // Workflow info overlay and Voltron overlay have been removed.
         let is_focused = self.focus_handle.as_ref().is_none_or(|h| h.is_focused(app));
-        if self.is_voltron_open && is_focused {
-            add_voltron_overlay(&mut stack, &self.voltron_view, menu_positioning);
-        }
 
         if is_focused {
             add_input_suggestions_overlays(self, &mut stack, appearance, menu_positioning, app);

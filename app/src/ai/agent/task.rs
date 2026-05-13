@@ -19,14 +19,11 @@ use warp_multi_agent_api::{
     message::{tool_call::subagent::Metadata, Message},
 };
 
+use ai::document::{AIDocumentId, AIDocumentVersion};
+
 use crate::{
-    ai::{
-        agent::comment::CodeReview,
-        document::ai_document_model::{AIDocumentId, AIDocumentVersion},
-    },
-    server::datetime_ext::DateTimeExt,
-    terminal::model::block::BlockId,
-    AIAgentTodoList,
+    ai::agent::comment::CodeReview, server::datetime_ext::DateTimeExt,
+    terminal::model::block::BlockId, AIAgentTodoList,
 };
 
 use super::{
