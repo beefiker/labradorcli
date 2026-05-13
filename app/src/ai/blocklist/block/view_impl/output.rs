@@ -15,7 +15,6 @@ use crate::ai::blocklist::block::view_impl::common::{
     MaybeShimmeringText, BLOCKED_ACTION_MESSAGE_FOR_GREP_OR_FILE_GLOB,
     BLOCKED_ACTION_MESSAGE_FOR_READING_FILES, BLOCKED_ACTION_MESSAGE_FOR_SEARCHING_CODEBASE,
 };
-use crate::ai::blocklist::inline_action::aws_bedrock_credentials_error::AwsBedrockCredentialsErrorView;
 use crate::ai::blocklist::secret_redaction::SecretRedactionState;
 use crate::ai::blocklist::view_util::format_credits;
 use crate::ai::skills::SkillOpenOrigin;
@@ -188,8 +187,6 @@ pub(crate) struct Props<'a> {
     pub(super) shared_session_status: &'a SharedSessionStatus,
     pub(super) terminal_view_id: EntityId,
     pub(super) is_conversation_transcript_viewer: bool,
-    pub(super) aws_bedrock_credentials_error_view:
-        Option<&'a ViewHandle<AwsBedrockCredentialsErrorView>>,
     pub(super) imported_comments: &'a HashMap<AIAgentActionId, ImportedCommentGroup>,
     #[cfg(feature = "local_fs")]
     pub(crate) resolved_code_block_paths:
@@ -1071,8 +1068,6 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                         invalid_api_key_button_handle: &props
                             .state_handles
                             .invalid_api_key_button_handle,
-                        aws_bedrock_credentials_error_view: props
-                            .aws_bedrock_credentials_error_view,
                         icon_right_margin: 16.,
                     },
                     app,

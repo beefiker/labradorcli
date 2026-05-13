@@ -275,8 +275,6 @@ pub enum AgentDriverError {
     SecretsFetchFailed(#[source] anyhow::Error),
     #[error("Failed to load conversation: {0}")]
     ConversationLoadFailed(String),
-    #[error("Failed to initialize AWS Bedrock credentials: {0}")]
-    AwsBedrockCredentialsFailed(String),
     #[error(
         "Conversation {conversation_id} was produced by the {expected} harness, but --harness {got} was requested. \
          Re-run with --harness {expected} (or omit --harness to match) to continue this conversation."

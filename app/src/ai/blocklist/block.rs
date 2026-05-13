@@ -81,9 +81,6 @@ use crate::ai::blocklist::block::keyboard_navigable_buttons::KeyboardNavigableBu
 use crate::ai::blocklist::inline_action::ask_user_question_view::{
     self, AskUserQuestionView, AskUserQuestionViewEvent,
 };
-use crate::ai::blocklist::inline_action::aws_bedrock_credentials_error::{
-    AwsBedrockCredentialsErrorEvent, AwsBedrockCredentialsErrorView,
-};
 use crate::ai::blocklist::inline_action::search_codebase::{
     SearchCodebaseView, SearchCodebaseViewEvent,
 };
@@ -912,9 +909,6 @@ pub struct AIBlock {
     /// Only used when `FeatureFlag::AgentView` is enabled.
     agent_view_controller: ModelHandle<AgentViewController>,
 
-    /// View for AWS Bedrock credentials error, created lazily when the error occurs.
-    aws_bedrock_credentials_error_view: Option<ViewHandle<AwsBedrockCredentialsErrorView>>,
-
     imported_comments: HashMap<AIAgentActionId, ImportedCommentGroup>,
     has_imported_comments: bool,
 
@@ -1297,7 +1291,6 @@ impl AIBlock {
             last_right_clicked_command: None,
             is_usage_footer_expanded: false,
             agent_view_controller,
-            aws_bedrock_credentials_error_view: None,
             imported_comments: Default::default(),
             has_imported_comments: false,
             link_detection_handle: None,
@@ -1325,8 +1318,7 @@ impl AIBlock {
             AIBlockOutputStatus::Complete { .. } => {
                 me.finish(FinishReason::Complete, ctx);
             }
-            AIBlockOutputStatus::Failed { error, .. } => {
-                me.maybe_create_aws_bedrock_credentials_error_view(&error, ctx);
+            AIBlockOutputStatus::Failed { .. } => {
                 me.finish(FinishReason::Error, ctx);
             }
             AIBlockOutputStatus::Cancelled { .. } => {
@@ -1660,9 +1652,8 @@ impl AIBlock {
 
                 let server_output_id = self.model.server_output_id(ctx);
             }
-            AIBlockOutputStatus::Failed { error, .. } => {
+            AIBlockOutputStatus::Failed { .. } => {
                 let server_output_id = self.model.server_output_id(ctx);
-                self.maybe_create_aws_bedrock_credentials_error_view(&error, ctx);
                 // There are no actions to be taken in this block, it is finished.
                 self.finish(FinishReason::Error, ctx);
             }
@@ -3413,56 +3404,6 @@ impl AIBlock {
             }
         }
 
-        ctx.notify();
-    }
-
-    /// Creates the AWS Bedrock credentials error view if the error is `AwsBedrockCredentialsExpiredOrInvalid`
-    /// and we don't already have one. If auto-login is enabled, automatically runs the login command.
-    fn maybe_create_aws_bedrock_credentials_error_view(
-        &mut self,
-        error: &RenderableAIError,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // Only create the view for AWS Bedrock credentials errors
-        let RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid { model_name } = error else {
-            return;
-        };
-
-        // Don't recreate if we already have a view
-        if self.aws_bedrock_credentials_error_view.is_some() {
-            return;
-        }
-
-        let ai_settings = AISettings::as_ref(ctx);
-        let login_command = ai_settings.aws_bedrock_auth_refresh_command.value().clone();
-        let auto_login_enabled = *ai_settings.aws_bedrock_auto_login.value();
-
-        // If auto-login is enabled, run the login command automatically
-        if auto_login_enabled {
-            ctx.emit(AIBlockEvent::RunAwsLoginCommand);
-        }
-
-        let model_name = model_name.clone();
-        let view = ctx.add_typed_action_view(|ctx| {
-            AwsBedrockCredentialsErrorView::new(model_name, login_command, auto_login_enabled, ctx)
-        });
-
-        // Subscribe to events from the view and emit AIBlockEvents directly
-        // Note: We emit events here rather than dispatch actions because we're in a
-        // subscription callback where the context is already for AIBlock
-        ctx.subscribe_to_view(&view, |_me, _view, event, ctx| match event {
-            AwsBedrockCredentialsErrorEvent::RunLoginCommand => {
-                ctx.emit(AIBlockEvent::RunAwsLoginCommand);
-            }
-            AwsBedrockCredentialsErrorEvent::ConfigureLoginCommand => {
-                ctx.dispatch_typed_action(&WorkspaceAction::ShowSettingsPageWithSearch {
-                    search_query: "aws bedrock".to_string(),
-                    section: Some(SettingsSection::WarpAgent),
-                });
-            }
-        });
-
-        self.aws_bedrock_credentials_error_view = Some(view);
         ctx.notify();
     }
 
@@ -5350,8 +5291,6 @@ pub enum AIBlockEvent {
         is_auto_open: bool,
     },
     OpenActiveAgentProfileEditor,
-    /// Run the configured AWS auth refresh command to fix expired Bedrock credentials
-    RunAwsLoginCommand,
     /// Emitted when a passive code diff has loaded its diffs and is ready to display.
     /// This is used to trigger height recalculation since the diffs are loaded asynchronously
     /// after the initial output completes.
@@ -5440,7 +5379,6 @@ pub enum AIBlockAction {
     ToggleReferencesSection,
     ToggleAutoexecuteReadonlyCommandsSpeedbumpCheckbox,
     ToggleAutoreadFilesSpeedbumpCheckbox,
-    ToggleAwsBedrockAutoLogin,
     ToggleCodebaseSearchSpeedbump(Option<usize>),
     StartNewConversationButtonClicked {
         action_id: AIAgentActionId,
@@ -5498,10 +5436,6 @@ pub enum AIBlockAction {
     CommentExpanded {
         id: CommentId,
     },
-    /// Run the configured AWS auth refresh command to fix expired Bedrock credentials
-    RunAwsLoginCommand,
-    /// Open settings to configure the AWS auth refresh command
-    ConfigureAwsLoginCommand,
     /// Open the screenshot lightbox for a UseComputer action.
     ViewScreenshot {
         action_id: AIAgentActionId,
@@ -5979,22 +5913,6 @@ impl TypedActionView for AIBlock {
             }
             AIBlockAction::StoreRightClickedCommand { command } => {
                 self.last_right_clicked_command = Some(command.clone());
-            }
-            AIBlockAction::RunAwsLoginCommand => {
-                ctx.emit(AIBlockEvent::RunAwsLoginCommand);
-            }
-            AIBlockAction::ToggleAwsBedrockAutoLogin => {
-                AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    let current = *settings.aws_bedrock_auto_login.value();
-                    let new_value = !current;
-                    report_if_error!(settings.aws_bedrock_auto_login.set_value(new_value, ctx));
-                });
-            }
-            AIBlockAction::ConfigureAwsLoginCommand => {
-                ctx.dispatch_typed_action(&WorkspaceAction::ShowSettingsPageWithSearch {
-                    search_query: "aws bedrock".to_string(),
-                    section: Some(SettingsSection::WarpAgent),
-                });
             }
             AIBlockAction::ToggleImportedCommentCollapsed {
                 action_id,

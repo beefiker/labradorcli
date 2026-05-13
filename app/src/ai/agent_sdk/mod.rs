@@ -11,12 +11,9 @@ use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_sdk::driver::harness::{harness_kind, HarnessKind};
 use crate::ai::agent_sdk::driver::{AgentDriverOptions, AgentRunPrompt, Task};
 use crate::ai::agent_sdk::mcp_config::build_mcp_servers_from_specs;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::aws_credentials::refresh_aws_credentials;
 use crate::ai::llms::LLMId;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
 use crate::server::server_api::ai::AIClient;
-use ai::api_keys::{ApiKeyManager, AwsCredentialsRefreshStrategy};
 use anyhow::Context;
 use warp_cli::{
     agent::{AgentCommand, AgentProfileCommand, OutputFormat},
@@ -516,7 +513,6 @@ impl AgentDriverRunner {
         let result: Result<(), AgentDriverError> = async {
             // Pull relevant variables out of args before moving it into the closure.
             let share_requests = args.share.share.clone();
-            let bedrock_inference_role = args.bedrock_inference_role.clone();
             let args_harness = args.harness;
 
             // `--conversation` path (user-invoked local resume): validate before any task side
@@ -551,32 +547,6 @@ impl AgentDriverRunner {
             // necessarily uses the same harness, so no extra conversation-metadata roundtrip is
             // needed here. Just merge the task's linked conversation id into the resume target.
             let resume_conversation_id = resume_conversation_id.or(task_conversation_id);
-
-            let bedrock_task_id = driver_options.task_id.map(|id| id.to_string());
-
-            #[cfg(not(target_family = "wasm"))]
-            if let Some(role_arn) = bedrock_inference_role {
-                // Set the OIDC strategy on the UI thread and kick off the refresh; the
-                // returned future resolves when credentials are committed to the model.
-                let refresh_future = foreground
-                    .spawn(move |_, ctx| {
-                        ApiKeyManager::handle(ctx).update(ctx, |manager, ctx| {
-                            // From here on, refresh credentials via OIDC federation only.
-                            manager.set_aws_credentials_refresh_strategy(
-                                AwsCredentialsRefreshStrategy::OidcManaged {
-                                    task_id: bedrock_task_id,
-                                    role_arn,
-                                },
-                            );
-                            refresh_aws_credentials(manager, ctx)
-                        })
-                    })
-                    .await?;
-
-                refresh_future
-                    .await
-                    .map_err(AgentDriverError::AwsBedrockCredentialsFailed)?;
-            }
 
             match &task.harness {
                 HarnessKind::Unsupported(harness) => {

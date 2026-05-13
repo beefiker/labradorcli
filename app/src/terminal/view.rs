@@ -161,10 +161,9 @@ use crate::workspaces::user_workspaces::UserWorkspacesEvent;
 
 pub use self::link_detection::GridHighlightedLink;
 pub use self::link_detection::{RichContentLink, RichContentLinkTooltipInfo};
-use crate::ai::llms::{LLMId, LLMModelHost, LLMPreferences};
+use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::settings::CodeSettings;
 pub use action::{AgentOnboardingVersion, OnboardingIntention, OnboardingVersion, TerminalAction};
-use ai::api_keys::{ApiKeyManager, AwsCredentialsState};
 use ai::index::full_source_code_embedding::manager::{BuildSource, CodebaseIndexManager};
 pub use block_banner::{WithinBlockBanner, BLOCK_BANNER_HEIGHT};
 use block_onboarding::onboarding_agentic_suggestions_block::{
@@ -22868,8 +22867,6 @@ impl TypedActionView for TerminalView {
             | OpenInlineHistoryMenu
             | OpenModelSelector
             | ResolvePromptSuggestion(..)
-            | AwsBedrockLoginBanner(_)
-            | AwsCliNotInstalledBanner(_)
             | ExecuteRewindFromInlineMenu { .. }
             | ToggleUsageFooter
             | RevealChildAgent { .. }
@@ -23792,12 +23789,6 @@ impl TypedActionView for TerminalView {
             }
             ResolvePromptSuggestion(resolution) => {
                 self.resolve_passive_suggestion(*resolution, ctx);
-            }
-            AwsBedrockLoginBanner(action) => {
-                self.handle_aws_bedrock_login_banner_action(*action, ctx);
-            }
-            AwsCliNotInstalledBanner(action) => {
-                self.handle_aws_cli_not_installed_banner_action(*action, ctx);
             }
             ToggleCloudModeDetailsPanel => {
                 self.is_cloud_mode_details_panel_open = !self.is_cloud_mode_details_panel_open;

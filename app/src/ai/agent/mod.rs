@@ -619,9 +619,6 @@ pub enum RenderableAIError {
         provider: String,
         model_name: String,
     },
-    AwsBedrockCredentialsExpiredOrInvalid {
-        model_name: String,
-    },
     Other {
         error_message: String,
         will_attempt_resume: bool,
@@ -634,10 +631,6 @@ pub enum RenderableAIError {
 impl RenderableAIError {
     pub fn is_invalid_api_key(&self) -> bool {
         matches!(self, Self::InvalidApiKey { .. })
-    }
-
-    pub fn is_aws_bedrock_credentials_error(&self) -> bool {
-        matches!(self, Self::AwsBedrockCredentialsExpiredOrInvalid { .. })
     }
 
     /// Returns true if an automatic resume will be attempted for this error.
@@ -679,12 +672,6 @@ impl Display for RenderableAIError {
             }
             Self::InvalidApiKey { provider, .. } => {
                 write!(f, "Invalid API key for {provider}")
-            }
-            Self::AwsBedrockCredentialsExpiredOrInvalid { model_name } => {
-                write!(
-                    f,
-                    "AWS Bedrock credentials expired or invalid for {model_name}"
-                )
             }
             Self::Other { error_message, .. } => write!(f, "{error_message}"),
         }
