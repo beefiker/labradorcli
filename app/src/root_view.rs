@@ -24,7 +24,6 @@ use onboarding::{
 use crate::features::FeatureFlag;
 use crate::persistence::ModelEvent;
 use crate::report_if_error;
-use crate::server::experiments::is_free_user_no_ai_experiment_active;
 use crate::server::server_api::auth::UserAuthenticationError;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::telemetry::LaunchConfigUiLocation;
@@ -2466,7 +2465,7 @@ impl RootView {
                 default_model_id,
                 workspace_enforces_autonomy,
                 FeatureFlag::AgentView.is_enabled(),
-                is_free_user_no_ai_experiment_active(ctx),
+                false,
                 agent_price_cents,
                 auth_state,
                 ctx,
@@ -2513,19 +2512,14 @@ impl RootView {
                         });
                     }
                     UserWorkspacesEvent::TeamsChanged => {
-                        let new_locked = is_free_user_no_ai_experiment_active(ctx);
                         let was_locked = onboarding_view_for_workspaces
                             .as_ref(ctx)
                             .free_user_no_ai_experiment(ctx);
-                        if was_locked && !new_locked {
+                        if was_locked {
                             // User upgraded — skip the intention slide.
                             onboarding_view_for_workspaces.update(ctx, |view, ctx| {
                                 view.set_free_user_no_ai_experiment(false, ctx);
                                 view.advance_to_agent_step(ctx);
-                            });
-                        } else {
-                            onboarding_view_for_workspaces.update(ctx, |view, ctx| {
-                                view.set_free_user_no_ai_experiment(new_locked, ctx);
                             });
                         }
                     }

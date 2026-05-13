@@ -198,7 +198,6 @@ use crate::network::NetworkStatus;
 use crate::palette::PaletteMode;
 use crate::persistence::PersistenceWriter;
 use crate::projects::ProjectManagementModel;
-use crate::server::experiments::ServerExperiments;
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::manager::SettingsManager;
 use crate::settings::{AccessibilitySettings, ScrollSettings, SelectionSettings};
@@ -1119,7 +1118,6 @@ fn initialize_app(
         app_state,
         command_history,
         restored_user_profiles,
-        experiments,
         ai_queries,
         persisted_workspaces,
         workspace_language_servers,
@@ -1137,7 +1135,6 @@ fn initialize_app(
                 Some(sqlite_data.app_state),
                 sqlite_data.command_history,
                 sqlite_data.user_profiles,
-                sqlite_data.experiments,
                 sqlite_data.ai_queries,
                 sqlite_data.codebase_indices,
                 sqlite_data.workspace_language_servers,
@@ -1165,15 +1162,9 @@ fn initialize_app(
                 Default::default(),
                 Default::default(),
                 Default::default(),
-                Default::default(),
             )
         });
     let _ = ai_client;
-
-    // Initialize a global model to track server-side experiment state.
-    // This depends on the [`GlobalResourceHandlesProvider`] and so it must
-    // be initialized after it.
-    ctx.add_singleton_model(|ctx| ServerExperiments::new_from_cache(experiments, ctx));
 
     ctx.add_singleton_model(|ctx| {
         UserWorkspaces::new(

@@ -20,7 +20,6 @@ use crate::{
     ai::execution_profiles::{ActionPermission, ComputerUsePermission, WriteToPtyPermission},
     auth::UserUid,
     report_error,
-    server::experiments::ServerExperiment,
     server::ids::ServerId,
     settings::AgentModeCommandExecutionPredicate,
     workspaces::workspace::{
@@ -29,7 +28,6 @@ use crate::{
         PurchaseAddOnCreditsPolicy, UsageBasedPricingSettings,
     },
 };
-use crate::convert_to_server_experiment;
 use anyhow::anyhow;
 use regex::Regex;
 use std::path::PathBuf;
@@ -934,15 +932,10 @@ impl From<GqlUser> for WorkspacesMetadataResponse {
             .map(|gql_joinable_team| gql_joinable_team.into())
             .collect();
 
-        let experiments = gql_user
-            .experiments
-            .and_then(|experiments| convert_to_server_experiment!(experiments));
-
         // TODO(skambashi) refactor to return back workspaces, and not teams
         WorkspacesMetadataResponse {
             workspaces,
             joinable_teams,
-            experiments,
             feature_model_choices,
         }
     }

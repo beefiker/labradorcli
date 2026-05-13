@@ -155,10 +155,6 @@ pub enum SettingsViewEvent {
     },
 }
 
-pub fn handle_experiment_change(app: &mut AppContext) {
-    let _ = app;
-}
-
 /// Different navigation sections within the settings view
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum SettingsSection {

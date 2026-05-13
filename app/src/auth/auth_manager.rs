@@ -328,7 +328,6 @@ impl AuthManager {
                 let FetchUserResult {
                     user,
                     credentials,
-                    server_experiments,
                     from_refresh,
                     llms,
                 } = fetch_user_result;
@@ -344,10 +343,6 @@ impl AuthManager {
                     Some(user.metadata.email.clone()),
                     ctx,
                 );
-
-                ServerApiProvider::handle(ctx).update(ctx, |provider, ctx| {
-                    provider.handle_experiments_fetched(server_experiments, ctx);
-                });
 
                 SettingsInitializer::handle(ctx).update(ctx, |initializer, ctx| {
                     initializer.handle_user_fetched(self.auth_state.clone(), ctx);

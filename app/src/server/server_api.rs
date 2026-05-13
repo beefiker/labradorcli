@@ -34,7 +34,6 @@ use workspace::WorkspaceClient;
 
 use crate::server::telemetry::TelemetryApi;
 use crate::settings::PrivacySettingsSnapshot;
-use crate::settings_view;
 
 use crate::ChannelState;
 
@@ -54,8 +53,6 @@ use warp_core::telemetry::TelemetryEvent;
 use warpui::Entity;
 use warpui::SingletonEntity;
 
-use super::experiments::ServerExperiment;
-use super::experiments::ServerExperiments;
 use super::graphql::GraphQLError;
 
 pub const FETCH_CHANNEL_VERSIONS_TIMEOUT: std::time::Duration = Duration::from_secs(60);
@@ -1336,19 +1333,6 @@ impl ServerApiProvider {
         Self {
             server_api: Arc::new(server_api),
         }
-    }
-
-    /// Handles fetching server-side experiments by updating the appropriate app state.
-    pub fn handle_experiments_fetched(
-        &self,
-        experiments: Vec<ServerExperiment>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        ServerExperiments::handle(ctx).update(ctx, |state, ctx| {
-            state.apply_latest_state(experiments, ctx);
-        });
-
-        settings_view::handle_experiment_change(ctx);
     }
 
     /// Constructs a new SeverApiProvider for tests.
