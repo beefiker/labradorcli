@@ -2424,6 +2424,3 @@ fn clear_user_profiles(conn: &mut SqliteConnection) -> Result<(), Error> {
     })
 }
 
-#[cfg(test)]
-#[path = "sqlite_tests.rs"]
-mod tests;

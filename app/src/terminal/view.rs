@@ -25002,28 +25002,15 @@ impl Drop for TerminalView {
                     "Session abandoned before bootstrap for shell {pending_shell:?} on ssh {has_pending_ssh_session}"
                 );
 
-                let was_ever_visible = self.was_ever_visible;
-                let duration_since_start =
-                    self.bootstrap_start.unwrap_or_else(Instant::now).elapsed();
-                let server_api = self.server_api.clone();
-                let privacy_settings_snapshot = self.privacy_settings_snapshot;
-                let task = self.background_executor.spawn(async move {
-                    if let Err(error) = server_api
-                        .send_telemetry_event(
-                            TelemetryEvent::SessionAbandonedBeforeBootstrap {
-                                pending_shell,
-                                has_pending_ssh_session,
-                                was_ever_visible,
-                                duration_since_start,
-                            },
-                            privacy_settings_snapshot,
-                        )
-                        .await
-                    {
-                        log::warn!("Error occurred with sending telemetry event: {error}");
-                    }
-                });
-                task.detach();
+                // dwarf is a local-only CLI terminal and does not phone home, so
+                // we just log the abandoned-bootstrap event locally.
+                let _ = (
+                    pending_shell,
+                    has_pending_ssh_session,
+                    self.was_ever_visible,
+                    self.bootstrap_start
+                        .map(|start| Instant::now().duration_since(start)),
+                );
             }
         };
     }

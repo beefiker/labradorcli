@@ -160,10 +160,6 @@ pub mod working_directories;
 
 use focus_state::PaneGroupFocusState;
 
-#[cfg(test)]
-#[path = "mod_tests.rs"]
-mod tests;
-
 pub use crate::code_review::CodeReviewPanelArg;
 pub use pane::ai_fact_pane::AIFactPane;
 pub use pane::code_diff_pane::CodeDiffPane;

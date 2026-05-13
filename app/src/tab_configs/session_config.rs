@@ -309,6 +309,3 @@ fn snapshot_to_flat_panes(
     }
 }
 
-#[cfg(test)]
-#[path = "session_config_tests.rs"]
-mod tests;
