@@ -198,7 +198,6 @@ use crate::code_review::comments::{
     attach_pending_imported_comments, convert_insert_review_comments, AttachedReviewComment,
     CommentId, CommentOrigin,
 };
-use crate::code_review::CodeReviewTelemetryEvent;
 use crate::PrivacySettings;
 use crate::{
     ai::agent::{AIAgentInput, ServerOutputId},

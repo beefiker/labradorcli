@@ -4,7 +4,6 @@ use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::{RequestInput, ResponseStreamId, SerializedBlockListItem};
 use crate::ai::skills::SkillDescriptor;
-use crate::code_review::CodeReviewTelemetryEvent;
 use crate::persistence::model::{ConversationUsageMetadata, ModelTokenUsage, ToolUsageMetadata};
 use crate::server::ids::ServerId;
 use crate::terminal::general_settings::GeneralSettings;

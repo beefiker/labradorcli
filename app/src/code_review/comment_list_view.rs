@@ -6,7 +6,6 @@ use crate::code_review::comments::{
     AttachedReviewComment, AttachedReviewCommentTarget, CommentId, CommentOrigin,
     ReviewCommentBatch, ReviewCommentBatchEvent,
 };
-use crate::code_review::CodeReviewTelemetryEvent;
 use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
 use crate::settings::AISettings;
 use crate::view_components::action_button::{
