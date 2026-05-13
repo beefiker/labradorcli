@@ -7,7 +7,6 @@ use crate::OnboardingIntention;
 use pathfinder_color::ColorU;
 use ui_components::{button, Component as _, Options as _};
 use warp_core::features::FeatureFlag;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::{appearance::Appearance, theme::color::internal_colors, theme::WarpTheme};
 use warpui::{
     elements::{

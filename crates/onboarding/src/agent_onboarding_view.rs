@@ -12,7 +12,6 @@ use ai::LLMId;
 use instant::Instant;
 use std::time::Duration;
 use warp_core::features::FeatureFlag;
-use warp_core::send_telemetry_from_ctx;
 use warpui::assets::asset_cache::AssetSource;
 use warpui::image_cache::ImageType;
 use warpui::windowing::{
