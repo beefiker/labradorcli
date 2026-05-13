@@ -12,7 +12,6 @@ use crate::{
         blocklist::{action_model::AIAgentActionType, BlocklistAIPermissions},
         mcp::TemplatableMCPServerManager,
     },
-    TelemetryEvent,
 };
 #[cfg(not(target_family = "wasm"))]
 use itertools::Itertools;

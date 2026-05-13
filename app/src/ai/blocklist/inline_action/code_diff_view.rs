@@ -114,7 +114,6 @@ use crate::{
         DismissibleToast,
     },
     workspace::ToastStack,
-    TelemetryEvent,
 };
 use ai::diff_validation::{
     fuzzy_match_diffs, fuzzy_match_v4a_diffs, parse_line_numbers, DiffDelta, DiffType, ParsedDiff,

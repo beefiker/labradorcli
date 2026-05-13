@@ -24,7 +24,6 @@ use crate::{
         outline::{OutlineStatus, RepoOutlines},
     },
     report_error,     server::server_api::{AIApiError, ServerApiProvider},
-    TelemetryEvent,
 };
 
 #[derive(Debug)]

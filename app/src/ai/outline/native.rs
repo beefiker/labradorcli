@@ -24,7 +24,6 @@ use crate::{
         InputSettingsChangedEvent,
     },
     workspaces::user_workspaces::UserWorkspaces,
-    TelemetryEvent,
 };
 
 use super::OutlineStatus;

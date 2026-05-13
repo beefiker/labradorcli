@@ -20,7 +20,6 @@ use crate::{
     },
     features::FeatureFlag,
         terminal::model::session::active_session::ActiveSession,
-    TelemetryEvent,
 };
 
 use super::{

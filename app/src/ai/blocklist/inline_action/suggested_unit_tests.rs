@@ -31,7 +31,6 @@ use crate::{
             MEDIUM_SIZE_SWITCH_THRESHOLD,
         },
     },
-    TelemetryEvent,
 };
 
 const ACCEPT_LABEL: &str = "Generate tests";

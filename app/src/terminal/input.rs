@@ -170,7 +170,6 @@ use crate::{
         telemetry::{
             AICommandSearchEntrypoint, AgentModeAutoDetectionFalsePositivePayload,
             AgentModeAutoDetectionSettingOrigin, AnonymousUserSignupEntrypoint, CommandXRayTrigger,
-            TelemetryEvent,
         },
     },
     session_management::SessionNavigationPromptElements,
@@ -6616,12 +6615,6 @@ impl Input {
 
     // TODO - Implement PageUp functionality for input suggestions menu
     fn editor_page_up(&mut self, ctx: &mut ViewContext<Self>) {
-        let event = self.editor.read(ctx, |editor, ctx| {
-            TelemetryEvent::PageUpDownInEditorPressed {
-                is_empty_editor: editor.is_empty(ctx),
-                is_down: false,
-            }
-        });
         self.editor
             .update(ctx, |input, ctx| input.move_page_up(ctx));
     }
@@ -6896,12 +6889,6 @@ impl Input {
 
     // TODO - Implement PageDown functionality for input suggestions menu
     fn editor_page_down(&mut self, ctx: &mut ViewContext<Self>) {
-        let event = self.editor.read(ctx, |editor, ctx| {
-            TelemetryEvent::PageUpDownInEditorPressed {
-                is_empty_editor: editor.is_empty(ctx),
-                is_down: true,
-            }
-        });
         self.editor
             .update(ctx, |input, ctx| input.move_page_down(ctx));
     }

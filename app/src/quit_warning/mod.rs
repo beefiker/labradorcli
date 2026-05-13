@@ -13,7 +13,6 @@ use crate::{
     session_management::{RunningSessionSummary, SessionNavigationData},
     terminal::general_settings::GeneralSettings,
     workspace::Workspace,
-    TelemetryEvent,
 };
 
 /// Scope of what's being quit/closed.

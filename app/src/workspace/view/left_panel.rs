@@ -55,7 +55,6 @@ use crate::{
     },
     util::bindings::keybinding_name_to_display_string,
     workspace::WorkspaceAction,
-    TelemetryEvent,
 };
 
 /// Fallback sidebar width constants (formerly in `drive::panel`).

@@ -32,7 +32,6 @@ use crate::{
         update_manager::TeamUpdateManager, user_workspaces::UserWorkspaces,
         workspace::AdminEnablementSetting,
     },
-    TelemetryEvent,
 };
 use ai::index::full_source_code_embedding::manager::{
     CodebaseIndexFinishedStatus, CodebaseIndexManager, CodebaseIndexManagerEvent,

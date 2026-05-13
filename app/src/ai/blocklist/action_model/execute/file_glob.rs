@@ -21,7 +21,6 @@ use crate::{
         model::session::active_session::ActiveSession, model::session::Session, shell::ShellType,
         ShellLaunchData,
     },
-    TelemetryEvent,
 };
 use warp_core::features::FeatureFlag;
 

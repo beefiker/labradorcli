@@ -34,7 +34,6 @@ use crate::{
         model::{rich_content::RichContentType, session::SessionId},
         History, TerminalModel,
     },
-    TelemetryEvent,
 };
 
 use super::telemetry_banner::should_collect_ai_ugc_telemetry;

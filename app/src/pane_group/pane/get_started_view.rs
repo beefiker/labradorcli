@@ -29,7 +29,6 @@ use crate::{
     view_components::DismissibleToast,
     workspace::ToastStack,
     workspace::{Workspace, WorkspaceAction},
-    TelemetryEvent,
 };
 
 pub fn init(app: &mut AppContext) {

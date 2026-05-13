@@ -22,7 +22,6 @@ use crate::{
     util::bindings::{
         filter_bindings_including_keystroke, reset_keybinding_to_default, set_custom_keybinding,
     },
-    TelemetryEvent,
 };
 use itertools::Itertools;
 

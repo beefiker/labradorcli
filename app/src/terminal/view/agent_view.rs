@@ -25,7 +25,6 @@ use crate::{
     },
     view_components::DismissibleToast,
     workspace::ToastStack,
-    TelemetryEvent,
 };
 
 pub const ENTER_AGAIN_TO_SEND_MESSAGE_ID: &str = "enter_again_to_send";
