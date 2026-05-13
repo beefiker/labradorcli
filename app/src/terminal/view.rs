@@ -23656,9 +23656,6 @@ impl TypedActionView for TerminalView {
                     page: Some(MCPServersSettingsPage::Edit { item_id: None }),
                 });
             }
-            OpenBillingAndUsagePane => {
-                ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent));
-            }
             OpenAddRulePane => {
                 ctx.emit(Event::OpenAddRulePane);
             }
