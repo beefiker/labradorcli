@@ -8,7 +8,6 @@ use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use serde::{Deserialize, Serialize};
 use warp_core::command::ExitCode;
-use warp_graphql::mutations::generate_commands::GenerateCommandsFailureType;
 
 pub mod execution_context;
 pub mod panel;
@@ -79,13 +78,3 @@ pub enum GenerateCommandsFromNaturalLanguageError {
     Other,
 }
 
-impl From<GenerateCommandsFailureType> for GenerateCommandsFromNaturalLanguageError {
-    fn from(value: GenerateCommandsFailureType) -> Self {
-        match value {
-            GenerateCommandsFailureType::BadPrompt => Self::BadPrompt,
-            GenerateCommandsFailureType::AiProviderError => Self::AiProviderError,
-            GenerateCommandsFailureType::RateLimited => Self::RateLimited,
-            GenerateCommandsFailureType::Other => Self::Other,
-        }
-    }
-}
