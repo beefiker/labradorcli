@@ -1,11 +1,9 @@
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::appearance::Appearance;
 
-use crate::terminal::shared_session::replay_agent_conversations::reconstruct_response_events_from_conversations;
 use crate::terminal::shared_session::role_change_modal::TEXT_FONT_SIZE;
 use crate::terminal::shared_session::{
-    ai_agent::encode_agent_response_event, max_session_size, SharedSessionActionSource,
-    SharedSessionScrollbackType,
+    max_session_size, SharedSessionActionSource, SharedSessionScrollbackType,
 };
 use crate::terminal::TerminalModel;
 use byte_unit::Byte;
@@ -78,25 +76,14 @@ impl Body {
         }
     }
 
-    /// Calculate the total size of agent conversation response events that will be sent
-    /// during session initialization. This is important because these events count toward
-    /// the session size quota, but are separate from the scrollback blocks.
+    /// Previously calculated the size of agent conversation response events that would be sent
+    /// during session initialization. Shared sessions have been removed, so this is now a
+    /// no-op stub returning zero.
     fn calculate_agent_conversations_size(
-        terminal_view_id: warpui::EntityId,
-        ctx: &ViewContext<Self>,
+        _terminal_view_id: warpui::EntityId,
+        _ctx: &ViewContext<Self>,
     ) -> Byte {
-        let conversations: Vec<_> = BlocklistAIHistoryModel::as_ref(ctx)
-            .all_live_conversations_for_terminal_view(terminal_view_id)
-            .filter(|conv| conv.exchange_count() > 0)
-            .cloned()
-            .collect();
-
-        let total_bytes: usize = reconstruct_response_events_from_conversations(&conversations)
-            .iter()
-            .map(|event| encode_agent_response_event(event).len())
-            .sum();
-
-        Byte::from_u64(total_bytes as u64)
+        Byte::from_u64(0)
     }
 }
 
