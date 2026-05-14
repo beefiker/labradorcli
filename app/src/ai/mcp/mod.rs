@@ -14,7 +14,6 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use warp_core::ui::Icon;
 
-pub mod manager;
 pub mod templatable_manager;
 #[cfg(not(target_family = "wasm"))]
 pub use templatable_manager::McpIntegration;

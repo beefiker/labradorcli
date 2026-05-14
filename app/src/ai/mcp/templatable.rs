@@ -7,8 +7,6 @@ use uuid::Uuid;
 
 use crate::server::datetime_ext::DateTimeExt;
 
-const UNIQUENESS_KEY_PREFIX: &str = "templatable_mcp_server";
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
 pub struct JsonTemplate {
     pub json: String,

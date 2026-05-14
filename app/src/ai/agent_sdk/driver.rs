@@ -58,7 +58,6 @@ pub(crate) mod terminal;
 use terminal::TerminalDriverEvent;
 
 const HARNESS_SAVE_INTERVAL: Duration = Duration::from_secs(30);
-pub(crate) const WARP_DRIVE_SYNC_TIMEOUT: Duration = Duration::from_secs(60);
 /// Signals to Claude child-harness hooks that Warp already owns the background
 /// message-listener lifecycle, so the plugin should reuse the shared state
 /// files instead of spawning and cleaning up its own listener.

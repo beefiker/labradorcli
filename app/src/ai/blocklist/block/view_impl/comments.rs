@@ -11,8 +11,6 @@ use warpui::elements::{
 };
 use warpui::{AppContext, Element, SingletonEntity};
 
-const COMMENT_CHIP_MAX_HEIGHT: f32 = 200.;
-
 /// Displays a series of chips for the "Address Comments" input type.
 pub fn address_comment_chips(
     review_request: &ReviewCommentBatch,
