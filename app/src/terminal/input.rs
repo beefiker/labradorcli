@@ -236,10 +236,10 @@ use warpui::{
     clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES,
     color::ColorU,
     elements::{
-        resizable_state_handle, Align, AnchorPair, ChildAnchor, Clipped, ConstrainedBox, Container,
+        resizable_state_handle, Align, AnchorPair, Clipped, ConstrainedBox, Container,
         CornerRadius, CrossAxisAlignment, DispatchEventResult, DropTargetData, Element,
         EventHandler, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
-        OffsetType, ParentAnchor, ParentElement, PositionedElementOffsetBounds, PositioningAxis,
+        OffsetType, ParentElement, PositionedElementOffsetBounds, PositioningAxis,
         Radius, ResizableStateHandle, SavePosition, SelectionHandle, Text, Wrap, XAxisAnchor,
         YAxisAnchor,
     },

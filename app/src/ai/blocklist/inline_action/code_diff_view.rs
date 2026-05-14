@@ -49,7 +49,6 @@ use warpui::{
     ViewContext, ViewHandle,
 };
 
-use super::malformed_line_heuristics::has_malformed_terminal_correction_signal;
 use crate::view_components::action_button::{ActionButton, NakedTheme};
 use crate::{
     ai::{
@@ -2296,10 +2295,6 @@ impl CodeDiffView {
 
                 let mut updated_files = Vec::new();
                 let mut deleted_files = Vec::new();
-                let mut edited_file_count = 0;
-                let mut correction_count = 0;
-                let mut edited_correction_count = 0;
-                let mut unedited_correction_count = 0;
 
                 for diff in self.pending_diffs.iter() {
                     let Some(path) = diff.diff_view.as_ref(ctx).file_path() else {
@@ -2324,28 +2319,6 @@ impl CodeDiffView {
                         }
                         let was_edited = diff.diff_view.as_ref(ctx).was_edited();
                         let changed_lines = diff.diff_view.as_ref(ctx).changed_lines(ctx);
-                        let has_malformed_terminal_signal = diff
-                            .diff_view
-                            .as_ref(ctx)
-                            .diff()
-                            .is_some_and(|editor_diff| {
-                                has_malformed_terminal_correction_signal(
-                                    editor_diff,
-                                    &changed_lines,
-                                )
-                            });
-
-                        if was_edited {
-                            edited_file_count += 1;
-                        }
-                        if has_malformed_terminal_signal {
-                            correction_count += 1;
-                            if was_edited {
-                                edited_correction_count += 1;
-                            } else {
-                                unedited_correction_count += 1;
-                            }
-                        }
                         updated_files.push((
                             FileLocations {
                                 name: file_path_str,
@@ -2360,9 +2333,6 @@ impl CodeDiffView {
                         ));
                     }
                 }
-                if correction_count > 0 {
-                }
-
                 // Extract accepted file contents from editor buffers so the
                 // executor doesn't need to re-read from disk or the network.
                 let file_contents: Vec<(String, String)> = self

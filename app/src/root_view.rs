@@ -5,7 +5,6 @@ use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
 use crate::auth::auth_state::AuthState;
 use crate::auth::AuthStateProvider;
 use crate::autoupdate::{AutoupdateState, AutoupdateStateEvent};
-use crate::experiments::Experiment;
 use crate::interval_timer::IntervalTimer;
 use crate::launch_configs::launch_config;
 use crate::linear::LinearIssueWork;
@@ -32,7 +31,7 @@ use crate::terminal::keys_settings::KeysSettings;
 use crate::terminal::shell::ShellType;
 use crate::terminal::view::cell_size_and_padding;
 use crate::themes::onboarding_theme_picker_themes;
-use crate::themes::theme::{AnsiColorIdentifier, Blend, Fill, ThemeKind, WarpThemeConfig};
+use crate::themes::theme::{AnsiColorIdentifier, ThemeKind, WarpThemeConfig};
 use crate::uri::OpenMCPSettingsArgs;
 use crate::util::bindings::{self, is_binding_pty_compliant};
 use crate::util::traffic_lights::{traffic_light_data, TrafficLightData, TrafficLightMouseStates};
@@ -88,7 +87,7 @@ use crate::ai::onboarding::{
 
 use ui_components::{button, Component as _, Options as _};
 use warpui::elements::{
-    Align, Border, CacheOption, ChildAnchor, ConstrainedBox, Container, CornerRadius,
+    Align, CacheOption, ChildAnchor, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, EventHandler, Fill as ElementFill, Flex,
     FormattedTextElement, Hoverable, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Point, Radius, Stack,
@@ -113,18 +112,6 @@ lazy_static! {
 /// This is the color of the border wrapping the whole window.
 ///
 /// On MacOS, this is drawn for us by the OS. On other platforms, we must draw it ourselves. Note
-/// that this is hard-coded for the default Dark theme. This is because it is only used by the
-/// AuthView and OnboardingSurveyModal which do not respect the chosen theme. So, do not use this for Views
-/// which respect themes.
-pub(crate) fn unthemed_window_border() -> Border {
-    if cfg!(all(not(target_os = "macos"), not(target_family = "wasm"))) {
-        // The 15% blend of fg into bg is the "ui surface" color.
-        Border::all(1.).with_border_fill(Fill::black().blend(&Fill::white().with_opacity(15)))
-    } else {
-        Border::all(1.).with_border_fill(Fill::black().with_opacity(0))
-    }
-}
-
 #[derive(Debug, Clone)]
 enum WindowState {
     /// Quake mode window is open and visible on the screen.
@@ -992,13 +979,6 @@ fn open_linear_issue_work_in_new_window(args: &LinearIssueWork, ctx: &mut AppCon
                 workspace.open_linear_issue_work(&args, ctx);
             });
         }
-    });
-}
-
-fn display_object_missing_error_in_window(window_id: WindowId, ctx: &mut AppContext) {
-    crate::workspace::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-        let toast = DismissibleToast::error(String::from("Resource not found or access denied"));
-        toast_stack.add_ephemeral_toast(toast, window_id, ctx);
     });
 }
 
@@ -2104,8 +2084,6 @@ pub struct RootView {
     /// Stores the tutorial from onboarding when the user needs to log in before
     /// the guided tour can start. Consumed after auth completes.
     pending_tutorial: Option<OnboardingTutorial>,
-    /// settings to apply after a new user login / initial cloud load completes
-    pending_post_auth_onboarding_settings: Option<SelectedSettings>,
     confetti_run: Option<DwarfConfettiRun>,
 }
 
@@ -2187,7 +2165,6 @@ impl RootView {
             mouse_states: Default::default(),
             window_id: ctx.window_id(),
             pending_tutorial: None,
-            pending_post_auth_onboarding_settings: None,
             confetti_run,
         };
 
@@ -2914,11 +2891,6 @@ impl RootView {
         }
     }
 
-    fn export_all_warp_drive_objects(&mut self, _ctx: &mut ViewContext<Self>) {
-        // Dwarf Drive export was tied to the removed cloud_object/drive modules; this
-        // method is now a no-op kept only so existing dispatch wiring still compiles.
-    }
-
     pub fn focus(&mut self, ctx: &mut ViewContext<Self>) -> bool {
         match &self.auth_onboarding_state {
             AuthOnboardingState::Onboarding {
@@ -3185,29 +3157,6 @@ impl WorkspaceArgs {
 }
 
 impl AuthOnboardingState {
-    fn complete_auth_and_create_workspace(&mut self, ctx: &mut ViewContext<RootView>) {
-        // Check if we should show onboarding (only for users who are not yet onboarded).
-        // The server-side `is_onboarded` flag is synced separately by
-        // `RootView::sync_local_onboarding_to_server`, which runs on every `AuthComplete`
-        // before we get here.
-        let auth_state = AuthStateProvider::as_ref(ctx).get();
-        let is_onboarded = auth_state.is_onboarded().unwrap_or(true);
-        let is_anonymous = auth_state.is_user_anonymous().unwrap_or(false);
-
-        let has_completed_local_onboarding = has_completed_local_onboarding(ctx);
-
-        if !local_agent_terminal_only()
-            && !is_onboarded
-            && !is_anonymous
-            && !has_completed_local_onboarding
-            && FeatureFlag::AgentOnboarding.is_enabled()
-        {
-            self.try_open_onboarding_slides(ctx);
-        }
-
-        ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
-    }
-
     fn try_open_onboarding_slides(&mut self, ctx: &mut ViewContext<RootView>) {
         let target = match self {
             AuthOnboardingState::Terminal(workspace) => {
