@@ -514,7 +514,6 @@ pub const TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME: &str = "workspace:toggle_comma
 
 const USER_AVATAR_BUTTON_POSITION_ID: &str = "workspace:user_avatar_button";
 const NOTIFICATIONS_MAILBOX_POSITION_ID: &str = "workspace:notifications_mailbox";
-pub(crate) const JUMP_TO_LATEST_TOAST_BINDING_NAME: &str = "workspace:jump_to_latest_toast";
 pub(crate) const TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME: &str =
     "workspace:toggle_notification_mailbox";
 
@@ -4183,16 +4182,6 @@ impl Workspace {
         })
     }
 
-    /// Finds the tab index containing a terminal viewing the given ambient agent conversation,
-    /// returning None if the ambient conversation is not open in any tab.
-    fn find_tab_with_ambient_agent_conversation(
-        &self,
-        _task_id: AmbientAgentTaskId,
-        _ctx: &AppContext,
-    ) -> Option<usize> {
-        None
-    }
-
     /// Gets all sessions in the current workspace.
     pub fn workspace_sessions<'a>(
         &'a self,
@@ -5300,10 +5289,6 @@ impl Workspace {
     fn copy_version(&mut self, version: &str, ctx: &mut ViewContext<Self>) {
         ctx.clipboard()
             .write(ClipboardContent::plain_text(version.to_string()));
-    }
-
-    fn export_all_warp_drive_objects(&mut self, _ctx: &mut ViewContext<Self>) {
-        // Removed: Dwarf Drive export functionality is no longer available.
     }
 
     /// Builds the unified new-session menu items

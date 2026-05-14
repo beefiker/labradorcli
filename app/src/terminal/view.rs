@@ -6425,12 +6425,6 @@ impl TerminalView {
         false
     }
 
-    fn maybe_insert_tombstone_for_non_running_shared_ambient_task(
-        &mut self,
-        _ctx: &mut ViewContext<Self>,
-    ) {
-    }
-
     pub fn active_session(&self) -> &ModelHandle<ActiveSession> {
         &self.active_session
     }

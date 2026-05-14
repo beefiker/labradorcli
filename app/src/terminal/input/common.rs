@@ -154,21 +154,6 @@ pub(super) fn wrap_input_with_terminal_padding_and_focus_handler(
     }
 }
 
-/// Renders the selected workflow info overlay over the input.
-pub(super) fn add_workflow_info_overlay(
-    _stack: &mut Stack,
-    _pane_height_px: f32,
-    _menu_positioning: MenuPositioning,
-) {
-}
-
-/// Renders the voltron overlay over the input.
-pub(super) fn add_voltron_overlay(
-    _stack: &mut Stack,
-    _menu_positioning: MenuPositioning,
-) {
-}
-
 /// Renders the appropriate input suggestions overlay over the input, bsaed on the current input
 /// suggestions mode (if any).
 pub(super) fn add_input_suggestions_overlays(

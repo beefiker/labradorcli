@@ -682,12 +682,6 @@ impl BackingView for TerminalView {
 }
 
 impl TerminalView {
-    /// Render the cancel button for cancelling the ambient agent task while it's loading.
-    /// Ambient agent tasks have been removed; render nothing.
-    fn render_ambient_agent_cancel_button(&self, _app: &AppContext) -> Box<dyn Element> {
-        warpui::elements::Empty::new().finish()
-    }
-
     /// Render the info button for toggling the cloud mode details panel.
     /// Only available on non-WASM platforms (WASM uses a per-window button instead).
     #[cfg(not(target_arch = "wasm32"))]

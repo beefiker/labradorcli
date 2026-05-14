@@ -27,7 +27,7 @@ use warpui::elements::Expanded;
 use warpui::{
     elements::{
         Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-        DispatchEventResult, DropTarget, Element, Empty, EventHandler, Flex, Hoverable,
+        DispatchEventResult, DropTarget, Element, EventHandler, Flex, Hoverable,
         MainAxisSize, OffsetPositioning, OffsetType, ParentElement, PositionedElementOffsetBounds,
         PositioningAxis, Radius, SavePosition, Stack, XAxisAnchor, YAxisAnchor,
     },
@@ -506,9 +506,6 @@ impl Input {
             .finish()
     }
 
-    pub(super) fn render_ambient_agent_status_footer(&self, _app: &AppContext) -> Box<dyn Element> {
-        Empty::new().finish()
-    }
 }
 
 pub mod styles {
