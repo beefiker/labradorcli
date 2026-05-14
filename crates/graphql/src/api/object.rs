@@ -1,25 +1,4 @@
-use crate::{
-    ai::AIConversation,
-    folder::{Folder, FolderWithDescendants},
-    generic_string_object::GenericStringObject,
-    notebook::Notebook,
-    scalars::Time,
-    schema,
-    workflow::Workflow,
-};
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub struct ObjectMetadata {
-    pub creator_uid: Option<cynic::Id>,
-    pub current_editor_uid: Option<cynic::Id>,
-    pub is_welcome_object: bool,
-    pub last_editor_uid: Option<cynic::Id>,
-    pub metadata_last_updated_ts: Time,
-    pub parent: Container,
-    pub revision_ts: Time,
-    pub trashed_ts: Option<Time>,
-    pub uid: cynic::Id,
-}
+use crate::{scalars::Time, schema};
 
 #[derive(cynic::Enum, Clone, Copy, Debug)]
 pub enum ObjectType {
@@ -37,32 +16,17 @@ pub enum ObjectType {
     Unknown,
 }
 
-#[derive(cynic::QueryFragment, Debug)]
-pub struct ObjectUpdateSuccess {
-    pub last_editor_uid: cynic::Id,
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub struct ObjectMetadata {
+    pub creator_uid: Option<cynic::Id>,
+    pub current_editor_uid: Option<cynic::Id>,
+    pub is_welcome_object: bool,
+    pub last_editor_uid: Option<cynic::Id>,
+    pub metadata_last_updated_ts: Time,
+    pub parent: Container,
     pub revision_ts: Time,
-}
-
-#[derive(cynic::InlineFragments, Debug, Clone)]
-pub enum CloudObject {
-    AIConversation(AIConversation),
-    Folder(Folder),
-    GenericStringObject(GenericStringObject),
-    Notebook(Notebook),
-    Workflow(Workflow),
-    #[cynic(fallback)]
-    Unknown,
-}
-
-#[derive(cynic::InlineFragments, Debug, Clone)]
-pub enum CloudObjectWithDescendants {
-    AIConversation(AIConversation),
-    FolderWithDescendants(FolderWithDescendants),
-    GenericStringObject(GenericStringObject),
-    Notebook(Notebook),
-    Workflow(Workflow),
-    #[cynic(fallback)]
-    Unknown,
+    pub trashed_ts: Option<Time>,
+    pub uid: cynic::Id,
 }
 
 #[derive(cynic::Enum, Clone, Copy, Debug)]
