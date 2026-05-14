@@ -4,7 +4,7 @@ use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
 use warpui::elements::{
     ClippedScrollStateHandle, ClippedScrollable, Dismiss, Empty, Expanded, ParentElement,
-    SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable,
+    SavePosition, ScrollbarWidth, Shrinkable,
 };
 use warpui::fonts::FamilyId;
 use warpui::ModelHandle;
