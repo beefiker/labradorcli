@@ -21,9 +21,7 @@ fn test_prompt_context_menu_items_shared_session_viewer_no_edit_prompt() {
         terminal.update(&mut app, |view, ctx| {
             let mut model = view.model.lock();
             view.current_prompt.update(ctx, |prompt, ctx| {
-                model.set_shared_session_status(SharedSessionStatus::ActiveViewer {
-                    role: Default::default(),
-                });
+                model.set_shared_session_status(SharedSessionStatus::Solo);
 
                 let PromptType::Dynamic { prompt } = prompt else {
                     return;
@@ -216,9 +214,7 @@ fn test_resize_shared_session_viewer_from_server() {
         let model = terminal.read(&app, |view, _| view.model.clone());
         model
             .lock()
-            .set_shared_session_status(SharedSessionStatus::ActiveViewer {
-                role: Default::default(),
-            });
+            .set_shared_session_status(SharedSessionStatus::Solo);
 
         // The viewer's current size info.
         let original_size_info = *model.lock().block_list().size();

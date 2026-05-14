@@ -23,9 +23,7 @@ fn test_viewer_secret_obfuscation_disabled() {
         });
 
         let mut model = TerminalModel::mock(None, None);
-        model.set_shared_session_status(SharedSessionStatus::ActiveViewer {
-            role: Default::default(),
-        });
+        model.set_shared_session_status(SharedSessionStatus::Solo);
         model.simulate_block("echo 1.1.1.1", "");
         for block in model.block_list().blocks() {
             assert_eq!(
