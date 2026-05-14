@@ -20,8 +20,6 @@ use warpui::{
 #[derive(PartialEq)]
 pub enum SessionStatus {
     Available,
-    Expired,
-    Unavailable,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
@@ -426,10 +424,6 @@ pub struct AgentConversationsModel {
 pub enum AgentConversationsModelEvent {
     /// Initial load of tasks completed.
     ConversationsLoaded,
-    /// New tasks were received during polling (view should diff against its local state).
-    NewTasksReceived,
-    /// Existing task data may have been updated (e.g., state changes).
-    TasksUpdated,
     /// Conversation status data was updated
     ConversationUpdated,
     /// Conversation artifacts were updated (plans, PRs, etc.)

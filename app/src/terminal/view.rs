@@ -3467,19 +3467,9 @@ impl TerminalView {
         ctx.subscribe_to_model(
             &AgentConversationsModel::handle(ctx),
             |me, _, event, ctx| {
-                let is_task_update = matches!(
-                    event,
-                    AgentConversationsModelEvent::TasksUpdated
-                        | AgentConversationsModelEvent::NewTasksReceived
-                );
-                if is_task_update {
-                    me.maybe_insert_tombstone_for_non_running_shared_ambient_task(ctx);
-                }
                 let should_refresh_details_panel = matches!(
                     event,
-                    AgentConversationsModelEvent::TasksUpdated
-                        | AgentConversationsModelEvent::NewTasksReceived
-                        | AgentConversationsModelEvent::ConversationUpdated
+                    AgentConversationsModelEvent::ConversationUpdated
                         | AgentConversationsModelEvent::ConversationArtifactsUpdated { .. }
                 );
                 // Cloud-mode details panel was removed; nothing to refresh.

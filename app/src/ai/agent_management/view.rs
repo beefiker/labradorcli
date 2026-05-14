@@ -13,7 +13,7 @@ use warpui::ui_components::button::ButtonVariant;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::{
     AgentConversationsModel, AgentConversationsModelEvent, AgentManagementFilters, ArtifactFilter,
-    ConversationOrTask, CreatedOnFilter, CreatorFilter, HarnessFilter, OwnerFilter, SessionStatus,
+    ConversationOrTask, CreatedOnFilter, CreatorFilter, HarnessFilter, OwnerFilter,
     SourceFilter, StatusFilter,
 };
 use crate::ai::agent_management::agent_type_selector::{
@@ -130,7 +130,6 @@ impl ManagementCardItemId {
 struct CardState {
     hover_state: MouseStateHandle,
     avatar_hover_state: MouseStateHandle,
-    session_status_hover_state: MouseStateHandle,
     artifact_buttons_view: Option<ViewHandle<ArtifactButtonsRow>>,
     action_buttons_hover_state: MouseStateHandle,
     action_buttons_view: ViewHandle<ConversationActionButtonsRow>,
@@ -851,7 +850,6 @@ impl AgentManagementView {
                 new_items.push(CardState {
                     hover_state: MouseStateHandle::default(),
                     avatar_hover_state: MouseStateHandle::default(),
-                    session_status_hover_state: MouseStateHandle::default(),
                     action_buttons_hover_state: MouseStateHandle::default(),
                     artifact_buttons_view,
                     action_buttons_view,
@@ -981,9 +979,7 @@ impl AgentManagementView {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            AgentConversationsModelEvent::ConversationsLoaded
-            | AgentConversationsModelEvent::NewTasksReceived
-            | AgentConversationsModelEvent::TasksUpdated => {
+            AgentConversationsModelEvent::ConversationsLoaded => {
                 self.update_creator_dropdown(ctx);
                 self.update_source_dropdown(ctx);
                 self.refresh_details_panel_if_needed(ctx);
@@ -1221,56 +1217,6 @@ impl AgentManagementView {
         .finish()
     }
 
-    // Renders a session status label based on the provided session status
-    fn render_session_status_label(
-        appearance: &Appearance,
-        mouse_state: MouseStateHandle,
-        session_status: SessionStatus,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-        let font_family = appearance.ui_font_family();
-        let font_size = appearance.ui_font_size();
-        let ui_builder = appearance.ui_builder().clone();
-
-        // Early return if session is available - no status label rendered
-        let (label_text, tooltip_text_opt) = match session_status {
-            SessionStatus::Expired => ("Session expired", Some(SESSION_EXPIRED_TEXT)),
-            SessionStatus::Unavailable => ("No session available", None),
-            SessionStatus::Available => return Empty::new().finish(),
-        };
-
-        Hoverable::new(mouse_state, move |state| {
-            let label = Text::new_inline(label_text, font_family, font_size)
-                .with_color(theme.nonactive_ui_text_color().into());
-
-            let container = Container::new(label.finish())
-                .with_background(internal_colors::fg_overlay_2(theme))
-                .with_horizontal_padding(4.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Percentage(50.)));
-
-            let mut stack = Stack::new().with_child(container.finish());
-            if state.is_hovered() {
-                if let Some(tooltip_text) = tooltip_text_opt {
-                    let tooltip = ui_builder
-                        .tool_tip(tooltip_text.to_string())
-                        .build()
-                        .finish();
-                    stack.add_positioned_overlay_child(
-                        tooltip,
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(0., -4.),
-                            ParentOffsetBounds::WindowByPosition,
-                            ParentAnchor::TopMiddle,
-                            ChildAnchor::BottomMiddle,
-                        ),
-                    );
-                }
-            }
-            stack.finish()
-        })
-        .finish()
-    }
-
     // Create a skeleton card for the loading screen
     fn render_skeleton_card(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
@@ -1494,14 +1440,6 @@ impl AgentManagementView {
         let mut time_and_avatar = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(4.);
-
-        if let Some(session_status) = card_data.get_session_status() {
-            time_and_avatar.add_child(Self::render_session_status_label(
-                appearance,
-                card_state.session_status_hover_state.clone(),
-                session_status,
-            ));
-        }
 
         time_and_avatar.add_child(time_text.finish());
         time_and_avatar.add_child(avatar);

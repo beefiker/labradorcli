@@ -2503,9 +2503,7 @@ impl Workspace {
             &AgentConversationsModel::handle(ctx),
             |me, _, event, ctx| match event {
                 // Update transcript details if task or conversation data is updated
-                AgentConversationsModelEvent::NewTasksReceived
-                | AgentConversationsModelEvent::TasksUpdated
-                | AgentConversationsModelEvent::ConversationUpdated
+                AgentConversationsModelEvent::ConversationUpdated
                 | AgentConversationsModelEvent::ConversationArtifactsUpdated { .. } => {
                     me.update_transcript_details_panel_data(ctx);
                 }

@@ -15,7 +15,6 @@ use warp_core::ui::appearance::Appearance;
 use warpui::fonts::FamilyId;
 use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
-use crate::ai::agent_conversations_model::{AgentConversationsModel, AgentConversationsModelEvent};
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::skills::{SkillDescriptor, SkillManager};
 use crate::search::data_source::{Query, QueryResult};
@@ -148,18 +147,6 @@ impl SlashCommandDataSource {
                 me.recompute_active_commands(ctx);
             }
         });
-        // Recompute when task data is updated so commands gated on a conversation's task
-        // harness (e.g. /continue-locally) appear once the task fetch resolves.
-        ctx.subscribe_to_model(&AgentConversationsModel::handle(ctx), |me, event, ctx| {
-            if matches!(
-                event,
-                AgentConversationsModelEvent::TasksUpdated
-                    | AgentConversationsModelEvent::NewTasksReceived
-            ) {
-                me.recompute_active_commands(ctx);
-            }
-        });
-
         let mut me = Self {
             active_session,
             agent_view_controller,
