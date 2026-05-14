@@ -17,10 +17,6 @@ use crate::auth::UserUid;
 pub enum Message {
     Identify(Identify),
     Track(Track),
-    Page(Page),
-    Screen(Screen),
-    Group(Group),
-    Alias(Alias),
     Batch(Batch),
 }
 
@@ -83,128 +79,6 @@ pub struct Track {
     pub integrations: Option<Value>,
 }
 
-/// A page event.
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Page {
-    /// The user id associated with this message.
-    #[serde(rename = "userId", skip_serializing_if = "Option::is_none")]
-    pub user_id: Option<UserUid>,
-
-    /// The anonymous user id associated with this message.
-    #[serde(rename = "anonymousId", skip_serializing_if = "Option::is_none")]
-    pub anonymous_id: Option<String>,
-
-    /// The name of the page being tracked.
-    pub name: String,
-
-    /// The properties associated with the event.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<Value>,
-
-    /// The timestamp associated with this message.
-    #[serde(rename = "originalTimestamp", skip_serializing_if = "Option::is_none")]
-    pub original_timestamp: Option<DateTime<Utc>>,
-
-    /// Context associated with this message.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<Value>,
-
-    /// Integrations to route this message to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub integrations: Option<Value>,
-}
-
-/// A screen event.
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Screen {
-    /// The user id associated with this message.
-    #[serde(rename = "userId", skip_serializing_if = "Option::is_none")]
-    pub user_id: Option<UserUid>,
-
-    /// The anonymous user id associated with this message.
-    #[serde(rename = "anonymousId", skip_serializing_if = "Option::is_none")]
-    pub anonymous_id: Option<String>,
-
-    /// The name of the screen being tracked.
-    pub name: String,
-
-    /// The properties associated with the event.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<Value>,
-
-    /// The timestamp associated with this message.
-    #[serde(rename = "originalTimestamp", skip_serializing_if = "Option::is_none")]
-    pub original_timestamp: Option<DateTime<Utc>>,
-
-    /// Context associated with this message.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<Value>,
-
-    /// Integrations to route this message to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub integrations: Option<Value>,
-}
-
-/// A group event.
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Group {
-    /// The user id associated with this message.
-    #[serde(rename = "userId", skip_serializing_if = "Option::is_none")]
-    pub user_id: Option<UserUid>,
-
-    /// The anonymous user id associated with this message.
-    #[serde(rename = "anonymousId", skip_serializing_if = "Option::is_none")]
-    pub anonymous_id: Option<String>,
-
-    /// The group the user is being associated with.
-    #[serde(rename = "groupId")]
-    pub group_id: String,
-
-    /// The traits to assign to the group.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub traits: Option<Value>,
-
-    /// The timestamp associated with this message.
-    #[serde(rename = "originalTimestamp", skip_serializing_if = "Option::is_none")]
-    pub original_timestamp: Option<DateTime<Utc>>,
-
-    /// Context associated with this message.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<Value>,
-
-    /// Integrations to route this message to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub integrations: Option<Value>,
-}
-
-/// An alias event.
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Alias {
-    /// The user id associated with this message.
-    #[serde(rename = "userId")]
-    pub user_id: UserUid,
-
-    /// The user's previous ID.
-    #[serde(rename = "previousId")]
-    pub previous_id: String,
-
-    /// The traits to assign to the alias.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub traits: Option<Value>,
-
-    /// The timestamp associated with this message.
-    #[serde(rename = "originalTimestamp", skip_serializing_if = "Option::is_none")]
-    pub original_timestamp: Option<DateTime<Utc>>,
-
-    /// Context associated with this message.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<Value>,
-
-    /// Integrations to route this message to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub integrations: Option<Value>,
-}
-
 /// A batch of events.
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Batch {
@@ -232,14 +106,6 @@ pub enum BatchMessageItem {
     Identify(Identify),
     #[serde(rename = "track")]
     Track(Track),
-    #[serde(rename = "page")]
-    Page(Page),
-    #[serde(rename = "screen")]
-    Screen(Screen),
-    #[serde(rename = "group")]
-    Group(Group),
-    #[serde(rename = "alias")]
-    Alias(Alias),
 }
 
 /// Metadata about a batch sent to Rudderstack and whether it contains user generated content.

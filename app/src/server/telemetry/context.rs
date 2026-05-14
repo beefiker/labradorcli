@@ -70,10 +70,6 @@ impl AttachContext for RudderMessage {
                 identify.context = Some(context);
             }
             RudderMessage::Track(track) => track.context = Some(context),
-            RudderMessage::Page(page) => page.context = Some(context),
-            RudderMessage::Screen(screen) => screen.context = Some(context),
-            RudderMessage::Group(group) => group.context = Some(context),
-            RudderMessage::Alias(alias) => alias.context = Some(context),
             RudderMessage::Batch(batch) => batch.context = Some(context),
         }
     }

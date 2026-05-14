@@ -386,10 +386,6 @@ impl TelemetryApi {
         let path = match msg {
             RudderMessage::Identify(_) => "/v1/identify",
             RudderMessage::Track(_) => "/v1/track",
-            RudderMessage::Page(_) => "/v1/page",
-            RudderMessage::Screen(_) => "/v1/screen",
-            RudderMessage::Group(_) => "/v1/group",
-            RudderMessage::Alias(_) => "/v1/alias",
             RudderMessage::Batch(_) => "/v1/batch",
         };
 
