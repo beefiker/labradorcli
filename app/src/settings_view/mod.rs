@@ -80,7 +80,6 @@ mod privacy;
 mod privacy_page;
 mod settings_file_footer;
 pub(crate) mod settings_page;
-mod telemetry;
 mod warpify_page;
 
 #[cfg(not(target_family = "wasm"))]
