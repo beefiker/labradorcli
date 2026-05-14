@@ -16,7 +16,6 @@ use super::{
     GridType, TerminalModel,
 };
 
-pub mod ai_agent;
 pub mod manager;
 pub mod network;
 pub mod participant_avatar_view;
