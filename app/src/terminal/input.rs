@@ -283,10 +283,7 @@ use super::{
     },
     session_settings::{SessionSettings, SessionSettingsChangedEvent},
     settings::{SpacingMode, TerminalSettings, TerminalSettingsChangedEvent},
-    shared_session::{
-        presence_manager::PresenceManager, viewer::history_model::SharedSessionHistoryModel,
-        SharedSessionStatus,
-    },
+    shared_session::{presence_manager::PresenceManager, SharedSessionStatus},
     universal_developer_input::{
         UniversalDeveloperInputButtonBar, UniversalDeveloperInputButtonBarEvent,
     },
@@ -749,22 +746,6 @@ impl InputSuggestionsMode {
         }
     }
 
-}
-
-struct SharedSessionInputState {
-    /// History model for viewers in a shared session.
-    // TODO: With this current approach, the shared session history crosses
-    // subshell boundaries, we'll need to make it work with our current history model
-    // to ensure we show the right shell history.
-    history_model: ModelHandle<SharedSessionHistoryModel>,
-
-    // Is [`Some`] iff a command execution was requested by a shared session executor.
-    pending_command_execution_request: Option<ViewerCommandExecutionRequest>,
-}
-
-struct ViewerCommandExecutionRequest {
-    /// Text in buffer when command execution was requested.
-    original_buffer: String,
 }
 
 /// Where a command execution request originates from.
@@ -1378,10 +1359,6 @@ pub struct Input {
     // A cached copy of enable_autosuggestions from settings (to avoid
     // a settings read on every typed character).
     enable_autosuggestions_setting: bool,
-
-    /// Manages the input state for a shared session.
-    /// Is [`Some`] iff this is a viewer in a shared session.
-    shared_session_input_state: Option<SharedSessionInputState>,
 
     /// Manages presence state for shared session.
     ///
@@ -2946,7 +2923,6 @@ impl Input {
                 .enable_autosuggestions,
             latest_buffer_operations: Vec::new(),
             deferred_remote_operations,
-            shared_session_input_state: None,
             shared_session_presence_manager: None,
             prompt_suggestions_banner_state: None,
             has_prompt_suggestion_banner,
@@ -5500,12 +5476,7 @@ impl Input {
                 log::warn!("Viewer tried to execute a command as a reader");
                 return false;
             } else if shared_session_status.is_executor() {
-                let original_buffer = self.freeze_input_in_loading_state(ctx);
-
-                if let Some(shared_session_input_state) = self.shared_session_input_state.as_mut() {
-                    shared_session_input_state.pending_command_execution_request =
-                        Some(ViewerCommandExecutionRequest { original_buffer });
-                }
+                let _ = self.freeze_input_in_loading_state(ctx);
             }
 
             // Get our own shared session participant ID.
@@ -8922,13 +8893,6 @@ impl Input {
         debug_assert!(self.model.lock().shared_session_status().is_viewer());
         self.set_shared_session_presence_manager(presence_manager);
 
-        // Set the history model which is only available for a shared session viewer.
-        let history_model = ctx.add_model(|_| SharedSessionHistoryModel::new());
-        self.shared_session_input_state = Some(SharedSessionInputState {
-            history_model,
-            pending_command_execution_request: None,
-        });
-
         // Set the server-assigned replica ID on the input buffer.
         self.editor().update(ctx, |editor, ctx| {
             editor.reinitialize_buffer(Some(replica_id), ctx);
@@ -8939,23 +8903,10 @@ impl Input {
     /// the shared session (run on the sharer's machine).
     fn shared_session_history<'b>(
         &'b self,
-        ctx: &'b ViewContext<Self>,
+        _ctx: &'b ViewContext<Self>,
     ) -> Vec<HistoryInputSuggestion<'b>> {
-        let Some(history_model) = self
-            .shared_session_input_state
-            .as_ref()
-            .map(|state| state.history_model.clone())
-        else {
-            return Vec::new();
-        };
-
-        let commands = history_model
-            .as_ref(ctx)
-            .entries()
-            .map(|entry| HistoryInputSuggestion::Command { entry })
-            .collect();
-        // TODO: append viewer's local shell history
-        commands
+        // Viewer-side history is unreachable; `is_viewer()` always returns false.
+        Vec::new()
     }
 
     /// Returns a collection of history entries that are user AI queries or shell commands in order
@@ -11356,29 +11307,7 @@ impl Input {
                 ai_input_model.set_input_config(new_config, false, ctx);
             });
 
-            let viewing_shared_session = self.model.lock().shared_session_status().is_viewer();
-            if viewing_shared_session {
-                // As we switch to the new block ID, if there were any remote
-                // edits that were pending for that block ID, we should flush them.
-                // Today, we only expect this to be the case with session-sharing viewers.
-                self.flush_deferred_remote_operations(ctx);
-
-                // Update shared session history model
-                if let Some(shared_session_history_model) = self
-                    .shared_session_input_state
-                    .as_ref()
-                    .map(|state| state.history_model.clone())
-                {
-                    shared_session_history_model.update(ctx, |history_model, _ctx| {
-                        history_model.push(HistoryEntry::for_completed_block(
-                            block_completed.command,
-                            &block_completed.serialized_block,
-                        ))
-                    })
-                } else {
-                    log::warn!("Tried to access non-existent shared session history model")
-                }
-            } else if is_next_command_enabled(ctx) {
+            if is_next_command_enabled(ctx) {
                 self.maybe_predict_next_action_ai(block_completed, ctx);
             }
 

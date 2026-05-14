@@ -2899,47 +2899,6 @@ impl PaneGroup {
         )
     }
 
-    pub fn new_for_shared_session_viewer(
-        session_id: SessionId,
-        tips_completed: ModelHandle<TipsCompleted>,
-        user_default_shell_unsupported_banner_model_handle: ModelHandle<BannerState>,
-        server_api: Arc<ServerApi>,
-        model_event_sender: Option<SyncSender<ModelEvent>>,
-        ctx: &mut ViewContext<Self>,
-    ) -> Self {
-        let model_event_sender_clone = model_event_sender.clone();
-        let initial_layout = move |resources,
-                                   pane_contents: &mut HashMap<PaneId, Box<dyn AnyPaneContent>>,
-                                   pane_history: &mut Vec<PaneId>,
-                                   view_bounds: RectF,
-                                   ctx: &mut ViewContext<Self>| {
-            let (view, terminal_manager) = PaneGroup::create_shared_session_viewer(
-                session_id,
-                resources,
-                view_bounds.size(),
-                ctx,
-            );
-
-            Self::terminal_pane_data(
-                Uuid::new_v4().as_bytes().to_vec(),
-                view,
-                terminal_manager,
-                model_event_sender_clone,
-                pane_contents,
-                pane_history,
-                ctx,
-            )
-        };
-        Self::new_internal(
-            tips_completed,
-            user_default_shell_unsupported_banner_model_handle,
-            server_api,
-            model_event_sender,
-            Box::new(initial_layout),
-            ctx,
-        )
-    }
-
     /// Create a new pane group for a view-only cloud conversation.
     pub fn new_for_conversation_transcript_viewer(
         conversation: AIConversation,
@@ -4702,33 +4661,6 @@ impl PaneGroup {
                 );
             }
         }
-
-        let terminal_view = terminal_manager.as_ref(ctx).view();
-        (terminal_view, terminal_manager)
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn create_shared_session_viewer(
-        session_id: SessionId,
-        resources: TerminalViewResources,
-        initial_size: Vector2F,
-        ctx: &mut ViewContext<Self>,
-    ) -> (
-        ViewHandle<TerminalView>,
-        ModelHandle<Box<dyn TerminalManager>>,
-    ) {
-        let window_id = ctx.window_id();
-        let terminal_manager = ctx.add_model(|ctx| {
-            let terminal_manager: Box<dyn TerminalManager> =
-                Box::new(shared_session::viewer::TerminalManager::new(
-                    session_id,
-                    resources,
-                    initial_size,
-                    window_id,
-                    ctx,
-                ));
-            terminal_manager
-        });
 
         let terminal_view = terminal_manager.as_ref(ctx).view();
         (terminal_view, terminal_manager)

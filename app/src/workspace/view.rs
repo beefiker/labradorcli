@@ -3142,9 +3142,6 @@ impl Workspace {
                 );
                 self.check_and_trigger_onboarding(ctx);
             }
-            NewWorkspaceSource::SharedSessionAsViewer { session_id } => {
-                self.add_tab_for_joining_shared_session(session_id, ctx);
-            }
             NewWorkspaceSource::FromCloudConversationId { conversation_id } => {
                 self.open_cloud_conversation_from_server_token(conversation_id, ctx);
             }
@@ -3264,11 +3261,9 @@ impl Workspace {
             | NewWorkspaceSource::Session { .. }
             | NewWorkspaceSource::AgentSession { .. } => should_default_open,
             #[cfg(not(target_family = "wasm"))]
-            NewWorkspaceSource::SharedSessionAsViewer { .. }
-            | NewWorkspaceSource::FromCloudConversationId { .. } => should_default_open,
+            NewWorkspaceSource::FromCloudConversationId { .. } => should_default_open,
             #[cfg(target_family = "wasm")]
-            NewWorkspaceSource::SharedSessionAsViewer { .. }
-            | NewWorkspaceSource::FromCloudConversationId { .. } => {
+            NewWorkspaceSource::FromCloudConversationId { .. } => {
                 // Web opens these as single-purpose views without exposed multi-tab UI, so keep
                 // the tabs panel closed even though native windows still expose workspace chrome.
                 false
@@ -3366,31 +3361,6 @@ impl Workspace {
             true
         };
         let _ = (open_warp_drive, show_warp_home, placeholder_pane);
-    }
-
-    pub fn add_tab_for_joining_shared_session(
-        &mut self,
-        session_id: SharedSessionId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let new_pane_group = ctx.add_typed_action_view(|ctx| {
-            PaneGroup::new_for_shared_session_viewer(
-                session_id,
-                self.tips_completed.clone(),
-                self.user_default_shell_unsupported_banner_model_handle
-                    .clone(),
-                self.server_api.clone(),
-                self.model_event_sender.clone(),
-                ctx,
-            )
-        });
-
-        ctx.subscribe_to_view(&new_pane_group, move |me, pane_group, event, ctx| {
-            me.handle_file_tree_event(pane_group, event, ctx)
-        });
-
-        self.tabs.push(TabData::new(new_pane_group));
-        self.activate_tab_internal(self.tab_count() - 1, ctx);
     }
 
     /// Opens a cloud conversation by server token.
