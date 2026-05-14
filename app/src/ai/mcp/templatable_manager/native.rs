@@ -6,7 +6,6 @@ use crate::ai::mcp::templatable_manager::oauth::{
 use crate::ai::mcp::FileBasedMCPManager;
 use itertools::Itertools;
 use std::collections::HashSet;
-use std::sync::Arc;
 use std::{collections::HashMap, future::Future};
 
 use crate::ai::mcp::http_client::build_client_with_headers;
@@ -30,7 +29,6 @@ use crate::{
 use async_compat::CompatExt as _;
 use cfg_if::cfg_if;
 use futures::FutureExt as _;
-use parking_lot::Mutex;
 use rmcp::{transport::ConfigureCommandExt as _, ServiceExt as _};
 use simple_logger::manager::LogManager;
 use simple_logger::SimpleLogger;
@@ -161,15 +159,6 @@ impl TemplatableMCPServerManager {
             FileBasedMCPManagerEvent::CloudEnvMcpScanComplete { .. } => {}
         });
 
-        let database_connection =
-            crate::persistence::database_file_path()
-                .to_str()
-                .and_then(|db_url| {
-                    crate::persistence::establish_ro_connection(db_url)
-                        .ok()
-                        .map(|conn| Arc::new(Mutex::new(conn)))
-                });
-
         let mut me = Self {
             server_states: Default::default(),
             active_servers: Default::default(),
@@ -177,7 +166,6 @@ impl TemplatableMCPServerManager {
             server_credentials: Default::default(),
             file_based_server_credentials: Default::default(),
             locally_installed_servers,
-            database_connection,
             server_error_messages: Default::default(),
             spawner: Some(ctx.spawner()),
             pending_reconnections: Default::default(),
