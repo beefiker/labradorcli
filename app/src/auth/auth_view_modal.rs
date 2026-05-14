@@ -13,13 +13,8 @@ use warpui::{
 
 #[derive(Clone, Copy, Debug)]
 pub enum AuthViewVariant {
-    RequireLogin,
     RequireLoginCloseable,
-    AnonymousSignup,
-    HitDriveObjectLimit,
-    HitDriveObjectLimitCloseable,
     ShareRequirementCloseable,
-    NewWindow,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

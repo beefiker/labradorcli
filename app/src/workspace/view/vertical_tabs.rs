@@ -743,7 +743,6 @@ enum SummaryPaneKind {
     CodeDiff,
     Settings,
     AIFact,
-    AIDocument,
     ExecutionProfileEditor,
     Other,
 }
@@ -2394,7 +2393,6 @@ enum TypedPane<'a> {
     CodeDiff,
     Settings,
     AIFact,
-    AIDocument,
     ExecutionProfileEditor,
     Other,
 }
@@ -2429,7 +2427,6 @@ impl TypedPane<'_> {
             TypedPane::CodeDiff => SummaryPaneKind::CodeDiff,
             TypedPane::Settings => SummaryPaneKind::Settings,
             TypedPane::AIFact => SummaryPaneKind::AIFact,
-            TypedPane::AIDocument => SummaryPaneKind::AIDocument,
             TypedPane::ExecutionProfileEditor => SummaryPaneKind::ExecutionProfileEditor,
             TypedPane::Other => SummaryPaneKind::Other,
         }
@@ -2445,7 +2442,6 @@ impl TypedPane<'_> {
             TypedPane::CodeDiff => "Code Diff",
             TypedPane::Settings => "Settings",
             TypedPane::AIFact => "Rules",
-            TypedPane::AIDocument => "Plan",
             TypedPane::ExecutionProfileEditor => "Execution Profile",
             TypedPane::Other => "Other",
         }
@@ -2462,7 +2458,6 @@ impl TypedPane<'_> {
             | TypedPane::CodeDiff
             | TypedPane::Settings
             | TypedPane::AIFact
-            | TypedPane::AIDocument
             | TypedPane::ExecutionProfileEditor
             | TypedPane::Other => None,
         }
@@ -2475,7 +2470,6 @@ impl TypedPane<'_> {
             TypedPane::CodeDiff => WarpIcon::Diff,
             TypedPane::Settings => WarpIcon::Gear,
             TypedPane::AIFact => WarpIcon::BookOpen,
-            TypedPane::AIDocument => WarpIcon::Compass,
             TypedPane::ExecutionProfileEditor => WarpIcon::Lightning,
             TypedPane::Other => WarpIcon::File,
         }
@@ -2607,7 +2601,6 @@ fn build_vertical_tabs_summary_data(
             TypedPane::CodeDiff
             | TypedPane::Settings
             | TypedPane::AIFact
-            | TypedPane::AIDocument
             | TypedPane::ExecutionProfileEditor
             | TypedPane::Other => {
                 push_normalized_unique_summary_text(
@@ -2725,7 +2718,6 @@ impl<'a> PaneProps<'a> {
             | TypedPane::CodeDiff
             | TypedPane::Settings
             | TypedPane::AIFact
-            | TypedPane::AIDocument
             | TypedPane::ExecutionProfileEditor
             | TypedPane::Other => {
                 non_terminal_search_text_fragments(self.generated_or_tab_title(), &self.subtitle)
@@ -3539,7 +3531,6 @@ fn render_summary_pane_kind_icon_circle(
         | SummaryPaneKind::CodeDiff
         | SummaryPaneKind::Settings
         | SummaryPaneKind::AIFact
-        | SummaryPaneKind::AIDocument
         | SummaryPaneKind::ExecutionProfileEditor
         | SummaryPaneKind::Other => {
             let (icon, icon_color) = summary_pane_kind_icon(kind, appearance);
@@ -3589,7 +3580,6 @@ fn summary_pane_kind_icon(
         SummaryPaneKind::CodeDiff => (WarpIcon::Diff, sub_text),
         SummaryPaneKind::Settings => (WarpIcon::Gear, main_text),
         SummaryPaneKind::AIFact => (WarpIcon::BookOpen, sub_text),
-        SummaryPaneKind::AIDocument => (WarpIcon::Compass, sub_text),
         SummaryPaneKind::ExecutionProfileEditor => (WarpIcon::Lightning, sub_text),
         SummaryPaneKind::Other => (WarpIcon::File, sub_text),
     }
@@ -5346,37 +5336,6 @@ fn render_code_detail_section(
         .finish()
 }
 
-fn render_warp_drive_object_detail_section(
-    props: &PaneProps<'_>,
-    appearance: &Appearance,
-    app: &AppContext,
-) -> Box<dyn Element> {
-    let theme = appearance.theme();
-    let text_colors = detail_sidecar_text_colors(theme);
-
-    let mut section = Flex::column()
-        .with_cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_spacing(DETAIL_SIDECAR_SECTION_GAP);
-    section.add_child(render_detail_wrapping_text(
-        props.title.clone(),
-        12.,
-        text_colors.main,
-        None,
-        appearance,
-    ));
-    section.add_child(render_detail_badge(
-        props.typed.kind_label(),
-        Some(render_detail_kind_badge_icon(props, appearance, app)),
-        None,
-        text_colors.disabled,
-        appearance,
-    ));
-
-    Container::new(section.finish())
-        .with_padding(Padding::uniform(DETAIL_SIDECAR_SECTION_PADDING))
-        .finish()
-}
-
 fn code_detail_kind_label(file_name: &str) -> Option<String> {
     language_by_filename(Path::new(file_name)).map(|language| language.display_name().to_string())
 }
@@ -5397,7 +5356,6 @@ fn render_detail_section(
         TypedPane::CodeDiff
         | TypedPane::Settings
         | TypedPane::AIFact
-        | TypedPane::AIDocument
         | TypedPane::ExecutionProfileEditor
         | TypedPane::Other => Empty::new().finish(),
     }

@@ -531,14 +531,6 @@ impl AuthManager {
         };
     }
 
-    pub fn anonymous_user_hit_drive_object_limit(&self, ctx: &mut ModelContext<Self>) {
-        if self.auth_state.is_anonymous_or_logged_out() {
-            ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature {
-                auth_view_variant: AuthViewVariant::HitDriveObjectLimitCloseable,
-            });
-        };
-    }
-
     pub fn initiate_anonymous_user_linking(
         &self,
         _entrypoint: AnonymousUserSignupEntrypoint,

@@ -63,7 +63,6 @@ use warpui::{
 };
 
 mod about_page;
-mod admin_actions;
 mod ai_page;
 mod appearance_page;
 mod code_page;
