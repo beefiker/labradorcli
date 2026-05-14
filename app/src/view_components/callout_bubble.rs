@@ -175,18 +175,6 @@ pub fn render_callout_bubble(
     }
 }
 
-/// Title text color for callout content (foreground, 100% opacity).
-pub fn callout_title_color(appearance: &Appearance) -> ColorU {
-    let _ = appearance;
-    phenomenon_foreground_color()
-}
-
-/// Body/description text color for callout content in the Phenomenon palette.
-pub fn callout_body_color(appearance: &Appearance) -> ColorU {
-    let _ = appearance;
-    phenomenon_body_text_color()
-}
-
 /// Label/secondary text color for callout content in the Phenomenon palette.
 pub fn callout_label_color(appearance: &Appearance) -> ColorU {
     let _ = appearance;
