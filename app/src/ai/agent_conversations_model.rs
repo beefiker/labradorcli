@@ -8,7 +8,6 @@ use crate::ui_components::icons::Icon;
 use crate::workspace::{RestoreConversationLayout, WorkspaceAction};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use session_sharing_protocol::common::SessionId;
 use std::collections::HashMap;
 use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;

@@ -35,7 +35,6 @@ use crate::themes::theme::{AnsiColorIdentifier, ThemeKind, WarpThemeConfig};
 use crate::uri::OpenMCPSettingsArgs;
 use crate::util::bindings::{self, is_binding_pty_compliant};
 use crate::util::traffic_lights::{traffic_light_data, TrafficLightData, TrafficLightMouseStates};
-use crate::view_components::DismissibleToast;
 use crate::window_settings::WindowSettings;
 use crate::workspace::WorkspaceAction;
 use crate::workspaces::team_tester::TeamTesterStatus;

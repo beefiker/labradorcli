@@ -53,7 +53,6 @@ use crate::ai::blocklist::agent_view::{
     AgentViewEntryBlockParams, AgentViewEntryOrigin, AgentViewHeaderDisabledTheme,
     AgentViewHeaderTheme, AgentViewZeroStateBlock, AgentViewZeroStateEvent, EphemeralMessageModel,
     ExitAgentViewError, ExitConfirmationTrigger, InlineAgentViewHeader, OrchestrationPillBar,
-    ENTER_OR_EXIT_CONFIRMATION_WINDOW,
 };
 use crate::ai::conversation_utils;
 use crate::ai::predict::prompt_suggestions::{
@@ -377,7 +376,6 @@ use warpui::event::ModifiersState;
 use warpui::keymap::Keystroke;
 use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
 use warpui::platform::{Cursor, OperatingSystem};
-use warpui::r#async::executor::Background;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
 use warpui::windowing::WindowManager;
 
@@ -428,12 +426,9 @@ use crate::server::telemetry::{
     PaletteSource, PromptSuggestionViewType,
     ToggleBlockFilterSource,
 };
-use crate::server::{
-    server_api::ServerApi,
-    telemetry::{
+use crate::server::telemetry::{
         SaveAsWorkflowModalSource, TelemetryEvent,
-    },
-};
+    };
 use crate::session_management::{CommandContext, SessionNavigationPromptElements};
 use crate::settings::{PrivacySettings, PrivacySettingsChangedEvent, PrivacySettingsSnapshot};
 use crate::terminal::alt_screen::alt_screen_element::AltScreenElement;
@@ -2474,7 +2469,6 @@ pub struct TerminalView {
 
     mouse_states: TerminalViewMouseStates,
 
-    server_api: Arc<ServerApi>,
     auth_state: Arc<AuthState>,
 
     /// A sender used to handle messages for whenever the entire terminal view
@@ -2534,9 +2528,6 @@ pub struct TerminalView {
 
     block_text_selection_start_position: Option<Vector2F>,
 
-    /// Background executor for sending telemetry when a TerminalView is
-    /// dropped.
-    background_executor: Arc<Background>,
 
     inline_banners_state: InlineBannersState,
 
@@ -2761,15 +2752,10 @@ pub struct TerminalView {
         ViewHandle<crate::ai::conversation_details_panel::ConversationDetailsPanel>,
     /// Whether the cloud mode details panel is currently open.
     is_cloud_mode_details_panel_open: bool,
-    /// Whether we've already auto-opened the panel when the agent started running.
-    /// This prevents re-opening the panel if the user manually closes it.
-    has_auto_opened_cloud_mode_details_panel: bool,
     /// Mouse state handle for the cloud mode details panel toggle button in the pane header.
     /// Only available on non-WASM platforms (WASM uses a per-window button instead).
     #[cfg(not(target_arch = "wasm32"))]
     cloud_mode_details_panel_toggle_mouse_state: warpui::elements::MouseStateHandle,
-    /// Mouse state handle for the ambient agent cancel button in the pane header.
-    ambient_agent_cancel_mouse_state: warpui::elements::MouseStateHandle,
 
     /// Environment setup mode selector modal for /create-environment command.
     environment_setup_mode_selector: ViewHandle<EnvironmentSetupModeSelector>,
@@ -4023,7 +4009,6 @@ impl TerminalView {
             mouse_states: Default::default(),
             open_grid_link_tool_tip: None,
             open_rich_content_link_tool_tip: None,
-            server_api: resources.server_api.clone(),
             auth_state: AuthStateProvider::as_ref(ctx).get().clone(),
             find_bar,
             resize_tx,
@@ -4048,7 +4033,6 @@ impl TerminalView {
             remote_server_shimmer_handle: ShimmeringTextStateHandle::new(),
             active_block_metadata: None,
             block_text_selection_start_position: None,
-            background_executor: ctx.background_executor().clone(),
             inline_banners_state: Default::default(),
             bookmarked_blocks: Default::default(),
             file_link_scanning_join_handle: None,
@@ -4126,10 +4110,8 @@ impl TerminalView {
             is_using_conversation_for_pane_header_title: false,
             cloud_mode_details_panel,
             is_cloud_mode_details_panel_open: false,
-            has_auto_opened_cloud_mode_details_panel: false,
             #[cfg(not(target_arch = "wasm32"))]
             cloud_mode_details_panel_toggle_mouse_state: Default::default(),
-            ambient_agent_cancel_mouse_state: Default::default(),
             active_init_project_model: None,
             manual_pty_shutdown_requested: false,
             environment_setup_mode_selector,
@@ -4346,33 +4328,6 @@ impl TerminalView {
         F: FnOnce(&mut Self, &mut ViewContext<Self>) + 'static,
     {
         self.block_completed_callbacks.push(Box::new(callback));
-    }
-
-    fn set_pending_cloud_mode_start_callback(
-        &mut self,
-        callback: TerminalViewCallback,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.clear_pending_cloud_mode_start_callback();
-        self.pending_cloud_mode_start_callback = Some(callback);
-
-        self.pending_cloud_mode_start_abort_handle = Some(ctx.spawn_abortable(
-            // Reuse the same timeout as agent-view confirmation prompts so a pending cloud-mode
-            // start cannot outlive the user-visible confirmation window semantics.
-            Timer::after(ENTER_OR_EXIT_CONFIRMATION_WINDOW),
-            |me, _, _ctx| {
-                me.pending_cloud_mode_start_callback = None;
-                me.pending_cloud_mode_start_abort_handle = None;
-            },
-            |_, _| (),
-        ));
-    }
-
-    fn clear_pending_cloud_mode_start_callback(&mut self) {
-        if let Some(handle) = self.pending_cloud_mode_start_abort_handle.take() {
-            handle.abort();
-        }
-        self.pending_cloud_mode_start_callback = None;
     }
 
     fn maybe_run_pending_cloud_mode_start_callback(&mut self, ctx: &mut ViewContext<Self>) {
@@ -21711,7 +21666,6 @@ impl TerminalView {
         }
 
         // Iterate from end backwards, reverting all diffs in each AIBlock from this conversation until the block the user clicked on (inclusive)
-        let mut num_blocks_reverted = 0;
         for rich_content in self.rich_content_views.iter().rev() {
             if let Some(ai_metadata) = rich_content.ai_block_metadata() {
                 // Only revert blocks from the same conversation
@@ -21719,7 +21673,6 @@ impl TerminalView {
                     ai_metadata.ai_block_handle.update(ctx, |block, ctx| {
                         block.revert_all_diffs(ctx);
                     });
-                    num_blocks_reverted += 1;
                     if ai_metadata.ai_block_handle.id() == ai_block_view_id {
                         break;
                     }
