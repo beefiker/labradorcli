@@ -19,7 +19,6 @@ use super::{
 pub mod manager;
 pub mod network;
 pub mod participant_avatar_view;
-pub mod permissions_manager;
 pub mod presence_manager;
 pub mod render_util;
 pub mod role_change_modal;

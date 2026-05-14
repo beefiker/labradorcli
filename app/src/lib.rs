@@ -1581,10 +1581,6 @@ fn initialize_app(
     // Add a singleton model to maintain state of shared session across all windows.
     ctx.add_singleton_model(terminal::shared_session::manager::Manager::new);
 
-    ctx.add_singleton_model(
-        terminal::shared_session::permissions_manager::SessionPermissionsManager::new,
-    );
-
     AutoupdateState::register(ctx, server_api.clone());
 
     ctx.add_singleton_model(LLMPreferences::new);

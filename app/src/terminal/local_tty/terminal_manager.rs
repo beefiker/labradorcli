@@ -27,7 +27,6 @@ use session_sharing_protocol::sharer::{
 use crate::editor::CrdtOperation;
 use crate::network::{NetworkStatusEvent, NetworkStatusKind};
 use crate::terminal::available_shells::{AvailableShell, AvailableShells};
-use crate::terminal::shared_session::permissions_manager::SessionPermissionsManager;
 use crate::terminal::ShellLaunchData;
 use crate::terminal::ShellLaunchState;
 use crate::view_components::ToastFlavor;
@@ -1558,19 +1557,6 @@ impl TerminalManager {
                     }
                 }
 
-                if let Some(session_id) = terminal_view.as_ref(ctx).shared_session_id().cloned() {
-                    SessionPermissionsManager::handle(ctx).update(
-                        ctx,
-                        |permissions_manager, ctx| {
-                            permissions_manager.updated_guests(
-                                ctx,
-                                session_id,
-                                participant_list.guests.clone(),
-                                participant_list.pending_guests.clone(),
-                            );
-                        },
-                    );
-                }
             }
             NetworkEvent::ParticipantPresenceUpdated(update) => {
                 terminal_view.update(ctx, |view, ctx| {
@@ -1834,21 +1820,7 @@ impl TerminalManager {
             }
             NetworkEvent::LinkAccessLevelUpdateResponse { response } => {
                 terminal_view.update(ctx, |view, ctx| match response {
-                    LinkAccessLevelUpdateResponse::Ok { role } => {
-                        let Some(session_id) = view.shared_session_id() else {
-                            return;
-                        };
-                        SessionPermissionsManager::handle(ctx).update(
-                            ctx,
-                            |permissions_manager, ctx| {
-                                permissions_manager.updated_link_permissions(
-                                    *session_id,
-                                    *role,
-                                    ctx,
-                                );
-                            },
-                        );
-                    }
+                    LinkAccessLevelUpdateResponse::Ok { .. } => {}
                     LinkAccessLevelUpdateResponse::Error => {
                         let reason_string =
                             "Failed to update permissions for shared session".to_owned();
@@ -1858,21 +1830,7 @@ impl TerminalManager {
             }
             NetworkEvent::TeamAccessLevelUpdateResponse { response } => {
                 terminal_view.update(ctx, |view, ctx| match response {
-                    TeamAccessLevelUpdateResponse::Success { team_acl, .. } => {
-                        let Some(session_id) = view.shared_session_id() else {
-                            return;
-                        };
-                        SessionPermissionsManager::handle(ctx).update(
-                            ctx,
-                            |permissions_manager, ctx| {
-                                permissions_manager.updated_team_permissions(
-                                    *session_id,
-                                    team_acl.clone(),
-                                    ctx,
-                                );
-                            },
-                        );
-                    }
+                    TeamAccessLevelUpdateResponse::Success { .. } => {}
                     TeamAccessLevelUpdateResponse::Error(_) => {
                         view.show_persistent_toast(
                             ACL_UPDATE_FAILURE_RESPONSE.to_owned(),
