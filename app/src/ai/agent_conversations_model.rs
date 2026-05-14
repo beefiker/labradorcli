@@ -166,10 +166,6 @@ impl AgentRunDisplayStatus {
         }
     }
 
-    pub fn is_cancellable(&self) -> bool {
-        self.is_working()
-    }
-
     pub fn is_working(&self) -> bool {
         matches!(self, AgentRunDisplayStatus::ConversationInProgress)
     }
@@ -259,15 +255,6 @@ impl ConversationOrTask<'_> {
         }
     }
 
-    pub fn creator_uid(&self, app: &AppContext) -> Option<String> {
-        match self {
-            ConversationOrTask::Conversation(_) => AuthStateProvider::as_ref(app)
-                .get()
-                .user_id()
-                .map(|uid| uid.to_string()),
-        }
-    }
-
     pub(super) fn request_usage(&self, app: &AppContext) -> Option<f32> {
         match self {
             ConversationOrTask::Conversation(metadata) => {
@@ -297,12 +284,6 @@ impl ConversationOrTask<'_> {
     pub fn created_at(&self) -> DateTime<Utc> {
         match self {
             ConversationOrTask::Conversation(metadata) => metadata.nav_data.last_updated.into(),
-        }
-    }
-
-    pub fn session_id(&self) -> Option<SessionId> {
-        match self {
-            ConversationOrTask::Conversation(_) => None,
         }
     }
 
