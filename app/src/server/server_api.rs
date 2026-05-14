@@ -32,7 +32,6 @@ use warp_managed_secrets::client::ManagedSecretsClient;
 use warpui::{r#async::BoxFuture, ModelContext};
 use workspace::WorkspaceClient;
 
-use crate::server::telemetry::TelemetryApi;
 use crate::settings::PrivacySettingsSnapshot;
 
 use crate::ChannelState;
@@ -384,8 +383,6 @@ pub struct ServerApi {
     client: Arc<http_client::Client>,
     auth_state: Arc<AuthState>,
     event_sender: async_channel::Sender<ServerApiEvent>,
-    // TODO(jeff): Make `TelemetryApi` another type of client, and move it off `ServerApi`.
-    telemetry_api: TelemetryApi,
     last_server_time: Arc<Mutex<Option<ServerTime>>>,
     // We technically use OAuth2 for headless device authentication.
     oauth_client: self::auth::OAuth2Client,
@@ -419,7 +416,6 @@ impl ServerApi {
             client: Arc::new(http_client::Client::new()),
             auth_state,
             event_sender,
-            telemetry_api: TelemetryApi::new(),
             last_server_time: Arc::new(Mutex::new(None)),
             oauth_client,
             ambient_workload_token: Arc::new(Mutex::new(None)),
@@ -440,7 +436,6 @@ impl ServerApi {
             client: Arc::new(http_client::Client::new_for_test()),
             auth_state: Arc::new(AuthState::new_for_test()),
             event_sender: tx,
-            telemetry_api: TelemetryApi::new(),
             last_server_time: Arc::new(Mutex::new(None)),
             oauth_client,
             ambient_workload_token: Arc::new(Mutex::new(None)),
@@ -1293,11 +1288,8 @@ impl ServerApiProvider {
 
         if ContextFlag::NetworkLogConsole.is_enabled() {
             super::network_logging::init(
-                [
-                    Arc::get_mut(&mut server_api.client)
-                        .expect("guaranteed there is only one copy of client"),
-                    &mut server_api.telemetry_api.client,
-                ],
+                [Arc::get_mut(&mut server_api.client)
+                    .expect("guaranteed there is only one copy of client")],
                 ctx,
             );
         }
