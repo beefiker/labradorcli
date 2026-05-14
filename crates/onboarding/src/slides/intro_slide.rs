@@ -1,6 +1,5 @@
 use crate::dwarf_icon::render_dwarf_icon;
 use crate::model::OnboardingStateModel;
-use crate::OnboardingEvent;
 
 use super::OnboardingSlide;
 use pathfinder_color::ColorU;

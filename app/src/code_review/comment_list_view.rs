@@ -491,7 +491,6 @@ impl CommentListView {
             EditorViewEvent::Focused => {
                 self.clear_other_comment_selections(Some(view.id()), ctx);
             }
-            _ => {}
         }
     }
 

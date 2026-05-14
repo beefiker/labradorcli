@@ -1,6 +1,6 @@
 // Re-export types from warp_server_client.
 pub use warp_server_client::ids::{
-    ClientId, HashableId, ObjectUid, ServerId, SyncId, ToServerId,
+    ClientId, HashableId, ObjectUid, ServerId, SyncId,
 };
 
 /// server_id_traits is a macro used for generating implementations for the type aliases on

@@ -7,7 +7,6 @@ use crate::slides::{
     IntroSlideEvent, OnboardingModelInfo, OnboardingSlide, ProjectSlide, ThemePickerSlide,
     ThemePickerSlideEvent, ThirdPartySlide,
 };
-use crate::telemetry::OnboardingEvent;
 use ai::LLMId;
 use instant::Instant;
 use std::time::Duration;

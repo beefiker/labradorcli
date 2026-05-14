@@ -17890,8 +17890,6 @@ impl TypedActionView for Workspace {
                     self.toggle_left_panel_view(&LeftPanelAction::ProjectExplorer, is_showing, ctx);
                 }
             }
-            _ToggleWarpDrive => {
-            }
             ToggleGlobalSearch => {
                 if FeatureFlag::GlobalSearch.is_enabled()
                     && *CodeSettings::as_ref(ctx).show_global_search
@@ -18099,6 +18097,10 @@ impl TypedActionView for Workspace {
             SyncTrafficLights => {
                 self.sync_window_button_visibility(ctx);
             }
+            OpenOpenWarpLaunchModal
+            | ResetOpenWarpLaunchModalState
+            | InstallOpenCodeWarpPlugin
+            | UseLocalOpenCodeWarpPlugin => {}
         };
         if action.should_save_app_state_on_action() {
             ctx.dispatch_global_action("workspace:save_app", ());
