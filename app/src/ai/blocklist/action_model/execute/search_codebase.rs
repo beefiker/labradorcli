@@ -205,17 +205,11 @@ impl SearchCodebaseExecutor {
             ));
         };
 
-        let search_dir;
-        let is_cross_repo;
-        if FeatureFlag::CrossRepoContext.is_enabled() {
-            is_cross_repo = codebase_path
-                .as_ref()
-                .is_some_and(|path| !current_working_directory.starts_with(path));
-            search_dir = codebase_path.unwrap_or(current_working_directory);
+        let search_dir = if FeatureFlag::CrossRepoContext.is_enabled() {
+            codebase_path.unwrap_or(current_working_directory)
         } else {
-            is_cross_repo = false;
-            search_dir = current_working_directory;
-        }
+            current_working_directory
+        };
         let _server_output_id = get_server_output_id(input.conversation_id, ctx);
 
         let Some(root_dir_for_search) = self.root_repo_paths.get(id) else {

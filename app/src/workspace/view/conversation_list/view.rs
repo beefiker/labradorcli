@@ -936,11 +936,7 @@ impl TypedActionView for ConversationListView {
                 ctx.notify();
             }
             ConversationListViewAction::DeleteFromOverflowMenu { conversation_id } => {
-                let ConversationOrTaskId::ConversationId(ai_conversation_id) = conversation_id
-                else {
-                    // For now, delete is only implemented for non-ambient conversations.
-                    return;
-                };
+                let ConversationOrTaskId::ConversationId(ai_conversation_id) = conversation_id;
 
                 let conversation =
                     BlocklistAIHistoryModel::as_ref(ctx).conversation(ai_conversation_id);
@@ -1050,10 +1046,7 @@ impl TypedActionView for ConversationListView {
                 conversation_id,
                 destination,
             } => {
-                let ConversationOrTaskId::ConversationId(ai_conversation_id) = conversation_id
-                else {
-                    return;
-                };
+                let ConversationOrTaskId::ConversationId(ai_conversation_id) = conversation_id;
 
                 ctx.dispatch_typed_action(&WorkspaceAction::ForkAIConversation {
                     conversation_id: *ai_conversation_id,

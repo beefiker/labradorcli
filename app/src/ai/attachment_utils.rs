@@ -3,9 +3,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-/// Max file attachment size is 10 MB.
-pub(crate) const MAX_ATTACHMENT_SIZE_BYTES: usize = 10 * 1024 * 1024;
-
 use crate::ai::agent::AIAgentAttachment;
 
 /// Returns the per-session directory for downloading file attachments,
