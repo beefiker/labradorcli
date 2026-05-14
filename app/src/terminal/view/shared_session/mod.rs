@@ -2,8 +2,6 @@
 
 pub(in crate::terminal::view) mod adapter;
 pub(in crate::terminal::view) mod sharer;
-#[cfg(test)]
-pub mod test_utils;
 mod view_impl;
 mod viewer;
 
