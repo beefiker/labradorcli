@@ -2,7 +2,6 @@ pub(crate) mod ask_user_question_view;
 pub(crate) mod code_diff_view;
 pub(crate) mod inline_action_header;
 pub(crate) mod inline_action_icons;
-mod malformed_line_heuristics;
 pub(crate) mod requested_action;
 pub(crate) mod requested_command;
 pub(crate) mod requested_command_attribution;
