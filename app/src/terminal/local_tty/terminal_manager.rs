@@ -292,16 +292,9 @@ impl TerminalManager {
             Self::record_pty_throughput(inactive_pty_reads_rx.clone(), model.clone(), ctx);
         }
 
-        // If this session should be a shared-session creator, configure its initial
-        // shared-session state before we construct the view, so that bootstrap
-        // events can observe the correct pending status and source type.
-        if FeatureFlag::CreatingSharedSessions.is_enabled() {
-            if let IsSharedSessionCreator::Yes { source_type } = is_shared_session_creator {
-                model.lock().set_shared_session_status(
-                    SharedSessionStatus::SharePendingPreBootstrap { source_type },
-                );
-            }
-        }
+        // Shared sessions have been removed; the session-sharing creator path
+        // is no longer reachable.
+        let _ = is_shared_session_creator;
 
         // Initialize the PtyController.
         let pty_controller = init_pty_controller_model(
@@ -397,24 +390,7 @@ impl TerminalManager {
                 .append_session_restoration_separator_to_block_list(is_historical);
         }
 
-        // In unit tests, we know we aren't going to bootstrap a shell
-        // so if we're waiting on starting a shared session until bootstrapped,
-        // just attempt to start it now.
-        #[cfg(test)]
-        if matches!(
-            model.lock().shared_session_status(),
-            SharedSessionStatus::SharePendingPreBootstrap { .. }
-        ) {
-            view.update(ctx, |view, ctx| {
-                view.attempt_to_share_session(
-                    SharedSessionScrollbackType::All,
-                    None,
-                    SessionSourceType::default(),
-                    false,
-                    ctx,
-                )
-            });
-        }
+        // Shared sessions have been removed; nothing to bootstrap-share.
 
         wire_up_pty_controller_with_view(
             &pty_controller,
@@ -1421,10 +1397,10 @@ impl TerminalManager {
                 sharer_id,
                 sharer_firebase_uid,
             } => {
-                // Change the status of the session to reflect that the share is now active.
+                // Shared sessions have been removed; this branch is no longer reachable.
                 model
                     .lock()
-                    .set_shared_session_status(SharedSessionStatus::ActiveSharer);
+                    .set_shared_session_status(SharedSessionStatus::Solo);
 
                 // Let the terminal view know the share is active so it can reflect that in its view.
                 terminal_view.update(ctx, |view, ctx| {
@@ -1477,7 +1453,7 @@ impl TerminalManager {
 
                 model
                     .lock()
-                    .set_shared_session_status(SharedSessionStatus::NotShared);
+                    .set_shared_session_status(SharedSessionStatus::Solo);
 
                 Manager::handle(ctx).update(ctx, |manager, ctx| {
                     manager.share_failed(window_id, ctx);
@@ -2078,8 +2054,8 @@ impl TerminalManager {
             return;
         }
 
-        // Change the status of the session to unshared.
-        model_lock.set_shared_session_status(SharedSessionStatus::NotShared);
+        // Change the status of the session to unshared (Solo).
+        model_lock.set_shared_session_status(SharedSessionStatus::Solo);
         model_lock.set_obfuscate_secrets(get_secret_obfuscation_mode(ctx));
         model_lock.clear_ordered_terminal_events_for_shared_session_tx();
 

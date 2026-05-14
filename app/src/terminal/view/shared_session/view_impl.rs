@@ -469,7 +469,7 @@ impl TerminalView {
 
         self.model
             .lock()
-            .set_shared_session_status(SharedSessionStatus::SharePending);
+            .set_shared_session_status(SharedSessionStatus::Solo);
 
         ctx.emit(Event::StartSharingCurrentSession {
             scrollback_type,
@@ -1063,17 +1063,8 @@ impl TerminalView {
         }
     }
 
-    pub fn open_shared_session_viewer_role_menu(&mut self, ctx: &mut ViewContext<Self>) {
-        let status = self.model.lock().shared_session_status().clone();
-        let SharedSessionStatus::ActiveViewer { role } = status else {
-            return;
-        };
-
-        if let Some(viewer) = self.shared_session_viewer_mut() {
-            viewer.open_role_change_menu(role, ctx);
-        }
-
-        self.update_shared_session_pane_header(ctx);
+    pub fn open_shared_session_viewer_role_menu(&mut self, _ctx: &mut ViewContext<Self>) {
+        // Shared sessions have been removed; there is no viewer role to open.
     }
 
     pub fn make_all_shared_session_participants_readers(
@@ -1223,16 +1214,11 @@ impl TerminalView {
 
     /// Updates view state when our own role was changed.
     fn on_self_role_updated(&mut self, role: Role, ctx: &mut ViewContext<Self>) {
-        // Update shared session status only if we are an active viewer.
-        // This avoids a race condition if a viewer receives a role change
-        // before catching up, by ensuring the view is still pending.
-        if self.model.lock().shared_session_status().is_active_viewer() {
-            // If not an active viewer now, role and status will be udpated
-            // in the call `process_ordered_terminal_event`.
-            self.model
-                .lock()
-                .set_shared_session_status(SharedSessionStatus::ActiveViewer { role });
-        }
+        // Shared sessions have been removed; status stays Solo regardless of
+        // any historical role event.
+        self.model
+            .lock()
+            .set_shared_session_status(SharedSessionStatus::Solo);
 
         // Enable/disable the editor based on the new role
         self.input().update(ctx, |input, ctx| {

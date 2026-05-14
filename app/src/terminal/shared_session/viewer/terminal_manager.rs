@@ -392,7 +392,7 @@ impl TerminalManager {
             .set_write_to_pty_events_for_shared_session_tx(write_to_pty_events_tx);
         self.model
             .lock()
-            .set_shared_session_status(SharedSessionStatus::ViewPending);
+            .set_shared_session_status(SharedSessionStatus::Solo);
 
         let network = ctx.add_model(|ctx| {
             Network::new(
@@ -1476,7 +1476,7 @@ impl TerminalManager {
 
         model
             .lock()
-            .set_shared_session_status(SharedSessionStatus::FinishedViewer);
+            .set_shared_session_status(SharedSessionStatus::Solo);
         model
             .lock()
             .clear_write_to_pty_events_for_shared_session_tx();
@@ -1540,7 +1540,7 @@ impl crate::terminal::TerminalManager for TerminalManager {
         }
         self.model
             .lock()
-            .set_shared_session_status(SharedSessionStatus::FinishedViewer);
+            .set_shared_session_status(SharedSessionStatus::Solo);
         self.view
             .update(app, |view, ctx| view.on_session_share_ended(ctx));
     }

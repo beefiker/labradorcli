@@ -848,7 +848,7 @@ fn test_synchronized_output_sharing_session() {
     let mut terminal: TerminalModel = TerminalModel::mock(None, None);
 
     // Configure the terminal model for a shared session.
-    terminal.set_shared_session_status(SharedSessionStatus::ActiveSharer);
+    terminal.set_shared_session_status(SharedSessionStatus::Solo);
     let (tx, rx) = async_channel::unbounded();
     terminal.set_ordered_terminal_events_for_shared_session_tx(tx);
 
@@ -883,7 +883,7 @@ fn test_synchronized_output_sharing_session_split_batch() {
     let mut terminal: TerminalModel = TerminalModel::mock(None, None);
 
     // Configure the terminal model for a shared session.
-    terminal.set_shared_session_status(SharedSessionStatus::ActiveSharer);
+    terminal.set_shared_session_status(SharedSessionStatus::Solo);
     let (tx, rx) = async_channel::unbounded();
     terminal.set_ordered_terminal_events_for_shared_session_tx(tx);
 

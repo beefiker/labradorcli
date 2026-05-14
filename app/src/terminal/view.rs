@@ -11181,23 +11181,7 @@ impl TerminalView {
             self.insert_vim_mode_banner(ctx);
         }
 
-        // If we were waiting to share this session once it was bootstrapped,
-        // we can now attempt to share it.
-        let source_type_opt = match self.model.lock().shared_session_status() {
-            SharedSessionStatus::SharePendingPreBootstrap { source_type } => {
-                Some(source_type.clone())
-            }
-            _ => None,
-        };
-        if let Some(source_type) = source_type_opt {
-            self.attempt_to_share_session(
-                SharedSessionScrollbackType::All,
-                None,
-                source_type,
-                false,
-                ctx,
-            );
-        }
+        // Shared sessions have been removed; nothing to bootstrap-share.
 
         let _ = self.pending_env_var_collection.take();
 

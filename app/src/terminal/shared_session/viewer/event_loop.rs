@@ -112,9 +112,7 @@ impl EventLoop {
         if catching_up_to_event_no.is_none() {
             terminal_model
                 .lock()
-                .set_shared_session_status(SharedSessionStatus::ActiveViewer {
-                    role: Default::default(),
-                });
+                .set_shared_session_status(SharedSessionStatus::Solo);
         }
 
         let mut event_loop = Self {
@@ -331,10 +329,10 @@ impl EventLoop {
                         // Role is set to the presence manager's role to stay as up-to-date as possible.
                         // This avoids a race condition if a viewer gets a new role before catching up,
                         // by ensuring we're not overwritting the new role.
-                        if let Some(role) = presence_manager.as_ref(ctx).role() {
-                            self.terminal_model.lock().set_shared_session_status(
-                                SharedSessionStatus::ActiveViewer { role },
-                            );
+                        if let Some(_role) = presence_manager.as_ref(ctx).role() {
+                            self.terminal_model
+                                .lock()
+                                .set_shared_session_status(SharedSessionStatus::Solo);
                         }
                     }
                 }

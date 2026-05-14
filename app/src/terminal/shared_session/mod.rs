@@ -58,114 +58,68 @@ pub enum IsSharedSessionCreator {
     No,
 }
 
-/// The type of shared session a particular session is, if applicable.
-#[derive(Debug, Clone)]
+/// The type of shared session a particular session is.
+///
+/// Shared sessions have been removed; the only remaining variant is `Solo`,
+/// which represents a local-only session. The helper methods continue to exist
+/// (returning `false`) so the many consumer sites that ask "are we sharing /
+/// viewing?" don't need to change at the same time as this removal.
+#[derive(Debug, Clone, Default)]
 pub enum SharedSessionStatus {
-    /// This session is not a shared session.
-    /// When a sharer ends a session, the status
-    /// changes back to [`SharedSessionStatus::NotShared`].
-    NotShared,
-
-    /// We're in the process of joining the session but have not
-    /// established the connection with the server yet, or have not received all the events that occurred before the viewer joined yet.
-    ViewPending,
-
-    /// This session is a shared session that we are actively viewing.
-    /// We have received all the scrollback and events for the shared session that occurred before the viewer joined, and are caught up and receiving events live.
-    ActiveViewer { role: Role },
-
-    /// We were viewing a shared session but it ended.
-    FinishedViewer,
-
-    /// We haven't yet attempted to share the session because it is not bootstrapped yet.
-    /// The `source_type` encodes what kind of shared session will be created once the
-    /// session finishes bootstrapping.
-    SharePendingPreBootstrap { source_type: SessionSourceType },
-
-    /// The session is bootstrapped and we're in the process of
-    /// sharing the session but have not yet established the
-    /// connection with the server.
-    SharePending,
-
-    /// This session is actively being shared.
-    ActiveSharer,
+    /// This is a local-only session. There is no remote sharing.
+    #[default]
+    Solo,
 }
 
 impl SharedSessionStatus {
-    pub fn reader() -> Self {
-        Self::ActiveViewer { role: Role::Reader }
-    }
-
-    pub fn executor() -> Self {
-        Self::ActiveViewer {
-            role: Role::Executor,
-        }
-    }
-
     pub fn is_view_pending(&self) -> bool {
-        matches!(self, SharedSessionStatus::ViewPending)
+        false
     }
 
     pub fn is_active_viewer(&self) -> bool {
-        matches!(self, SharedSessionStatus::ActiveViewer { .. })
+        false
     }
 
     pub fn is_finished_viewer(&self) -> bool {
-        matches!(self, SharedSessionStatus::FinishedViewer)
+        false
     }
 
     pub fn is_viewer(&self) -> bool {
-        self.is_view_pending() || self.is_active_viewer() || self.is_finished_viewer()
+        false
     }
 
     pub fn is_executor(&self) -> bool {
-        matches!(self, SharedSessionStatus::ActiveViewer { role } if role.can_execute())
+        false
     }
 
     pub fn is_reader(&self) -> bool {
-        matches!(
-            self,
-            SharedSessionStatus::ActiveViewer { role: Role::Reader }
-        )
+        false
     }
 
     pub fn is_share_pending(&self) -> bool {
-        matches!(
-            self,
-            SharedSessionStatus::SharePending
-                | SharedSessionStatus::SharePendingPreBootstrap { .. }
-        )
+        false
     }
 
     pub fn is_active_sharer(&self) -> bool {
-        matches!(self, SharedSessionStatus::ActiveSharer)
+        false
     }
 
     pub fn is_sharer(&self) -> bool {
-        self.is_share_pending() || self.is_active_sharer()
+        false
     }
 
     pub fn is_sharer_or_viewer(&self) -> bool {
-        !matches!(self, Self::NotShared)
+        false
     }
 
     pub fn as_keymap_context(&self) -> &'static str {
-        match self {
-            Self::NotShared => "SharedSessionStatus_NotShared",
-            Self::ViewPending => "SharedSessionStatus_ViewPending",
-            Self::ActiveViewer { role: Role::Reader } => "SharedSessionStatus_Reader",
-            Self::ActiveViewer {
-                role: Role::Executor | Role::Full,
-            } => "SharedSessionStatus_Executor",
-            Self::FinishedViewer => "SharedSessionStatus_FinishedViewer",
-            Self::SharePendingPreBootstrap { .. } => "SharedSessionStatus_SharePendingPreBootstrap",
-            Self::SharePending => "SharedSessionStatus_SharePending",
-            Self::ActiveSharer => "SharedSessionStatus_ActiveSharer",
-        }
+        "SharedSessionStatus_Solo"
     }
 
     pub fn active_viewer_keymap_context() -> ContextPredicate {
-        id!(Self::reader().as_keymap_context()) | id!(Self::executor().as_keymap_context())
+        // No active viewer state is ever reachable now, but we return a predicate
+        // that matches no real context so downstream keymap wiring stays compiling.
+        id!("SharedSessionStatus_Solo_NeverMatches_Viewer")
     }
 }
 

@@ -42,7 +42,6 @@ use crate::{
             join_link,
             manager::{Manager, ManagerEvent},
             role_change_modal::RoleChangeOpenSource,
-            SharedSessionStatus,
         },
         view::Event,
         TerminalManager, TerminalView,
@@ -524,23 +523,10 @@ impl PaneContent for TerminalPane {
             return Err(ShareableLinkError::Expected);
         }
 
-        // Check for shared session status
-        let session_status = lock.shared_session_status();
-        match session_status {
-            SharedSessionStatus::NotShared => Ok(ShareableLink::Base),
-            SharedSessionStatus::ActiveViewer { role: _ } => {
-                let manager = Manager::as_ref(ctx);
-                let terminal_view_id = self.terminal_view(ctx).id();
-                if let Some(url) = retrieve_shared_session_link(manager, &terminal_view_id) {
-                    Ok(ShareableLink::Pane { url })
-                } else {
-                    Err(ShareableLinkError::Unexpected(String::from(
-                        "Failed to retreive shared session link",
-                    )))
-                }
-            }
-            _ => Err(ShareableLinkError::Expected),
-        }
+        // Shared sessions have been removed; we always return the base shareable
+        // link for a solo terminal pane.
+        let _session_status = lock.shared_session_status();
+        Ok(ShareableLink::Base)
     }
 
     fn pane_configuration(&self) -> ModelHandle<PaneConfiguration> {

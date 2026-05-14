@@ -1202,7 +1202,7 @@ impl TerminalModel {
             is_ai_ugc_telemetry_enabled,
             session_startup_path,
             shell_state,
-            SharedSessionStatus::NotShared,
+            SharedSessionStatus::Solo,
             false,
         )
     }
@@ -1269,7 +1269,7 @@ impl TerminalModel {
                 display_name: ShellName::blank(),
                 shell_type: ShellType::Zsh,
             },
-            SharedSessionStatus::ViewPending,
+            SharedSessionStatus::Solo,
             is_dummy_cloud_mode_session,
         )
     }
