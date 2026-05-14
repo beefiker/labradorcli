@@ -191,7 +191,6 @@ use crate::{
 };
 
 use ai::skills::SkillReference;
-use base64::Engine as _;
 #[cfg(feature = "local_fs")]
 use diesel::SqliteConnection;
 use futures::FutureExt as _;
@@ -206,7 +205,6 @@ use std::{
     any::Any,
     borrow::Cow,
     collections::HashMap,
-    fmt::Write,
     ops::Range,
     path::{Path, PathBuf},
     rc::Rc,
@@ -751,49 +749,6 @@ impl InputSuggestionsMode {
         }
     }
 
-    fn to_telemetry_mode(&self) -> TelemetryInputSuggestionsMode {
-        match *self {
-            InputSuggestionsMode::HistoryUp {
-                search_mode: HistorySearchMode::Prefix,
-                ..
-            } => TelemetryInputSuggestionsMode::HistoryUp,
-            InputSuggestionsMode::HistoryUp {
-                search_mode: HistorySearchMode::Fuzzy,
-                ..
-            } => TelemetryInputSuggestionsMode::HistoryFuzzySearch,
-            InputSuggestionsMode::CompletionSuggestions { .. } => {
-                TelemetryInputSuggestionsMode::CompletionSuggestions
-            }
-            InputSuggestionsMode::StaticWorkflowEnumSuggestions { .. } => {
-                TelemetryInputSuggestionsMode::StaticWorkflowEnumSuggestions
-            }
-            InputSuggestionsMode::DynamicWorkflowEnumSuggestions { .. } => {
-                TelemetryInputSuggestionsMode::DynamicWorkflowEnumSuggestions
-            }
-            InputSuggestionsMode::AIContextMenu { .. } => {
-                TelemetryInputSuggestionsMode::AIContextMenu
-            }
-            InputSuggestionsMode::SlashCommands => TelemetryInputSuggestionsMode::SlashCommands,
-            InputSuggestionsMode::ConversationMenu => {
-                TelemetryInputSuggestionsMode::ConversationMenu
-            }
-            InputSuggestionsMode::ModelSelector => TelemetryInputSuggestionsMode::ModelSelector,
-            InputSuggestionsMode::ProfileSelector => TelemetryInputSuggestionsMode::ProfileSelector,
-            InputSuggestionsMode::PromptsMenu => TelemetryInputSuggestionsMode::PromptsMenu,
-            InputSuggestionsMode::SkillMenu => TelemetryInputSuggestionsMode::SkillMenu,
-            InputSuggestionsMode::UserQueryMenu { .. } => {
-                TelemetryInputSuggestionsMode::ConversationMenu
-            }
-            InputSuggestionsMode::InlineHistoryMenu { .. } => {
-                TelemetryInputSuggestionsMode::InlineHistoryMenu
-            }
-            InputSuggestionsMode::IndexedReposMenu => {
-                TelemetryInputSuggestionsMode::IndexedReposMenu
-            }
-            InputSuggestionsMode::PlanMenu { .. } => TelemetryInputSuggestionsMode::PlanMenu,
-            InputSuggestionsMode::Closed => unreachable!(),
-        }
-    }
 }
 
 struct SharedSessionInputState {
@@ -1136,31 +1091,6 @@ impl MenuPositioning {
         self.y_anchor()
     }
 
-    fn workflows_info_y_anchor(&self) -> AnchorPair<YAxisAnchor> {
-        self.y_anchor()
-    }
-
-    fn voltron_parent_anchor(&self) -> ParentAnchor {
-        match *self {
-            MenuPositioning::AboveInputBox => ParentAnchor::BottomLeft,
-            MenuPositioning::BelowInputBox => ParentAnchor::TopLeft,
-        }
-    }
-
-    fn voltron_child_anchor(&self) -> ChildAnchor {
-        match *self {
-            MenuPositioning::AboveInputBox => ChildAnchor::BottomLeft,
-            MenuPositioning::BelowInputBox => ChildAnchor::TopLeft,
-        }
-    }
-
-    fn voltron_offset(&self) -> Vector2F {
-        match *self {
-            MenuPositioning::AboveInputBox => vec2f(11., -11.),
-            MenuPositioning::BelowInputBox => vec2f(11., -66.),
-        }
-    }
-
     fn y_anchor(&self) -> AnchorPair<YAxisAnchor> {
         match *self {
             MenuPositioning::AboveInputBox => {
@@ -1178,12 +1108,6 @@ impl MenuPositioningProvider for MenuPositioning {
         *self
     }
 }
-
-#[derive(Default)]
-struct WorkflowsState;
-
-#[derive(Default)]
-struct EnvVarCollectionState;
 
 /// Helper struct for performing alias expansion.
 struct ExpansionInfo {
@@ -1422,8 +1346,6 @@ pub struct Input {
     terminal_view_id: EntityId,
     view_id: EntityId,
     input_render_state_model_handle: ModelHandle<InputRenderStateModel>,
-    workflows_state: WorkflowsState,
-    env_var_collection_state: EnvVarCollectionState,
     is_voltron_open: bool,
     command_x_ray_description: Option<Arc<Description>>,
     last_parsed_tokens: Option<decorations::ParsedTokensSnapshot>,
@@ -2538,10 +2460,6 @@ impl Input {
 
         ctx.subscribe_to_model(&LigatureSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
 
-        let workflows_state = WorkflowsState::default();
-
-        let env_var_collection_state = EnvVarCollectionState::default();
-
         let last_word_insertion = LastWordInsertion {
             insert_command_from_history_index: 0,
             is_latest_editor_event: false,
@@ -3003,8 +2921,6 @@ impl Input {
             active_block_metadata: None,
             view_id,
             input_render_state_model_handle,
-            workflows_state,
-            env_var_collection_state,
             is_voltron_open: false,
             command_x_ray_description: None,
             last_parsed_tokens: None,
@@ -5875,8 +5791,6 @@ impl Input {
         }
     }
 
-    fn clear_selected_env_var_collection(&mut self) {}
-
     fn clear_selected_workflow(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.notify();
     }
@@ -6140,10 +6054,6 @@ impl Input {
                 }
             }
         }
-    }
-
-    fn reset_workflow_state(&mut self, _env_vars: Option<SyncId>, ctx: &mut ViewContext<Input>) {
-        ctx.notify();
     }
 
     fn confirm_suggestion(&mut self, suggestion: &str, ctx: &mut ViewContext<Input>) -> bool {
