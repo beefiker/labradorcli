@@ -106,29 +106,8 @@ impl AIFactView {
         }
     }
 
-    fn handle_rule_view_event(&mut self, event: &RuleViewEvent, ctx: &mut ViewContext<Self>) {
-        match event {
-            RuleViewEvent::AddRule => {
-                self.update_page(AIFactPage::RuleEditor { sync_id: None }, ctx);
-            }
-            RuleViewEvent::Edit(sync_id) => {
-                self.update_page(
-                    AIFactPage::RuleEditor {
-                        sync_id: Some(*sync_id),
-                    },
-                    ctx,
-                );
-            }
-            RuleViewEvent::OpenSettings => {
-                ctx.emit(AIFactViewEvent::OpenSettings);
-            }
-            RuleViewEvent::OpenFile(path) => {
-                ctx.emit(AIFactViewEvent::OpenFile(path.clone()));
-            }
-            RuleViewEvent::InitializeProject(path) => {
-                ctx.emit(AIFactViewEvent::InitializeProject(path.clone()));
-            }
-        }
+    fn handle_rule_view_event(&mut self, event: &RuleViewEvent, _ctx: &mut ViewContext<Self>) {
+        match *event {}
     }
 
     fn handle_rule_editor_view_event(
@@ -137,24 +116,7 @@ impl AIFactView {
         ctx: &mut ViewContext<Self>,
     ) {
         self.update_page(AIFactPage::Rules, ctx);
-        match event {
-            RuleEditorViewEvent::Add { name, content } => {
-                // AI rule editing was tied to cloud-synced rules; the path is gone.
-                let _ = (name, content);
-            }
-            RuleEditorViewEvent::Edit {
-                name,
-                content,
-                sync_id,
-                revision_ts,
-            } => {
-                let _ = (name, content, sync_id, revision_ts);
-            }
-            RuleEditorViewEvent::Delete { sync_id } => {
-                let _ = sync_id;
-            }
-            _ => {}
-        }
+        match *event {}
     }
 
     pub fn update_page(&mut self, page: AIFactPage, ctx: &mut ViewContext<Self>) {

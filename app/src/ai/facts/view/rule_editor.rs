@@ -4,33 +4,11 @@ use crate::server::ids::SyncId;
 use warpui::elements::Empty;
 use warpui::{AppContext, Element, Entity, TypedActionView, View, ViewContext};
 
-/// Placeholder for the deleted cloud `Revision` type.
-pub type Revision = String;
+#[derive(Debug, Clone)]
+pub enum RuleEditorViewEvent {}
 
 #[derive(Debug, Clone)]
-pub enum RuleEditorViewEvent {
-    Back,
-    Add {
-        name: Option<String>,
-        content: String,
-    },
-    Edit {
-        name: Option<String>,
-        content: String,
-        sync_id: SyncId,
-        revision_ts: Option<Revision>,
-    },
-    Delete {
-        sync_id: SyncId,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub enum RuleEditorViewAction {
-    Back,
-    Save,
-    Delete,
-}
+pub enum RuleEditorViewAction {}
 
 pub struct RuleEditorView;
 
