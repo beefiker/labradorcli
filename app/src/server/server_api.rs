@@ -32,8 +32,6 @@ use warp_managed_secrets::client::ManagedSecretsClient;
 use warpui::{r#async::BoxFuture, ModelContext};
 use workspace::WorkspaceClient;
 
-use crate::settings::PrivacySettingsSnapshot;
-
 use crate::ChannelState;
 
 use ::http::header::CONTENT_LENGTH;
@@ -45,10 +43,8 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use warp_core::telemetry::TelemetryEvent;
 use warpui::Entity;
 use warpui::SingletonEntity;
 
@@ -859,47 +855,6 @@ impl ServerApi {
                 log::error!("Could not retrieve access token for notifying user login: {err:?}");
             }
         }
-    }
-
-    /// No-op replacement for the original Rudderstack `track` send. dwarf is
-    /// a local-only CLI terminal and does not phone home to any analytics
-    /// backend.
-    pub async fn send_telemetry_event(
-        &self,
-        _event: impl TelemetryEvent,
-        _settings_snapshot: PrivacySettingsSnapshot,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    /// No-op replacement for the original Rudderstack queue flusher. dwarf
-    /// keeps an in-memory event queue for compatibility but never sends it
-    /// over the network.
-    pub async fn flush_telemetry_events(
-        &self,
-        _settings_snapshot: PrivacySettingsSnapshot,
-    ) -> Result<usize> {
-        Ok(0)
-    }
-
-    /// No-op replacement for the original Rudderstack file-flush. dwarf
-    /// never writes telemetry to disk so there is nothing to forward.
-    pub async fn flush_persisted_events_to_rudder(
-        &self,
-        _path: &Path,
-        _settings_snapshot: PrivacySettingsSnapshot,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    /// No-op replacement for the original on-quit persistence. dwarf does
-    /// not retain telemetry events between sessions.
-    pub fn persist_telemetry_events(
-        &self,
-        _max_event_count: usize,
-        _settings_snapshot: PrivacySettingsSnapshot,
-    ) -> Result<()> {
-        Ok(())
     }
 
     /// Hits the /ai/generate_input_suggestions endpoint to get the predicted next action, based on past context.
