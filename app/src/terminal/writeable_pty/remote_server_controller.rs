@@ -16,7 +16,6 @@ use crate::remote_server::ssh_transport::SshTransport;
 use crate::server::server_api::ServerApiProvider;
 use crate::terminal::model::session::{IsLegacySSHSession, SessionInfo};
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
-use crate::{TelemetryEvent};
 use remote_server::setup::RemotePlatform;
 
 use super::pty_controller::{EventLoopSender, PtyController};
@@ -328,11 +327,11 @@ impl<T: EventLoopSender> RemoteServerController<T> {
         // subsequently initializes, so it picks `RemoteServerCommandExecutor`.
         self.flush_stashed_bootstrap(session_info, ctx);
 
-        let duration_ms = Instant::now()
+        let _duration_ms = Instant::now()
             .duration_since(setup_start)
             .as_millis()
             .min(u64::MAX as u128) as u64;
-        let (remote_os, remote_arch) = self
+        let (_remote_os, _remote_arch) = self
             .remote_platform
             .as_ref()
             .map(|p| {

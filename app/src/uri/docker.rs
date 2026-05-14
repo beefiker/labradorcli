@@ -1,8 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{
-    server::telemetry::TelemetryEvent, terminal::shell::ShellType,
-};
+use crate::terminal::shell::ShellType;
 use regex::Regex;
 use url::Url;
 use warp_util::path::{is_posix_portable_pathname, ShellFamily};

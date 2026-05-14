@@ -27,12 +27,9 @@ use std::ops::Not;
 use super::DEFAULT_AI_BLOCK_HEIGHT;
 
 use crate::ai::agent::task::helper::MessageExt;
-use crate::ai::agent::AIAgentActionResultType;
-use crate::ai::agent::CreateDocumentsRequest;
 use crate::ai::agent::MessageId;
 use crate::ai::agent::{
     AIAgentAction, AIAgentActionType, AIAgentOutputMessage, AIAgentOutputMessageType,
-    CreateDocumentsResult, EditDocumentsResult,
 };
 use crate::{
     ai::{

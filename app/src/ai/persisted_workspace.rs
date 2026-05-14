@@ -32,8 +32,6 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 #[cfg(feature = "local_fs")]
 use crate::code::language_server_shutdown_manager::LanguageServerShutdownManager;
 #[cfg(feature = "local_fs")]
-use crate::code::lsp_telemetry::LspTelemetryEvent;
-#[cfg(feature = "local_fs")]
 use crate::server::server_api::ServerApiProvider;
 #[cfg(feature = "local_fs")]
 use crate::terminal::local_shell::LocalShellState;
@@ -1064,7 +1062,7 @@ impl PersistedWorkspace {
 
         for server in servers {
             let workspace_root_display = workspace_root_display.clone();
-            let server_type_name = server.as_ref(ctx).server_name();
+            let _server_type_name = server.as_ref(ctx).server_name();
             ctx.subscribe_to_model(&server, move |_me, event, ctx| match event {
                 LspEvent::Started => {
                 }
@@ -1204,8 +1202,8 @@ impl PersistedWorkspace {
 }
 
 fn send_active_indexed_repos_changed_telemetry<T: Entity>(ctx: &mut ModelContext<T>) {
-    let total = CodebaseIndexManager::as_ref(ctx).num_active_indices();
-    let hit_max = false;
+    let _total = CodebaseIndexManager::as_ref(ctx).num_active_indices();
+    let _hit_max = false;
 }
 
 #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]

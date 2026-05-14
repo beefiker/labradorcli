@@ -11,16 +11,12 @@ use futures::FutureExt;
 use warpui::r#async::FutureExt as AsyncFutureExt;
 use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
-use crate::ai::agent::redaction::redact_secrets;
 use crate::ai::agent::{
-    conversation::AIConversationId, AIAgentAction, AIAgentActionType, GrepResult, ServerOutputId,
+    conversation::AIConversationId, AIAgentAction, AIAgentActionType, GrepResult,
 };
-use crate::ai::blocklist::{
-    telemetry_banner::should_collect_ai_ugc_telemetry, BlocklistAIPermissions,
-};
+use crate::ai::blocklist::BlocklistAIPermissions;
 use crate::ai::paths::{host_native_absolute_path, shell_native_absolute_path};
 use crate::terminal::model::session::ExecuteCommandOptions;
-use crate::PrivacySettings;
 use crate::{
     ai::agent::{AIAgentActionResultType, GrepFileMatch, GrepLineMatch},
         terminal::{
@@ -30,7 +26,7 @@ use crate::{
 };
 
 use super::{
-    get_server_output_id, is_file_path, is_git_repository, ActionExecution, AnyActionExecution,
+    is_file_path, is_git_repository, ActionExecution, AnyActionExecution,
     ExecuteActionInput, PreprocessActionInput,
 };
 

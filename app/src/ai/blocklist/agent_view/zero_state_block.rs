@@ -2,7 +2,6 @@ use itertools::Itertools as _;
 use markdown_parser::{parse_markdown, FormattedText, FormattedTextFragment, FormattedTextLine};
 use parking_lot::FairMutex;
 use std::{borrow::Cow, cmp::Reverse, path::Path, sync::Arc};
-use warp_core::features::FeatureFlag;
 use warpui::{
     assets::asset_cache::AssetSource,
     elements::{

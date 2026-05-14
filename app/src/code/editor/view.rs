@@ -56,7 +56,7 @@ use warp_editor::{
             VerticalExpansionBehavior,
         },
         model::{
-            AutoScrollMode, BlockSpacing, Decoration, ExpansionType, LineCount, ParagraphStyles,
+            AutoScrollMode, Decoration, ExpansionType, LineCount,
             RichTextStyles, CODE_EDITOR_HIDDEN_SECTION_EXPANSION_LINES,
         },
     },
@@ -67,9 +67,8 @@ use warpui::{
     elements::{
         new_scrollable::{
             AxisConfiguration, DualAxisConfig, NewScrollableElement, ScrollableAppearance,
-        },
-        ChildAnchor, ChildView, Dismiss, Fill, Flex, Margin, MouseStateHandle, NewScrollable,
-        OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds,
+        }, ChildView, Dismiss, Fill, Flex, MouseStateHandle, NewScrollable,
+        OffsetPositioning, ParentElement,
         ScrollStateHandle, Shrinkable, Stack,
     },
     event::ModifiersState,

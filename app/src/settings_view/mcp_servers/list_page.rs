@@ -259,24 +259,12 @@ impl MCPServersListPageView {
     }
 
     fn is_shareable(
-        item_id: ServerCardItemId,
-        server_card_status: ServerCardStatus,
-        ctx: &mut ViewContext<Self>,
+        _item_id: ServerCardItemId,
+        _server_card_status: ServerCardStatus,
+        _ctx: &mut ViewContext<Self>,
     ) -> bool {
-        if !UserWorkspaces::as_ref(ctx).has_teams() {
-            return false;
-        }
         // Team space ids were tied to cloud-hosted templatable servers; never available in this fork.
-        return false;
-        match item_id {
-            ServerCardItemId::TemplatableMCP(_)
-            | ServerCardItemId::TemplatableMCPInstallation(_) => {
-                let is_shared = Self::is_shared(item_id, ctx);
-                let is_running = matches!(server_card_status, ServerCardStatus::Running);
-                !is_shared && is_running
-            }
-            ServerCardItemId::GalleryMCP(_) | ServerCardItemId::FileBasedMCP(_) => false,
-        }
+        false
     }
 
     fn register_server_card(&mut self, server_card: ServerCardView, ctx: &mut ViewContext<Self>) {
@@ -654,7 +642,7 @@ impl MCPServersListPageView {
                             instructions_in_markdown: None,
                             origin: InstallOrigin::InApp,
                         });
-                        let source: MCPTemplateInstallationSource = match is_shared {
+                        let _source: MCPTemplateInstallationSource = match is_shared {
                             true => MCPTemplateInstallationSource::Shared,
                             false => MCPTemplateInstallationSource::Local,
                         };

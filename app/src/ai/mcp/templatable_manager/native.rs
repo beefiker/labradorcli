@@ -4,7 +4,6 @@ use crate::ai::mcp::templatable_manager::oauth::{
     TEMPLATABLE_MCP_CREDENTIALS_KEY,
 };
 use crate::ai::mcp::FileBasedMCPManager;
-use core::fmt;
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -17,18 +16,12 @@ use crate::ai::mcp::{Author, JsonTemplate, MCPGalleryManager, MCPServerUpdate};
 
 use crate::ai::mcp::parsing::resolve_json;
 use crate::ai::mcp::TemplatableMCPServer;
-use crate::auth::AuthStateProvider;
-use crate::server::ids::ClientId;
-use crate::server::telemetry::{
-    MCPServerModel, MCPServerTelemetryTransportType, MCPTemplateCreationSource,
-};
 use crate::{
     ai::mcp::{
         logs, templatable_installation::VariableValue, MCPServer, StaticEnvVar,
         TemplatableMCPServerInstallation, TransportType,
     },
     persistence::ModelEvent,
-        server::telemetry::TelemetryEvent,
     settings::AISettings,
     view_components::DismissibleToast,
     workspace::ToastStack,
@@ -562,7 +555,7 @@ impl TemplatableMCPServerManager {
 
         // Extract values from mode before moving it into the closure.
         let should_persist = mode.should_persist_running_state_to_sqlite();
-        let should_send_telemetry = mode.should_send_telemetry();
+        let _should_send_telemetry = mode.should_send_telemetry();
         let is_reconnect = mode.is_reconnect();
 
         self.change_server_state(installation_uuid, MCPServerState::Starting, ctx);

@@ -17,14 +17,12 @@ mod preprocess;
 
 use crate::ai::agent::conversation::ConversationStatus;
 use crate::ai::agent::{
-    AIAgentActionResultType, AIAgentActionType, AIAgentExchange, CancellationReason,
-    CreateDocumentsResult, EditDocumentsResult, RequestCommandOutputResult,
+    AIAgentActionResultType, AIAgentActionType, AIAgentExchange, CancellationReason, RequestCommandOutputResult,
 };
 use crate::ai::{
     agent::AIAgentInput,
     blocklist::action_model::execute::suggest_new_conversation::SuggestNewConversationExecutor,
 };
-use chrono::Local;
 pub(crate) use execute::apply_edits;
 pub(crate) use execute::coerce_integer_args;
 pub(crate) use execute::FileReadResult;
@@ -70,7 +68,6 @@ use self::execute::{
 
 use super::BlocklistAIHistoryModel;
 
-use crate::{TelemetryEvent};
 
 /// The status of an action from an AI output.
 #[derive(Clone, Debug)]

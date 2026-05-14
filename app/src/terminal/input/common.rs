@@ -22,9 +22,8 @@ use warpui::{
         PositioningAxis, Radius, Shrinkable, Stack, Text, XAxisAnchor,
     },
     fonts::Weight,
-    presenter::ChildView,
     ui_components::components::{UiComponent, UiComponentStyles},
-    AppContext, EntityId, SingletonEntity, ViewHandle,
+    AppContext, SingletonEntity,
 };
 
 /// Whether the terminal input message bar should be shown.

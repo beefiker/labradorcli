@@ -9,7 +9,7 @@ use warpui::{
 use crate::{
     appearance::Appearance,
     editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions, TextOptions},
-    report_if_error,     server::telemetry::TelemetryEvent,
+    report_if_error,
     settings_view::features_page::render_group,
     terminal::session_settings::*,
     view_components::{dropdown::TOP_MENU_BAR_HEIGHT, Dropdown, DropdownItem},

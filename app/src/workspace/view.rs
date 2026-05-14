@@ -13,7 +13,6 @@ mod vertical_tabs;
 #[cfg(target_family = "wasm")]
 mod wasm_view;
 
-use self::vertical_tabs::telemetry::{VerticalTabsDisplayOption, VerticalTabsTelemetryEvent};
 use self::vertical_tabs::{
     render_detail_sidecar, render_settings_popup, VerticalTabsPanelState,
     VERTICAL_TABS_SETTINGS_BUTTON_POSITION_ID,
@@ -26,7 +25,6 @@ use crate::ai::agent_conversations_model::ConversationOrTask;
 use crate::ai::agent_management::notifications::toast_stack::AgentNotificationToastStack;
 use crate::ai::agent_management::notifications::view::NotificationMailboxView;
 use crate::ai::agent_management::notifications::NotificationFilter;
-use crate::ai::agent_management::telemetry::AgentManagementTelemetryEvent;
 use crate::ai::agent_management::view::{AgentManagementView, AgentManagementViewEvent};
 use crate::ai::agent_management::AgentManagementEvent;
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::AgentToolbarEditorMode;
@@ -214,9 +212,7 @@ use crate::search::command_search::view::{CommandSearchEvent, CommandSearchView}
 use crate::server::ids::ServerId;
 use crate::server::server_api::{ServerApi, ServerApiEvent, ServerApiProvider, ServerTime};
 use crate::server::telemetry::{
-    AddTabWithShellSource, AnonymousUserSignupEntrypoint, CloseTarget, FileTreeSource,
-    KnowledgePaneEntrypoint, LaunchConfigUiLocation, MCPServerCollectionPaneEntrypoint,
-    OpenedWarpAISource, WarpDriveSource,
+    AddTabWithShellSource, AnonymousUserSignupEntrypoint, LaunchConfigUiLocation,
 };
 use crate::session_management::{SessionNavigationData, SessionSource};
 use crate::settings::{
@@ -304,7 +300,6 @@ use crate::{
 };
 use crate::{GlobalResourceHandles};
 
-use futures::Future;
 use itertools::Itertools;
 use parking_lot::FairMutex;
 use pathfinder_geometry::rect::RectF;
@@ -374,11 +369,8 @@ use crate::tab_configs::remove_confirmation_dialog::{
     RemoveTabConfigConfirmationDialog, RemoveTabConfigConfirmationEvent,
 };
 use crate::tab_configs::session_config_modal::{SessionConfigModal, SessionConfigModalEvent};
-use crate::tab_configs::telemetry::{
-    ExistingTabConfigOpenMode, GuidedModalSessionType, TabConfigsTelemetryEvent,
-};
 #[cfg(feature = "local_fs")]
-use crate::tab_configs::telemetry::{NewWorktreeConfigOpenSource, WorktreeBranchNamingMode};
+use crate::tab_configs::telemetry::WorktreeBranchNamingMode;
 use crate::tab_configs::{
     NewWorktreeModal, NewWorktreeModalEvent, TabConfigParamsModal, TabConfigParamsModalEvent,
 };
@@ -386,10 +378,10 @@ use crate::tab_configs::{
 use crate::code::editor::{add_color, remove_color};
 use crate::palette::PaletteMode;
 use crate::search::command_palette::view::{Event as CommandPaletteEvent, View as CommandPalette};
-use crate::server::telemetry::{NotificationsTurnedOnSource, PaletteSource, TabRenameEvent};
+use crate::server::telemetry::PaletteSource;
 use crate::tab::{
     tab_position_id, NewSessionMenuItem, PaneNameMenuTarget, SelectedTabColor, TabBarState,
-    TabComponent, TabData, TabTelemetryAction, TAB_BAR_BORDER_HEIGHT,
+    TabComponent, TabData, TAB_BAR_BORDER_HEIGHT,
 };
 use crate::terminal::view::ssh_file_upload::FileUploadId;
 #[cfg(target_family = "wasm")]
@@ -1442,10 +1434,10 @@ impl Workspace {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            SuggestedRuleModalEvent::AddNewRule { rule } => {
+            SuggestedRuleModalEvent::AddNewRule { rule: _ } => {
                 self.current_workspace_state.is_suggested_rule_modal_open = false;
             }
-            SuggestedRuleModalEvent::OpenRuleForEditing { rule } => {
+            SuggestedRuleModalEvent::OpenRuleForEditing { rule: _ } => {
                 self.current_workspace_state.is_suggested_rule_modal_open = false;
                 self.open_ai_fact_collection_pane(Some(Direction::Right), None, ctx);
             }
@@ -5016,7 +5008,7 @@ impl Workspace {
     fn handle_agent_management_view_event(
         &mut self,
         event: &AgentManagementViewEvent,
-        ctx: &mut ViewContext<Self>,
+        _ctx: &mut ViewContext<Self>,
     ) {
         match event {
             AgentManagementViewEvent::OpenPlanNotebook { .. } => {}
@@ -5662,7 +5654,7 @@ impl Workspace {
         ctx: &mut ViewContext<Self>,
     ) {
         if tab_config.params.is_empty() {
-            let is_worktree_config = tab_config.is_worktree();
+            let _is_worktree_config = tab_config.is_worktree();
             let worktree_branch_name = self.maybe_generate_worktree_name(&tab_config);
             let param_values = tab_config.default_param_values();
             self.open_tab_config_with_params(
@@ -8021,7 +8013,7 @@ impl Workspace {
 
         match toml::from_str::<crate::tab_configs::TabConfig>(&toml_content) {
             Ok(tab_config) => {
-                let naming_mode = if worktree_branch_name.is_some() {
+                let _naming_mode = if worktree_branch_name.is_some() {
                     WorktreeBranchNamingMode::Manual
                 } else {
                     WorktreeBranchNamingMode::Auto
@@ -9295,7 +9287,7 @@ impl Workspace {
     fn add_tab_with_shell(
         &mut self,
         shell: AvailableShell,
-        source: AddTabWithShellSource,
+        _source: AddTabWithShellSource,
         ctx: &mut ViewContext<Self>,
     ) {
         self.add_new_session_tab_with_default_mode(
@@ -13523,7 +13515,7 @@ impl Workspace {
 
     fn open_prompt_editor(
         &mut self,
-        open_source: PromptEditorOpenSource,
+        _open_source: PromptEditorOpenSource,
         ctx: &mut ViewContext<Self>,
     ) {
         // Try to get a prompt preview from an active session. Otherwise, read it from the settings
@@ -17287,7 +17279,7 @@ impl TypedActionView for Workspace {
                 ctx.notify();
             }
             ToggleVerticalTabsShowPrLink => {
-                let new_value = TabSettings::handle(ctx).update(ctx, |settings, ctx| {
+                let _new_value = TabSettings::handle(ctx).update(ctx, |settings, ctx| {
                     let new_value = !*settings.vertical_tabs_show_pr_link.value();
                     let _ = settings
                         .vertical_tabs_show_pr_link
@@ -17297,7 +17289,7 @@ impl TypedActionView for Workspace {
                 ctx.notify();
             }
             ToggleVerticalTabsShowDiffStats => {
-                let new_value = TabSettings::handle(ctx).update(ctx, |settings, ctx| {
+                let _new_value = TabSettings::handle(ctx).update(ctx, |settings, ctx| {
                     let new_value = !*settings.vertical_tabs_show_diff_stats.value();
                     let _ = settings
                         .vertical_tabs_show_diff_stats
@@ -17307,7 +17299,7 @@ impl TypedActionView for Workspace {
                 ctx.notify();
             }
             ToggleVerticalTabsShowDetailsOnHover => {
-                let new_value = TabSettings::handle(ctx).update(ctx, |settings, ctx| {
+                let _new_value = TabSettings::handle(ctx).update(ctx, |settings, ctx| {
                     let new_value = !*settings.vertical_tabs_show_details_on_hover.value();
                     let _ = settings
                         .vertical_tabs_show_details_on_hover
@@ -17347,14 +17339,14 @@ impl TypedActionView for Workspace {
                 ctx.open_file_path(path);
             }
             NewTabInAgentMode {
-                entrypoint,
+                entrypoint: _,
                 zero_state_prompt_suggestion_type,
             } => {
 
                 self.add_terminal_tab_in_ai_mode(*zero_state_prompt_suggestion_type, ctx);
             }
             NewPaneInAgentMode {
-                entrypoint,
+                entrypoint: _,
                 zero_state_prompt_suggestion_type,
             } => {
 
@@ -17898,7 +17890,7 @@ impl TypedActionView for Workspace {
                     self.toggle_left_panel_view(&LeftPanelAction::ProjectExplorer, is_showing, ctx);
                 }
             }
-            ToggleWarpDrive => {
+            _ToggleWarpDrive => {
             }
             ToggleGlobalSearch => {
                 if FeatureFlag::GlobalSearch.is_enabled()

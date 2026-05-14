@@ -250,7 +250,7 @@ use crate::root_view::{
 pub use crate::server::telemetry::{
     AgentModeEntrypoint, AgentModeEntrypointSelectionType, TelemetryEvent,
 };
-use crate::server::telemetry::{AppStartupInfo, CloseTarget, PaletteSource, TelemetryCollector};
+use crate::server::telemetry::{PaletteSource, TelemetryCollector};
 use crate::terminal::CustomSecretRegexUpdater;
 use crate::util::bindings::is_binding_cross_platform;
 use crate::workspace::{PaneViewLocator, Workspace, WorkspaceAction};
@@ -1184,7 +1184,7 @@ fn initialize_app(
         if #[cfg(feature = "crash_reporting")] {
             let is_crash_reporting_enabled = crash_reporting::init(ctx);
         } else {
-            let is_crash_reporting_enabled = false;
+            let _is_crash_reporting_enabled = false;
         }
     }
     // Send buffered pre-init errors to Sentry now that the client is ready.
@@ -1302,10 +1302,10 @@ fn initialize_app(
 
         // Set the first frame callback to record the app's startup time.
         // This is only sent for logged-in users so that new users don't skew performance metrics.
-        let is_screen_reader_enabled = ctx.is_screen_reader_enabled();
-        let from_relaunch = launch_mode.args().finish_update;
+        let _is_screen_reader_enabled = ctx.is_screen_reader_enabled();
+        let _from_relaunch = launch_mode.args().finish_update;
         ctx.on_first_frame_drawn(move |ctx| {
-            let timing_data = IntervalTimer::handle(ctx).update(ctx, |timer, _| {
+            let _timing_data = IntervalTimer::handle(ctx).update(ctx, |timer, _| {
                 timer.mark_interval_end("FIRST_FRAME_DRAWN");
                 timer.compute_stats()
             });

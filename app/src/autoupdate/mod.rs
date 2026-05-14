@@ -848,7 +848,7 @@ pub fn initiate_relaunch_for_update(app: &mut AppContext) {
         } => {
             // There's a pending update, and we haven't finished applying it.
             let new_version = new_version.clone();
-            let new_version_string = new_version.version.clone();
+            let _new_version_string = new_version.version.clone();
             let update_id = update_id.clone();
 
             // First, record that we're applying an update.

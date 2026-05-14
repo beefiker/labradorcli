@@ -24,7 +24,6 @@ use crate::editor::{
 };
 use crate::gpu_state::{GPUState, GPUStateEvent};
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
-use crate::server::telemetry::InputUXChangeOrigin;
 use crate::settings::{
     active_theme_kind,
     app_icon::{AppIcon, AppIconSettings},
@@ -66,7 +65,6 @@ use crate::{
     view_components::{Dropdown, DropdownItem, FilterableDropdown},
 };
 use crate::{report_error, report_if_error, themes};
-use crate::{server::telemetry::TelemetryEvent};
 use ::settings::{Setting, SettingSection, ToggleableSetting};
 use enum_iterator::all;
 use std::borrow::Cow;
@@ -612,7 +610,7 @@ impl TypedActionView for AppearanceSettingsPageView {
                         .focus_panes_on_hover
                         .toggle_and_save_value(ctx)
                     {
-                        Ok(new_val) => {
+                        Ok(_new_val) => {
                         }
                         Err(e) => {
                             report_error!(e);
@@ -2090,7 +2088,7 @@ impl AppearanceSettingsPageView {
                 .should_dim_inactive_panes
                 .toggle_and_save_value(ctx)
             {
-                Ok(new_value) => {
+                Ok(_new_value) => {
                 }
                 Err(e) => {
                     report_error!(e);
@@ -2128,7 +2126,7 @@ impl AppearanceSettingsPageView {
         from_binding: bool,
         ctx: &mut ViewContext<Self>,
     ) {
-        let old_mode = *InputModeSettings::as_ref(ctx).input_mode.value();
+        let _old_mode = *InputModeSettings::as_ref(ctx).input_mode.value();
         InputModeSettings::handle(ctx).update(ctx, |input_mode, ctx| {
             report_if_error!(input_mode.input_mode.set_value(new_mode, ctx));
         });
@@ -2156,7 +2154,7 @@ impl AppearanceSettingsPageView {
             self.input_type_radio_state
                 .set_selected_idx(new_type as usize);
 
-            let is_udi_enabled = new_type == InputBoxType::Universal;
+            let _is_udi_enabled = new_type == InputBoxType::Universal;
 
             // Selecting classic mode must also enable honor_ps1 so the mode takes
             // effect immediately (input_type() requires honor_ps1 to return classic).
@@ -2256,7 +2254,7 @@ impl AppearanceSettingsPageView {
         new_value: WorkspaceDecorationVisibility,
         ctx: &mut ViewContext<Self>,
     ) {
-        let previous_value = TabSettings::handle(ctx).update(ctx, |tab_settings, ctx| {
+        let _previous_value = TabSettings::handle(ctx).update(ctx, |tab_settings, ctx| {
             let prev_value = *tab_settings.workspace_decoration_visibility.value();
             report_if_error!(tab_settings
                 .workspace_decoration_visibility
@@ -2267,7 +2265,7 @@ impl AppearanceSettingsPageView {
 
     /// Toggle among the supported workspace decoration visibility values.
     fn toggle_workspace_decoration_visiblity(&mut self, ctx: &mut ViewContext<Self>) {
-        let (new_value, previous_value) =
+        let (_new_value, _previous_value) =
             TabSettings::handle(ctx).update(ctx, |tab_settings, ctx| {
                 let previous_value = *tab_settings.workspace_decoration_visibility.value();
                 let new_value = previous_value.toggled();

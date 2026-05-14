@@ -34,7 +34,6 @@ use crate::features::FeatureFlag;
 use crate::palette::PaletteMode;
 use crate::root_view::OpenLaunchConfigArg;
 use crate::search::command_palette::data_sources::DataSourceStore;
-use crate::server::ids::SyncId;
 use crate::session_management::SessionSource;
 use crate::workspace::{active_terminal_in_window, ForkedConversationDestination, WorkspaceAction};
 use warpui::elements::{
@@ -603,8 +602,8 @@ impl View {
     }
 
     fn close(&mut self, ctx: &mut ViewContext<Self>, accepted_action_type: Option<&'static str>) {
-        let buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
-        let filter = self.active_query_filter(ctx);
+        let _buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
+        let _filter = self.active_query_filter(ctx);
 
         self.state.clipped_scroll_state = Default::default();
         self.reset(ctx);

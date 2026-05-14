@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crate::interval_timer::IntervalTimer;
 use crate::settings::import::config::{Config, ConfigError};
-use crate::{TelemetryEvent};
 
 use serde::Serialize;
 use strum::IntoEnumIterator;
@@ -86,7 +85,7 @@ impl ImportedConfigModel {
         &self,
         terminal_type: &TerminalType,
         configs: &Result<Vec<Config>, ConfigError>,
-        ctx: &mut ModelContext<Self>,
+        _ctx: &mut ModelContext<Self>,
     ) {
         if let TerminalType::ITerm = terminal_type {
             if let Ok(configs) = configs {
@@ -104,7 +103,7 @@ impl ImportedConfigModel {
     pub fn write_parse_results(
         &mut self,
         terminal_type: TerminalType,
-        (configs, timer): (Result<Vec<Config>, ConfigError>, IntervalTimer),
+        (configs, _timer): (Result<Vec<Config>, ConfigError>, IntervalTimer),
         ctx: &mut ModelContext<Self>,
     ) {
         #[cfg(target_os = "macos")]

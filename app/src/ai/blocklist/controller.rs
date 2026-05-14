@@ -29,9 +29,8 @@ use crate::ai::agent::{
     AIAgentActionResult, CancellationReason, PassiveSuggestionResultType, PassiveSuggestionTrigger,
     PassiveSuggestionTriggerType, RunningCommand,
 };
-use crate::ai::agent::{DocumentContentAttachmentSource, FileContext};
+use crate::ai::agent::FileContext;
 use crate::ai::agent_sdk::AmbientAgentTaskId;
-use ai::document::AIDocumentId;
 use crate::ai::llms::LLMId;
 use crate::ai::{
     agent::{
@@ -59,7 +58,6 @@ use crate::terminal::{
 };
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{server::telemetry::TelemetryEvent};
 use anyhow::anyhow;
 use chrono::{DateTime, Local};
 use itertools::Itertools;

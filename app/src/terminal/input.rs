@@ -39,13 +39,12 @@ use crate::ai::predict::prompt_suggestions::{
     is_accept_prompt_suggestion_bound_to_ctrl_enter,
 };
 use crate::ai::skills::SkillManager;
-use crate::ai::skills::{SkillOpenOrigin, SkillTelemetryEvent};
 use crate::context_chips::spacing;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
 use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND_REGISTRY};
 
-use crate::server::telemetry::{PaletteSource, SlashCommandAcceptedDetails, SlashMenuSource};
+use crate::server::telemetry::PaletteSource;
 use crate::settings::PrivacySettings;
 use crate::suggestions::ignored_suggestions_model::{
     IgnoredSuggestionsModel, IgnoredSuggestionsModelEvent, SuggestionType,
@@ -124,7 +123,7 @@ use crate::{
     },
     ai_assistant::execution_context::WarpAiExecutionContext,
     appearance::{Appearance, AppearanceEvent},
-    channel::{Channel, ChannelState},
+    channel::ChannelState,
     cmd_or_ctrl_shift,
     code_review::diff_state::DiffMode,
     completer::SessionContext,
@@ -142,7 +141,7 @@ use crate::{
         EditorDecoratorElements, EditorOptions, EditorSnapshot, EditorView, Event as EditorEvent,
         ImageContextOptions, InteractionState, PathTransformerFn, PlainTextEditorViewAction,
         Point as BufferPoint, PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys,
-        PropagateHorizontalNavigationKeys, ReplicaId, TextColors, TextRun,
+        PropagateHorizontalNavigationKeys, ReplicaId, TextColors,
         MAX_IMAGES_PER_CONVERSATION,
     },
     features::FeatureFlag,
@@ -168,8 +167,7 @@ use crate::{
         ids::SyncId,
         server_api::ServerApi,
         telemetry::{
-            AICommandSearchEntrypoint, AgentModeAutoDetectionFalsePositivePayload,
-            AgentModeAutoDetectionSettingOrigin, AnonymousUserSignupEntrypoint, CommandXRayTrigger,
+            AICommandSearchEntrypoint, AgentModeAutoDetectionFalsePositivePayload, AnonymousUserSignupEntrypoint, CommandXRayTrigger,
         },
     },
     session_management::SessionNavigationPromptElements,
@@ -181,7 +179,6 @@ use crate::{
     settings_view::{flags, SettingsSection},
     terminal::view::inline_banner::{PromptSuggestionsEvent, PromptSuggestionsView},
     ui_components::{blended_colors, icons::Icon},
-    user_config::WarpConfig,
     util::bindings::{self, CustomAction},
     util::image::MAX_IMAGE_COUNT_FOR_QUERY,
     view_components::{DismissibleToast, ToastFlavor},
@@ -191,7 +188,6 @@ use crate::{
         WorkspaceAction,
     },
     workspaces::user_workspaces::UserWorkspaces,
-    AgentModeEntrypoint, ServerApiProvider,
 };
 
 use ai::skills::SkillReference;
@@ -217,7 +213,6 @@ use std::{
     time::Duration,
 };
 use string_offset::CharOffset;
-use vec1::Vec1;
 use vim::vim::{VimHandler, VimMode};
 use warp_completer::util::parse_current_commands_and_tokens;
 
@@ -256,7 +251,6 @@ use warpui::{
     presenter::ChildView,
     r#async::SpawnedFutureHandle,
     start_trace,
-    text_layout::TextStyle,
     ui_components::{
         chip::Chip,
         components::{Coords, UiComponent, UiComponentStyles},
@@ -295,7 +289,6 @@ use super::{
         presence_manager::PresenceManager, viewer::history_model::SharedSessionHistoryModel,
         SharedSessionStatus,
     },
-    shell::ShellType,
     universal_developer_input::{
         UniversalDeveloperInputButtonBar, UniversalDeveloperInputButtonBarEvent,
     },
@@ -3363,9 +3356,9 @@ impl Input {
             });
 
             // Emit telemetry for @ menu opened
-            let is_udi_enabled =
+            let _is_udi_enabled =
                 InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
-            let current_input_mode = self.ai_input_model.as_ref(ctx).input_type();
+            let _current_input_mode = self.ai_input_model.as_ref(ctx).input_type();
 
         } else if self.suggestions_mode_model.as_ref(ctx).is_ai_context_menu() {
             self.close_ai_context_menu(ctx);
@@ -3407,7 +3400,7 @@ impl Input {
             self.close_slash_commands_menu(ctx);
         } else {
             self.system_insert("/", ctx);
-            let is_in_agent_view = FeatureFlag::AgentView.is_enabled()
+            let _is_in_agent_view = FeatureFlag::AgentView.is_enabled()
                 && self.agent_view_controller.as_ref(ctx).is_fullscreen();
         }
     }
@@ -3421,7 +3414,7 @@ impl Input {
             InlineConversationMenuEvent::NavigateToConversation {
                 conversation_navigation_data,
             } => {
-                let is_in_agent_view = FeatureFlag::AgentView.is_enabled()
+                let _is_in_agent_view = FeatureFlag::AgentView.is_enabled()
                     && self.agent_view_controller.as_ref(ctx).is_fullscreen();
 
                 let conversation_id = conversation_navigation_data.id;
@@ -3809,7 +3802,7 @@ impl Input {
         self.suggestions_mode_model.update(ctx, |model, ctx| {
             model.set_mode(InputSuggestionsMode::ConversationMenu, ctx);
         });
-        let is_in_agent_view = FeatureFlag::AgentView.is_enabled()
+        let _is_in_agent_view = FeatureFlag::AgentView.is_enabled()
             && self.agent_view_controller.as_ref(ctx).is_fullscreen();
         ctx.notify();
     }
@@ -3867,7 +3860,7 @@ impl Input {
                     destination,
                 });
 
-                let is_in_agent_view = FeatureFlag::AgentView.is_enabled()
+                let _is_in_agent_view = FeatureFlag::AgentView.is_enabled()
                     && self.agent_view_controller.as_ref(ctx).is_active();
 
                 self.suggestions_mode_model.update(ctx, |model, ctx| {
@@ -4129,7 +4122,7 @@ impl Input {
                     exchange_id: *exchange_id,
                 });
 
-                let is_in_agent_view = FeatureFlag::AgentView.is_enabled()
+                let _is_in_agent_view = FeatureFlag::AgentView.is_enabled()
                     && self.agent_view_controller.as_ref(ctx).is_active();
 
                 self.suggestions_mode_model.update(ctx, |model, ctx| {
@@ -4533,7 +4526,7 @@ impl Input {
     pub fn insert_zero_state_prompt_suggestion(
         &mut self,
         suggestion_type: ZeroStatePromptSuggestionType,
-        triggered_from: ZeroStatePromptSuggestionTriggeredFrom,
+        _triggered_from: ZeroStatePromptSuggestionTriggeredFrom,
         ctx: &mut ViewContext<Self>,
     ) {
         match suggestion_type {
@@ -5722,11 +5715,11 @@ impl Input {
             // until the user executes a command.
             if !command.is_empty() {
                 if let Some(ZeroStateSuggestionInfo {
-                    request,
+                    request: _,
                     response,
                     is_from_ai,
-                    history_based_autosuggestion_state,
-                    request_duration_ms,
+                    history_based_autosuggestion_state: _,
+                    request_duration_ms: _,
                 }) = zerostate_next_command_suggestion_info
                 {
                     self.last_intelligent_autosuggestion_result =
@@ -5736,7 +5729,7 @@ impl Input {
                             predicted_command: response.most_likely_action.clone(),
                         });
 
-                    let should_collect_ugc = should_collect_ai_ugc_telemetry(
+                    let _should_collect_ugc = should_collect_ai_ugc_telemetry(
                         ctx,
                         PrivacySettings::as_ref(ctx).is_telemetry_enabled,
                     );
@@ -5987,7 +5980,7 @@ impl Input {
         match event {
             InputSuggestionsEvent::ConfirmSuggestion {
                 suggestion,
-                match_type,
+                match_type: _,
             } => {
                 if !self.confirm_suggestion(suggestion, ctx) {
                     return;
@@ -5997,7 +5990,7 @@ impl Input {
             }
             InputSuggestionsEvent::ConfirmAndExecuteSuggestion {
                 suggestion,
-                match_type,
+                match_type: _,
             } => {
                 if !self.confirm_and_execute_suggestion(suggestion, ctx) {
                     return;
@@ -6726,17 +6719,17 @@ impl Input {
         ctx: &mut ViewContext<Self>,
     ) {
         let input_buffer_text = self.buffer_text(ctx);
-        let buffer_length = input_buffer_text.len();
-        let input =
+        let _buffer_length = input_buffer_text.len();
+        let _input =
             should_collect_ai_ugc_telemetry(ctx, PrivacySettings::as_ref(ctx).is_telemetry_enabled)
                 .then_some(input_buffer_text);
-        let is_udi_enabled = InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
+        let _is_udi_enabled = InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
 
         let ai_input_model = self.ai_input_model.as_ref(ctx);
         if matches!(new_input_type, InputType::Shell) && !ai_input_model.is_input_type_locked() {
             let current_input_text = self.buffer_text(ctx);
             if !current_input_text.is_empty() {
-                let event_payload = if ChannelState::channel().is_dogfood() {
+                let _event_payload = if ChannelState::channel().is_dogfood() {
                     AgentModeAutoDetectionFalsePositivePayload::InternalDogfoodUsers {
                         input_text: current_input_text,
                     }
@@ -8151,8 +8144,8 @@ impl Input {
                 }
             }
             EditorEvent::AutosuggestionAccepted {
-                insertion_length,
-                buffer_char_length,
+                insertion_length: _,
+                buffer_char_length: _,
                 autosuggestion_type,
             } => {
                 ctx.emit(Event::AutosuggestionAccepted);
@@ -10375,7 +10368,7 @@ impl Input {
             ctx.emit(Event::SubmitCLIAgentInput { text });
             return;
         }
-        let command = self.editor.as_ref(ctx).buffer_text(ctx);
+        let _command = self.editor.as_ref(ctx).buffer_text(ctx);
 
         ctx.emit(Event::Enter);
 
@@ -10517,9 +10510,9 @@ impl Input {
             // If we're submitting an AI query, we want to send telemetry for the input type.
             if FeatureFlag::NldImprovements.is_enabled() {
                 let input_model = self.ai_input_model.as_ref(ctx);
-                let input_type = input_model.input_type();
-                let is_locked = input_model.is_input_type_locked();
-                let was_lock_set_with_empty_buffer = input_model.was_lock_set_with_empty_buffer();
+                let _input_type = input_model.input_type();
+                let _is_locked = input_model.is_input_type_locked();
+                let _was_lock_set_with_empty_buffer = input_model.was_lock_set_with_empty_buffer();
             }
 
             self.submit_ai_query(None, ctx);
@@ -10527,9 +10520,9 @@ impl Input {
             // If we're submitting a shell command, we want to send telemetry for the input type.
             if FeatureFlag::NldImprovements.is_enabled() {
                 let input_model = self.ai_input_model.as_ref(ctx);
-                let input_type = input_model.input_type();
-                let is_locked = input_model.is_input_type_locked();
-                let was_lock_set_with_empty_buffer = input_model.was_lock_set_with_empty_buffer();
+                let _input_type = input_model.input_type();
+                let _is_locked = input_model.is_input_type_locked();
+                let _was_lock_set_with_empty_buffer = input_model.was_lock_set_with_empty_buffer();
             }
 
             let command = self.get_command(ctx);
@@ -12049,7 +12042,7 @@ impl Input {
 
         ctx.emit(Event::ShowCommandSearch(Default::default()));
 
-        let entrypoint = if buffer_starts_with_trigger {
+        let _entrypoint = if buffer_starts_with_trigger {
             AICommandSearchEntrypoint::ShortHandTrigger
         } else {
             AICommandSearchEntrypoint::Keybinding
@@ -12186,7 +12179,7 @@ impl TypedActionView for Input {
                 }
             }
             InputAction::ToggleInputAutoDetection => {
-                if let Ok(new_value) =
+                if let Ok(_new_value) =
                     AISettings::handle(ctx).update(ctx, |ai_settings, model_ctx| {
                         ai_settings
                             .ai_autodetection_enabled_internal

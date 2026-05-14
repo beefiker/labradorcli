@@ -1,9 +1,4 @@
 use super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
-use super::telemetry::{
-    BlocklistOrchestrationTelemetryEvent, TeamAgentCommunicationFailedEvent,
-    TeamAgentCommunicationFailureReason, TeamAgentCommunicationKind,
-    TeamAgentCommunicationTransport, TeamAgentOrchestrationVersion,
-};
 use crate::ai::agent::{
     conversation::{AIConversationId, ConversationStatus},
     task::TaskId,

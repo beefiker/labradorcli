@@ -37,7 +37,6 @@ use crate::{
     banner::{Banner, BannerTextContent},
     code::editor::view::{CodeEditorRenderOptions, CodeEditorView},
     persistence::ModelEvent,
-    server::telemetry::{MCPTemplateCreationSource, TelemetryEvent},
     settings_view::mcp_servers::{
         destructive_mcp_confirmation_dialog::{
             DestructiveMCPConfirmationDialog, DestructiveMCPConfirmationDialogEvent,

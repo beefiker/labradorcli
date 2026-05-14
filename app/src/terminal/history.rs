@@ -7,7 +7,7 @@ use std::{
 };
 
 use warp_core::command::ExitCode;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
+use warpui::{Entity, ModelContext, SingletonEntity};
 
 use super::{
     model::block::{AgentInteractionMetadata, Block, SerializedAIMetadata, SerializedBlock},

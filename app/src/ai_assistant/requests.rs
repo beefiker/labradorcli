@@ -8,10 +8,7 @@ use warpui::{Entity, ModelContext};
 
 use crate::{
     ai_assistant::utils::{AssistantTranscriptPart, TranscriptPartSubType},
-        server::{
-        server_api::{ai::AIClient, ServerApi},
-        telemetry::{TelemetryEvent, WarpAIRequestResult},
-    },
+        server::server_api::{ai::AIClient, ServerApi},
 };
 
 use super::{
@@ -159,7 +156,7 @@ impl Requests {
                             // it will remain so until it's reset.
                             model.current_transcript_summarized |= transcript_summarized;
 
-                            let req_latency = end_time.signed_duration_since(start_time).num_milliseconds();
+                            let _req_latency = end_time.signed_duration_since(start_time).num_milliseconds();
                         }
                         _ => {
                             let response = "We're experiencing technical difficulties right now. Please try again later.".to_owned();

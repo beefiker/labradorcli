@@ -12,13 +12,10 @@ use warp_util::standardized_path::StandardizedPath;
 use warpui::{elements::MouseStateHandle, ViewContext};
 
 use super::{FileTreeIdentifier, FileTreeItem, FileTreeView};
-use crate::{
-    code::file_tree::{
+use crate::code::file_tree::{
         view::{PendingEdit, PendingEditKind},
         FileTreeEvent,
-    },
-        server::telemetry::TelemetryEvent,
-};
+    };
 
 /// Custom ordering function for items in the file tree.
 ///

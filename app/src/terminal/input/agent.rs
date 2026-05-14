@@ -1,7 +1,6 @@
 use super::{
     common::{
-        add_command_xray_overlay, add_input_suggestions_overlays, add_voltron_overlay,
-        add_workflow_info_overlay, wrap_input_with_terminal_padding_and_focus_handler,
+        add_command_xray_overlay, add_input_suggestions_overlays, wrap_input_with_terminal_padding_and_focus_handler,
     },
     Input, InputAction, InputDropTargetData,
 };
@@ -78,7 +77,7 @@ impl Input {
         let appearance = Appearance::as_ref(app);
         let menu_positioning = self.menu_positioning(app);
 
-        let model = self.model.lock();
+        let _model = self.model.lock();
 
         // We should likely rework this stack to not need to use `with_constrain_absolute_children`,
         // by reworking the positioning of the children to not depend on this.
@@ -283,7 +282,7 @@ impl Input {
     fn render_cloud_mode_v2_composing_input(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let menu_positioning = self.menu_positioning(app);
-        let model = self.model.lock();
+        let _model = self.model.lock();
 
         let mut stack = Stack::new();
 

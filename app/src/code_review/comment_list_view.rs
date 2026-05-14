@@ -19,8 +19,6 @@ use indexmap::IndexMap;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use std::path::PathBuf;
-use string_offset::CharOffset;
-use vec1::vec1;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::color::blend::Blend;
 use warp_editor::model::CoreEditorModel;

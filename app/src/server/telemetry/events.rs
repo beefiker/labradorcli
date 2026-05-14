@@ -49,7 +49,6 @@ use crate::pane_group::PaneDragDropLocation;
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
 use crate::search::command_search::searcher::CommandSearchItemAction;
 use crate::search::QueryFilter;
-use crate::server::ids::ObjectUid;
 use crate::server::ids::ServerId;
 use crate::settings::import::config::ParsedTerminalSetting;
 use crate::settings::import::config::SettingType;

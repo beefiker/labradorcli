@@ -10,7 +10,7 @@ use warpui::r#async::FutureExt;
 use warpui::{AppContext, GetSingletonModelHandle, SingletonEntity as _, UpdateModel};
 
 use crate::ai::agent::conversation::ServerAIConversationMetadata;
-use crate::ai::agent_sdk::driver::{AgentDriverError, WARP_DRIVE_SYNC_TIMEOUT};
+use crate::ai::agent_sdk::driver::AgentDriverError;
 use crate::ai::agent_sdk::{AmbientAgentTaskId, Owner};
 use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::auth::auth_state::AuthStateProvider;

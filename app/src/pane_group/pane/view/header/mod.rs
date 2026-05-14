@@ -11,7 +11,7 @@ use crate::{
         },
         BackingView, Direction, PaneDragDropLocation, PaneId, TabBarHoverIndex,
     },
-        server::telemetry::{SharingDialogSource, TelemetryEvent},
+        server::telemetry::SharingDialogSource,
     settings::CodeSettings,
     tab::tab_position_id,
     terminal::view::TerminalAction,
@@ -534,7 +534,7 @@ impl<P: BackingView> PaneHeader<P> {
         &self,
         stack: &mut Stack,
         should_display_overflow_menu_button: bool,
-        app: &AppContext,
+        _app: &AppContext,
     ) {
         match self.open_overlay {
             OpenOverlay::OverflowMenu => {

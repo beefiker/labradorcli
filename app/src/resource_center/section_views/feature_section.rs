@@ -1,6 +1,5 @@
 use crate::{
     appearance::Appearance,
-        server::telemetry::TelemetryEvent,
     settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier},
     themes::theme::Fill,
 };

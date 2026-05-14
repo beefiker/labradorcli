@@ -222,7 +222,7 @@ impl RepoOutlines {
                     // The abort handle doesn't always abort.
                     if Self::should_build_outlines(ctx) {
                         match res {
-                            Ok((canonicalized_path, outline, parse_duration)) => {
+                            Ok((canonicalized_path, outline, _parse_duration)) => {
 
                                 safe_info!(
                                     safe: ("Successfully constructed symbols outline for repo."),

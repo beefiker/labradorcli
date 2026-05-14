@@ -23,7 +23,6 @@ use crate::{
         EditOrigin, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys,
         SingleLineEditorOptions, TextOptions, ValidInputType,
     },
-        server::telemetry::TelemetryEvent,
     themes::theme::Fill,
     ui_components::{blended_colors, icons::Icon},
 };

@@ -43,8 +43,6 @@ use warpui::{BlurContext, ModelHandle};
 use crate::code::active_file::{ActiveFileEvent, ActiveFileModel};
 use crate::coding_panel_enablement_state::CodingPanelEnablementState;
 use crate::editor::{EditorOptions, EditorView, TextOptions};
-#[cfg(feature = "local_fs")]
-use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
 use crate::terminal::input::InputDropTargetData;
 use crate::terminal::view::{TerminalDropTargetData, TerminalView};
 use crate::ui_components::item_highlight::{ImageOrIcon, ItemHighlightState};
@@ -58,7 +56,6 @@ use crate::util::openable_file_type::{
 use crate::{
     appearance::Appearance,
     menu::{Menu, MenuItem, MenuItemFields},
-    server::telemetry::TelemetryEvent,
     ui_components::icons::Icon,
     view_components::DismissibleToast,
     workspace::ToastStack,
@@ -2421,7 +2418,7 @@ impl FileTreeView {
             return;
         };
 
-        let is_directory = matches!(item, FileTreeItem::DirectoryHeader { .. });
+        let _is_directory = matches!(item, FileTreeItem::DirectoryHeader { .. });
 
         ctx.emit(FileTreeEvent::AttachAsContext {
             path: relative_path,

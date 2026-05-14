@@ -45,7 +45,6 @@ use crate::settings::AISettings;
 use crate::terminal::History;
 use crate::themes::theme::WarpTheme;
 use crate::ui_components::icons::Icon;
-use crate::workspace::WorkspaceAction;
 
 /// Position ID for the command palette list.
 const PALETTE_LIST_SAVE_POSITION_ID: &str = "welcome_palette:list";
@@ -548,9 +547,9 @@ impl WelcomePalette {
         ctx.notify();
     }
 
-    fn close(&mut self, ctx: &mut ViewContext<Self>, accepted_action_type: Option<&'static str>) {
-        let buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
-        let filter = self.active_query_filter(ctx);
+    fn close(&mut self, ctx: &mut ViewContext<Self>, _accepted_action_type: Option<&'static str>) {
+        let _buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
+        let _filter = self.active_query_filter(ctx);
 
         self.state_handles.clipped_scroll_state = Default::default();
         self.reset(ctx);

@@ -1,8 +1,7 @@
-use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIAgentHarness, AIConversation, AIConversationId};
 use crate::ai::agent_conversations_model::{
-    AgentConversationsModel, AgentConversationsModelEvent, ConversationOrTask,
+    AgentConversationsModel, AgentConversationsModelEvent,
 };
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::history_model::CloudConversationData;
@@ -10,7 +9,7 @@ use crate::ai::blocklist::inline_action::code_diff_view::CodeDiffView;
 use crate::ai::blocklist::suggested_agent_mode_workflow_modal::SuggestedAgentModeWorkflowAndId;
 use crate::ai::blocklist::suggested_rule_modal::SuggestedRuleAndId;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, InputConfig};
-use ai::document::{AIDocumentId, AIDocumentVersion};
+use ai::document::AIDocumentId;
 use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::execution_profiles::profiles::{AIExecutionProfilesModel, ClientProfileId};
 use crate::ai::llms::LLMId;
@@ -110,7 +109,6 @@ use crate::report_if_error;
 use crate::resource_center::{
     mark_feature_used_and_write_to_user_defaults, Tip, TipAction, TipsCompleted,
 };
-use crate::server::ids::ObjectUid;
 use warp_server_client::ids::SyncId;
 use crate::server::telemetry::{AnonymousUserSignupEntrypoint, PaletteSource};
 use crate::session_management::SessionNavigationData;
@@ -145,7 +143,7 @@ use crate::util::bindings::{is_binding_pty_compliant, CustomAction};
 use crate::palette::PaletteMode;
 use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
 use crate::workspace::{
-    self, CommandSearchOptions, PaneViewLocator, TabBarLocation, WorkspaceAction,
+    self, CommandSearchOptions, PaneViewLocator, TabBarLocation,
 };
 use crate::{
     server::server_api::ServerApi,
@@ -1425,8 +1423,8 @@ impl PaneGroup {
         view_size: Vector2F,
         model_event_sender: Option<SyncSender<ModelEvent>>,
         #[cfg_attr(not(feature = "local_fs"), allow(unused_variables, clippy::ptr_arg))]
-        deferred_panes: &mut Vec<(PaneId, LeafSnapshot)>,
-        pending_ambient_restorations: &mut Vec<(AmbientAgentTaskId, PaneId)>,
+        _deferred_panes: &mut Vec<(PaneId, LeafSnapshot)>,
+        _pending_ambient_restorations: &mut Vec<(AmbientAgentTaskId, PaneId)>,
     ) -> anyhow::Result<(PaneData, InitialFocus)> {
         let custom_vertical_tabs_title = leaf.custom_vertical_tabs_title.clone();
         let result = match leaf.contents {
@@ -1704,7 +1702,7 @@ impl PaneGroup {
     #[cfg_attr(not(feature = "local_fs"), allow(unused_variables, unused_mut))]
     fn process_deferred_panes(
         deferred_panes: Vec<(PaneId, LeafSnapshot)>,
-        mut result: (PaneData, InitialFocus),
+        result: (PaneData, InitialFocus),
         pane_contents: &mut HashMap<PaneId, Box<dyn AnyPaneContent>>,
         ctx: &mut ViewContext<Self>,
     ) -> (PaneData, InitialFocus) {

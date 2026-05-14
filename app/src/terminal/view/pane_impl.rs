@@ -23,7 +23,6 @@ use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
 };
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
-use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
 use crate::terminal::shared_session::participant_avatar_view::render_participants_and_role_elements;
 use crate::terminal::shared_session::render_util::shared_session_indicator_color;
 use crate::terminal::shared_session::SharedSessionActionSource;

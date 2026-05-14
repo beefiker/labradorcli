@@ -21,7 +21,7 @@ pub(crate) use telemetry::MalformedFinalLineProxyEvent;
 #[allow(unused_imports)]
 pub use telemetry::{EditAcceptAndContinueClickedEvent, EditAcceptClickedEvent};
 pub use telemetry::{
-    EditReceivedEvent, EditResolvedEvent, EditStats, RequestFileEditsFormatKind,
+    EditResolvedEvent, EditStats, RequestFileEditsFormatKind,
     RequestFileEditsTelemetryEvent,
 };
 
@@ -36,7 +36,7 @@ use crate::{
             inline_action::code_diff_view::{
                 CodeDiffView, CodeDiffViewEvent, DiffSessionType, FileDiff,
             },
-            BlocklistAIPermissions, RequestedEditResolution,
+            BlocklistAIPermissions,
         },
         paths::host_native_absolute_path,
     },
@@ -165,7 +165,7 @@ impl RequestFileEditsExecutor {
             ));
         }
 
-        let identifiers = self
+        let _identifiers = self
             .generate_ai_identifiers(&input.conversation_id, id, ctx)
             .unwrap_or_else(|| AIIdentifiers {
                 client_conversation_id: Some(input.conversation_id),
@@ -210,7 +210,7 @@ impl RequestFileEditsExecutor {
                     return;
                 }
 
-                let passive_diff = BlocklistAIHistoryModel::as_ref(ctx)
+                let _passive_diff = BlocklistAIHistoryModel::as_ref(ctx)
                     .is_entirely_passive_conversation(&input.conversation_id);
 
                 // Build a map of file path → content from the editor buffers.

@@ -5,13 +5,12 @@ use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
 use crate::auth::auth_state::AuthState;
 use crate::auth::AuthStateProvider;
 use crate::autoupdate::{AutoupdateState, AutoupdateStateEvent};
-use crate::experiments::{BlockOnboarding, Experiment};
+use crate::experiments::Experiment;
 use crate::interval_timer::IntervalTimer;
 use crate::launch_configs::launch_config;
 use crate::linear::LinearIssueWork;
 use crate::settings::apply_onboarding_settings;
 use crate::settings::AISettings;
-use crate::workspace::tab_settings::TabSettings;
 use onboarding::{
     AgentOnboardingEvent, AgentOnboardingView, OnboardingIntention, SelectedSettings,
 };
@@ -47,7 +46,7 @@ use crate::{
     app_state::{AppState, PaneUuid, WindowSnapshot},
     autoupdate::{RequestType, UpdateReady},
     pane_group::{NewTerminalOptions, PanesLayout},
-        server::{server_api::ServerTime, telemetry::TelemetryEvent},
+        server::server_api::ServerTime,
     UpdateQuakeModeEventArg,
 };
 use crate::{
@@ -2118,7 +2117,7 @@ impl RootView {
     ) -> Self {
         let server_api_provider = ServerApiProvider::as_ref(ctx);
         let server_api = server_api_provider.get();
-        let auth_state = AuthStateProvider::as_ref(ctx).get().clone();
+        let _auth_state = AuthStateProvider::as_ref(ctx).get().clone();
 
         ctx.subscribe_to_model(&AuthManager::handle(ctx), |me, _, event, ctx| {
             me.handle_auth_manager_event(event, ctx);

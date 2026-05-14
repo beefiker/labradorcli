@@ -13,9 +13,7 @@ use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::ui_components::icon_with_status::{
     render_icon_with_status, IconWithStatusSizing, IconWithStatusVariant,
 };
-use crate::workspace::view::vertical_tabs::telemetry::{
-    VerticalTabsChipEntrypoint, VerticalTabsTelemetryEvent,
-};
+use crate::workspace::view::vertical_tabs::telemetry::VerticalTabsChipEntrypoint;
 use crate::FeatureFlag;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -53,7 +51,6 @@ use pathfinder_geometry::vector::{vec2f, Vector2F};
 use settings::Setting as _;
 use std::path::{Path, PathBuf};
 use warp_core::context_flag::ContextFlag;
-use warp_core::telemetry::TelemetryEvent as _;
 use warp_core::ui::color::blend::Blend;
 use warp_core::ui::color::coloru_with_opacity;
 use warp_core::ui::theme::color::internal_colors;
@@ -3008,7 +3005,7 @@ fn vtab_diff_stats_text(line_changes: &GitLineChanges) -> String {
 }
 
 impl PaneGroup {
-    fn resolve_pane_type(&self, pane_id: PaneId, app: &AppContext) -> TypedPane<'_> {
+    fn resolve_pane_type(&self, pane_id: PaneId, _app: &AppContext) -> TypedPane<'_> {
         match pane_id.pane_type() {
             IPaneType::Terminal => TypedPane::Terminal(
                 self.downcast_pane_by_id::<TerminalPane>(pane_id)
@@ -3850,7 +3847,7 @@ fn render_terminal_diff_stats_badge(
     git_line_changes: &GitLineChanges,
     pane_group_id: EntityId,
     pane_id: PaneId,
-    entrypoint: VerticalTabsChipEntrypoint,
+    _entrypoint: VerticalTabsChipEntrypoint,
     mouse_state: MouseStateHandle,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
@@ -3867,7 +3864,7 @@ fn render_terminal_diff_stats_badge(
             bg,
         )
     })
-    .on_click(move |ctx, app, _| {
+    .on_click(move |ctx, _app, _| {
         let locator = PaneViewLocator {
             pane_group_id,
             pane_id,
@@ -3882,7 +3879,7 @@ fn render_terminal_diff_stats_badge(
 fn render_terminal_pull_request_badge(
     label: String,
     url: String,
-    entrypoint: VerticalTabsChipEntrypoint,
+    _entrypoint: VerticalTabsChipEntrypoint,
     mouse_state: MouseStateHandle,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
@@ -3896,7 +3893,7 @@ fn render_terminal_pull_request_badge(
         };
         render_badge_container(render_pull_request_badge_content(&label, appearance), bg)
     })
-    .on_click(move |ctx, app, _| {
+    .on_click(move |ctx, _app, _| {
         ctx.dispatch_typed_action(WorkspaceAction::OpenLink(url.clone()));
     })
     .with_cursor(Cursor::PointingHand)

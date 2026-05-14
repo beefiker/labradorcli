@@ -150,7 +150,7 @@ pub fn run(
     command: CliCommand,
     global_options: GlobalOptions,
 ) -> anyhow::Result<()> {
-    let event = command_to_telemetry_event(&command);
+    let _event = command_to_telemetry_event(&command);
 
     launch_command(ctx, command, global_options)
 }

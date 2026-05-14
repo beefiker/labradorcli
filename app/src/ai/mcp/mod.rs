@@ -142,7 +142,7 @@ mod tests {
 
 pub mod gallery;
 pub use gallery::MCPGalleryManager;
-use warpui::{AppContext, SingletonEntity as _};
+use warpui::SingletonEntity as _;
 pub mod templatable;
 pub use templatable::JsonTemplate;
 pub use templatable::{TemplatableMCPServer, TemplateVariable};

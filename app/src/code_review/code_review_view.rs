@@ -50,8 +50,7 @@ use crate::{
         editor_state::CodeReviewEditorState,
         hidden_lines::calculate_hidden_lines,
         telemetry_event::{
-            AddToContextOrigin, CodeReviewContextDestination, CodeReviewTelemetryEvent,
-            GitButtonKind, PaneStateChange,
+            CodeReviewContextDestination, PaneStateChange,
         },
     },
 };
@@ -87,8 +86,6 @@ use crate::{
 };
 
 use crate::code_review::find_model::CodeReviewFindModel;
-#[cfg(feature = "local_fs")]
-use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
 use crate::terminal::cli_agent::{
     build_selection_line_range_prompt, build_selection_substring_prompt,
 };
@@ -126,7 +123,7 @@ use warpui::{
         ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
         DragBarSide, Element, Empty, EventHandler, Flex, List, ListState, MainAxisAlignment,
         MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds,
-        Percentage, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect,
+        Percentage, Radius, Rect,
         Resizable, ResizableStateHandle, ScrollOffset, ScrollStateHandle, ScrollbarWidth, Stack,
         Text, DEFAULT_UI_LINE_HEIGHT_RATIO,
     },
@@ -177,7 +174,7 @@ use vec1::Vec1;
 use super::{
     code_review_header::CodeReviewHeader,
     comment_list_view::{CommentListDebugState, CommentListEvent, CommentListView},
-    comments::{attach_pending_imported_comments, AttachedReviewComment, CommentOrigin},
+    comments::{attach_pending_imported_comments, AttachedReviewComment},
     diff_size_limits::DiffSize,
     file_invalidation_queue::FileInvalidationTask,
     git_dialog::{GitDialog, GitDialogEvent, GitDialogKind},
@@ -2993,7 +2990,7 @@ impl CodeReviewView {
 
     fn delete_comment_by_id(&mut self, id: CommentId, ctx: &mut ViewContext<Self>) {
         if let Some(model) = self.active_comment_model.clone() {
-            let is_imported = model
+            let _is_imported = model
                 .read(ctx, |batch, _| {
                     batch
                         .get_review_comment_by_id(id)
@@ -3795,7 +3792,7 @@ impl CodeReviewView {
         }
 
         if !newly_imported_ids.is_empty() {
-            let (active_count, outdated_count) = relocated_comments
+            let (_active_count, _outdated_count) = relocated_comments
                 .iter()
                 .filter(|c| newly_imported_ids.contains(&c.id))
                 .fold((0usize, 0usize), |(active, outdated), c| {
@@ -4523,9 +4520,9 @@ impl CodeReviewView {
     ) {
         match result {
             ReviewSubmissionResult::Success {
-                comment_count,
-                file_count,
-                destination,
+                comment_count: _,
+                file_count: _,
+                destination: _,
             } => {
                 log::info!("Successfully submitted review comments to terminal");
 
@@ -5937,7 +5934,7 @@ impl CodeReviewView {
             if let Some(routing) = terminal_view.update(ctx, |tv, ctx| {
                 tv.try_send_text_to_cli_agent_or_rich_input(prompt, ctx)
             }) {
-                let destination = match routing {
+                let _destination = match routing {
                     CliAgentRouting::RichInput => CodeReviewContextDestination::RichInput,
                     CliAgentRouting::Pty => CodeReviewContextDestination::Pty,
                 };
@@ -6007,7 +6004,7 @@ impl CodeReviewView {
         {
             let active_cli_agent = terminal_view.read(ctx, |tv, ctx| tv.active_cli_agent(ctx));
 
-            let diff_set_scope = match &scope {
+            let _diff_set_scope = match &scope {
                 DiffSetScope::All => DiffSetContextScope::All,
                 DiffSetScope::File(_) => DiffSetContextScope::File,
             };
@@ -6032,7 +6029,7 @@ impl CodeReviewView {
                     let routing = terminal_view.update(ctx, |tv, ctx| {
                         tv.send_diff_context_to_cli_agent_or_rich_input(&file_diffs, ctx)
                     });
-                    let destination = match routing {
+                    let _destination = match routing {
                         Some(CliAgentRouting::RichInput) => CodeReviewContextDestination::RichInput,
                         _ => CodeReviewContextDestination::Pty,
                     };
@@ -6228,7 +6225,7 @@ impl CodeReviewView {
                             ctx,
                         )
                     });
-                    let destination = match routing {
+                    let _destination = match routing {
                         Some(CliAgentRouting::RichInput) => CodeReviewContextDestination::RichInput,
                         _ => CodeReviewContextDestination::Pty,
                     };
@@ -7247,7 +7244,7 @@ impl TypedActionView for CodeReviewView {
                     .as_ref()
                     .is_some_and(|h| h.is_maximized(ctx));
 
-                let state_change = if is_currently_maximized {
+                let _state_change = if is_currently_maximized {
                     PaneStateChange::Minimized
                 } else {
                     PaneStateChange::Maximized

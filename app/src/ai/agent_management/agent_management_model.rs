@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use warp_core::features::FeatureFlag;
 use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, WindowId};
 
 use crate::settings::AISettings;

@@ -16,7 +16,6 @@ use crate::{
     },
     global_resource_handles::GlobalResourceHandlesProvider,
     persistence::ModelEvent,
-    server::telemetry::TelemetryAgentViewEntryOrigin,
     terminal::{
         input::message_bar::{Message, MessageItem},
         model::rich_content::RichContentType,

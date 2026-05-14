@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::server::telemetry::{CLISubagentControlState};
 use instant::Instant;
 use parking_lot::FairMutex;
 use serde::{Deserialize, Serialize};
@@ -427,12 +426,12 @@ impl CLISubagentController {
 
         if active_block.toggle_subagent_response_visibility() {
             let conversation_id = active_block.ai_conversation_id();
-            let block_id = active_block.id().clone();
-            let is_hidden = active_block.should_hide_responses();
+            let _block_id = active_block.id().clone();
+            let _is_hidden = active_block.should_hide_responses();
 
             ctx.emit(CLISubagentEvent::ToggledHideResponses);
 
-            if let Some(conversation_id) = conversation_id {
+            if let Some(_conversation_id) = conversation_id {
             }
         }
     }

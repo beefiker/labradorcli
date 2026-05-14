@@ -7,8 +7,7 @@ use crate::code::editor::{
     view::{CodeEditorEvent, CodeEditorView, VimMode},
 };
 use crate::{
-    cmd_or_ctrl_shift, code_review::comments::CommentId,
-    code_review::telemetry_event::CodeReviewTelemetryEvent, editor::InteractionState,
+    cmd_or_ctrl_shift, code_review::comments::CommentId, editor::InteractionState,
     features::FeatureFlag, util::bindings::CustomAction,
 };
 use lazy_static::lazy_static;

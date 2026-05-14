@@ -19,7 +19,7 @@ use crate::{
             conversation::{AIConversationId, ConversationStatus},
             LifecycleEventType, StartAgentExecutionMode,
         },
-        agent_sdk::{AgentConfigSnapshot, HarnessConfig},
+        agent_sdk::HarnessConfig,
         blocklist::{
             agent_view::AgentViewEntryOrigin, orchestration_events::OrchestrationEventService,
             BlocklistAIHistoryModel,

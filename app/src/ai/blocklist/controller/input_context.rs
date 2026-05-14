@@ -11,7 +11,6 @@ use crate::{
     ai::{
         agent::{
             conversation::AIConversationId, AIAgentAttachment, AIAgentContext,
-            DocumentContentAttachmentSource, DriveObjectPayload,
         },
         block_context::BlockContext,
         blocklist::BlocklistAIContextModel,

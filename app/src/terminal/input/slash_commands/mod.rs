@@ -16,10 +16,6 @@ use warpui::{SingletonEntity, ViewContext};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::agent::conversation::AIConversationId;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent_conversations_model::AgentConversationsModel;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent_management::telemetry::AgentManagementTelemetryEvent;
 use crate::ai::blocklist::agent_view::{
     AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage, ENTER_OR_EXIT_CONFIRMATION_WINDOW,
 };
@@ -29,7 +25,6 @@ use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND
 use crate::search::slash_command_menu::static_commands::Availability;
 use crate::search::slash_command_menu::{SlashCommandId, StaticCommand};
 use crate::server::ids::SyncId;
-use crate::server::telemetry::SlashCommandAcceptedDetails;
 use crate::settings::AISettings;
 use crate::tab::SelectedTabColor;
 use crate::terminal::input::decorations::InputBackgroundJobOptions;
@@ -947,7 +942,7 @@ impl Input {
             });
         }
 
-        let is_in_agent_view = FeatureFlag::AgentView.is_enabled()
+        let _is_in_agent_view = FeatureFlag::AgentView.is_enabled()
             && self.agent_view_controller.as_ref(ctx).is_active();
         true
     }

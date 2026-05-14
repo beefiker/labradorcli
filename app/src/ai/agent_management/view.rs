@@ -22,10 +22,6 @@ use crate::ai::agent_management::agent_type_selector::{
 use crate::ai::agent_management::details_action_buttons::{
     ActionButtonsConfig, AgentDetailsButtonEvent, ConversationActionButtonsRow,
 };
-use crate::ai::agent_management::telemetry::{
-    AgentManagementTelemetryEvent, ArtifactType, FilterType, OpenedFrom,
-};
-use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::artifacts::{Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent};
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::ai::conversation_details_panel::{
@@ -924,7 +920,7 @@ impl AgentManagementView {
             }
             AgentDetailsButtonEvent::CopyLink { link } => {
                 match item_id {
-                    ManagementCardItemId::Conversation(conversation_id) => {
+                    ManagementCardItemId::Conversation(_conversation_id) => {
                     }
                 }
 
@@ -2045,7 +2041,7 @@ impl TypedActionView for AgentManagementView {
                 };
 
                 match item_id {
-                    ManagementCardItemId::Conversation(conversation_id) => {
+                    ManagementCardItemId::Conversation(_conversation_id) => {
                     }
                 }
                 ctx.dispatch_typed_action(&action);

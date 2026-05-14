@@ -24,10 +24,6 @@ use crate::{
     auth::auth_state::AuthState,
     safe_debug, safe_warn, };
 
-use super::telemetry::{
-    DiffInvalidFileEvent, DiffMatchFailedEvent, MissingLineNumbersEvent,
-    RequestFileEditsTelemetryEvent,
-};
 
 /// Result of reading a file from disk or a remote server.
 ///
@@ -166,10 +162,10 @@ impl DiffApplicationError {
 pub(crate) async fn apply_edits<F, Fut>(
     edits: Vec<FileEdit>,
     session_context: &SessionContext,
-    ai_identifiers: &AIIdentifiers,
-    background_executor: Arc<Background>,
-    auth_state: Arc<AuthState>,
-    passive_diff: bool,
+    _ai_identifiers: &AIIdentifiers,
+    _background_executor: Arc<Background>,
+    _auth_state: Arc<AuthState>,
+    _passive_diff: bool,
     read_file: F,
 ) -> Result<Vec<AIRequestedCodeDiff>, Vec1<DiffApplicationError>>
 where
@@ -185,7 +181,7 @@ where
 
     for error in result.errors.iter() {
         match error {
-            DiffApplicationError::UnmatchedDiffs { match_failures, .. } => {
+            DiffApplicationError::UnmatchedDiffs { match_failures: _, .. } => {
             }
             DiffApplicationError::MissingFile { .. }
             | DiffApplicationError::ReadFailed { .. }

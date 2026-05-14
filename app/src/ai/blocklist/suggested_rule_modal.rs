@@ -5,7 +5,7 @@ use crate::ai::agent::SuggestedRule;
 use crate::modal::Modal;
 use crate::server::ids::SyncId;
 use warpui::{
-    elements::Empty, AppContext, Element, Entity, SingletonEntity, TypedActionView, View,
+    elements::Empty, AppContext, Element, Entity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
 

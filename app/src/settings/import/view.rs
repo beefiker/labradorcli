@@ -36,7 +36,7 @@ use crate::{
     ui_components::blended_colors,
     user_config::{self, WarpConfig},
     window_settings::WindowSettings,
-    GlobalResourceHandlesProvider, TelemetryEvent,
+    GlobalResourceHandlesProvider,
 };
 
 use super::config::{QuakeModeWindow, ThemeType};
@@ -871,7 +871,7 @@ impl SettingsImportView {
         ctx: &mut ViewContext<Self>,
     ) {
         let model = ImportedConfigModel::handle(ctx);
-        let imported_settings = model.read(ctx, |model, _ctx| {
+        let _imported_settings = model.read(ctx, |model, _ctx| {
             let Some(config) = model.config(terminal_type_and_profile) else {
                 log::error!("Could not find config for terminal {terminal_type_and_profile:?}");
                 return Default::default();

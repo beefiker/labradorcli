@@ -3,9 +3,8 @@ use std::sync::Arc;
 
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::Vector2F;
-use warpui::{AppContext, ModelHandle, SingletonEntity, ViewHandle, WindowId};
+use warpui::{AppContext, ModelHandle, ViewHandle, WindowId};
 
-use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::{
     ai::blocklist::SerializedBlockListItem, context_chips::prompt_type::PromptType,
     pane_group::TerminalViewResources, terminal::view::ConversationRestorationInNewPaneType,

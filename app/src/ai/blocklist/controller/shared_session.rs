@@ -613,7 +613,7 @@ impl BlocklistAIController {
             );
             return;
         };
-        let Some(task_id) = self.ambient_agent_task_id else {
+        let Some(_task_id) = self.ambient_agent_task_id else {
             log::error!("No task_id available to download attachments");
             self.send_shared_session_query(
                 prompt,

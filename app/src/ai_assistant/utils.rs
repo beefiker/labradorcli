@@ -312,7 +312,7 @@ pub fn render_prepared_response_button(
 
 pub fn render_request_limit_info(
     request_model: &ModelHandle<Requests>,
-    app: &AppContext,
+    _app: &AppContext,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let text_color: ColorU =

@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::Path;
 use std::str::FromStr;
@@ -15,7 +14,7 @@ use std::{
 
 use ai::project_context::model::ProjectRulePath;
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use diesel::{
     connection::{DefaultLoadingMode, SimpleConnection},
     result::Error,
@@ -28,9 +27,7 @@ use itertools::Itertools;
 use libsqlite3_sys as sqlite3;
 use num_traits::FromPrimitive;
 use pathfinder_geometry::{rect::RectF, vector::Vector2F};
-use persistence::model::AMBIENT_AGENT_PANE_KIND;
 use uuid::Uuid;
-use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::platform::FullscreenState;
 use warpui::{AppContext, SingletonEntity};
 
@@ -40,13 +37,13 @@ use super::block_list::{
     upsert_ai_query,
 };
 use super::model::{
-    self, ActiveMCPServer, CurrentUserInformation, MCPEnvironmentVariables, NewActiveMCPServer,
-    NewApp, NewCommand, NewFolder, NewNotebook, NewTab, NewTeam, NewWindow,
-    NewWorkspace, NewWorkspaceMetadata, NewWorkspaceTeam, ObjectMetadata, ObjectPermissions,
-    Project, Tab, Window, WorkspaceMetadata as WorkspaceMetadataModel, AI_DOCUMENT_PANE_KIND,
-    AI_FACT_PANE_KIND, CODE_PANE_KIND, ENV_VAR_COLLECTION_PANE_KIND,
-    EXECUTION_PROFILE_EDITOR_PANE_KIND, MCP_SERVER_PANE_KIND, NOTEBOOK_PANE_KIND,
-    SETTINGS_PANE_KIND, TERMINAL_PANE_KIND, WELCOME_PANE_KIND, WORKFLOW_PANE_KIND,
+    self, NewActiveMCPServer,
+    NewApp, NewCommand, NewTab, NewTeam, NewWindow,
+    NewWorkspace, NewWorkspaceMetadata, NewWorkspaceTeam,
+    Project, Tab, Window, WorkspaceMetadata as WorkspaceMetadataModel,
+    AI_FACT_PANE_KIND, CODE_PANE_KIND,
+    EXECUTION_PROFILE_EDITOR_PANE_KIND, MCP_SERVER_PANE_KIND,
+    SETTINGS_PANE_KIND, TERMINAL_PANE_KIND, WELCOME_PANE_KIND,
 };
 use super::schema;
 use super::{
@@ -61,17 +58,15 @@ use crate::app_state::{
     AIFactPaneSnapshot, CodeReviewPaneSnapshot, LeftPanelSnapshot, RightPanelSnapshot,
     SettingsPaneSnapshot,
 };
-use crate::auth::auth_manager::PersistedCurrentUserInformation;
 use crate::auth::auth_state::AuthStateProvider;
 use crate::auth::UserUid;
 use crate::code::editor_management::CodeSource;
-use crate::features::FeatureFlag;
 use crate::persistence::agent::read_agent_conversations;
 use crate::persistence::block_list::{get_all_restored_blocks, read_ai_queries};
 use crate::persistence::model::{
     NewTeamSettings, ProjectRules, UserProfile, CODE_REVIEW_PANE_KIND, GET_STARTED_PANE_KIND,
 };
-use crate::server::ids::{HashableId, ServerId, ToServerId};
+use crate::server::ids::ServerId;
 use crate::settings_view::SettingsSection;
 use crate::suggestions::ignored_suggestions_model::SuggestionType;
 use crate::tab::SelectedTabColor;
@@ -101,7 +96,7 @@ diesel::define_sql_function! {
 const CHANNEL_SIZE: usize = 1024;
 const COMMANDS_COUNT_LIMIT: i64 = 10000;
 
-use warp_server_client::persistence::{upsert_cloud_object, CloudObjectId};
+use warp_server_client::persistence::CloudObjectId;
 
 const WARP_SQLITE_FILE_NAME: &str = "warp.sqlite";
 
@@ -1999,7 +1994,7 @@ fn read_node(conn: &mut SqliteConnection, node: model::PaneNode) -> Result<PaneN
 /// In the future, the awkwardness of the transaction interface is resolved in diesel 2.0.0.
 fn read_sqlite_data(
     conn: &mut SqliteConnection,
-    current_user_id: Option<UserUid>,
+    _current_user_id: Option<UserUid>,
 ) -> Result<PersistedData, Error> {
     use schema::windows::dsl::*;
 

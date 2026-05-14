@@ -4,9 +4,7 @@ use serde::{Serialize, Serializer};
 
 use warpui::{platform::Cursor, ViewContext};
 
-use crate::{
-        server::telemetry::{LinkOpenMethod, TelemetryEvent},
-    terminal::{
+use crate::terminal::{
         model::{
             grid::grid_handler::Link,
             index::Point,
@@ -14,8 +12,7 @@ use crate::{
             RespectObfuscatedSecrets,
         },
         TerminalModel,
-    },
-};
+    };
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {

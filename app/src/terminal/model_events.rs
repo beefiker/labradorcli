@@ -32,7 +32,6 @@ use super::{
 };
 use crate::features::FeatureFlag;
 use crate::terminal::shell::ShellType;
-use crate::{TelemetryEvent};
 
 /// Model that dispatches events that have been emitted by the [`crate::terminal::TerminalModel`],
 /// allowing other models/views to subscribe to `TerminalModel` events like it would any other
@@ -191,7 +190,7 @@ impl ModelEventDispatcher {
                 {
                     if let Some(TmuxControlModeContext::WarpInitiatedForSsh(control_mode)) = context
                     {
-                        let duration_ms = Instant::now()
+                        let _duration_ms = Instant::now()
                             .duration_since(control_mode.start_time)
                             .as_millis()
                             // Clip large durations to u64::MAX

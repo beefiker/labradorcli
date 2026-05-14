@@ -6,11 +6,6 @@ use crate::ai::agent::{
 };
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::ai::blocklist::orchestration_events::{OrchestrationEventService, SendMessageResult};
-use crate::ai::blocklist::telemetry::{
-    BlocklistOrchestrationTelemetryEvent, TeamAgentCommunicationFailedEvent,
-    TeamAgentCommunicationFailureReason, TeamAgentCommunicationKind,
-    TeamAgentCommunicationTransport, TeamAgentOrchestrationVersion,
-};
 use crate::server::server_api::ai::SendAgentMessageRequest;
 use crate::server::server_api::ServerApiProvider;
 use warp_core::features::FeatureFlag;
@@ -73,7 +68,7 @@ impl SendMessageToAgentExecutor {
             };
             return ActionExecution::new_async(
                 async move { ai_client.send_agent_message(request).await },
-                move |result, ctx| match result {
+                move |result, _ctx| match result {
                     Ok(response) => {
                         let message_id =
                             response.message_ids.into_iter().next().unwrap_or_default();

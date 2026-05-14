@@ -11,7 +11,6 @@ use crate::server::retry_strategies::{
     OUT_OF_BAND_REQUEST_RETRY_STRATEGY, PERIODIC_POLL, PERIODIC_POLL_RETRY_STRATEGY,
 };
 use crate::server::server_api::team::TeamClient;
-use crate::server::server_api::ServerApiProvider;
 use crate::{report_error, report_if_error};
 use anyhow::{Context, Result};
 use futures::channel::oneshot::{self, Receiver};

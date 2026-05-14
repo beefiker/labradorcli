@@ -26,7 +26,7 @@ use crate::{
             show_toast, user_facing_git_error, GitDialog, GitDialogAction, GitDialogEvent,
             GitDialogMode,
         },
-        telemetry_event::{CodeReviewTelemetryEvent, GitDialogStatus, GitOperationKind},
+        telemetry_event::GitDialogStatus,
     },
     ui_components::icons::Icon,
     util::git::{Commit, FileChangeEntry},
@@ -152,7 +152,7 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
             crate::util::git::run_push(&repo_path, &branch, path_env.as_deref()).await
         },
         move |me, result, ctx| {
-            let (status, error) = match &result {
+            let (_status, _error) = match &result {
                 Ok(_) => (GitDialogStatus::Succeeded, None),
                 Err(err) => (GitDialogStatus::Failed, Some(err.to_string())),
             };

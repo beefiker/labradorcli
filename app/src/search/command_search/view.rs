@@ -7,7 +7,6 @@ use pathfinder_geometry::vector::Vector2F;
 use crate::search::mixer::AddAsyncSourceOptions;
 use lazy_static::lazy_static;
 use std::{collections::HashSet, ops::Range, sync::Arc, time::Duration};
-use warp_core::features::FeatureFlag;
 use warpui::{
     accessibility::{AccessibilityContent, WarpA11yRole},
     elements::{
@@ -40,7 +39,7 @@ use crate::{
         search_bar::{SearchBar, SearchBarEvent, SearchBarState, SearchResultOrdering},
         QueryFilter,
     },
-        server::{ids::ServerId, server_api::ai::AIClient, telemetry::TelemetryEvent},
+        server::{ids::ServerId, server_api::ai::AIClient},
     settings::AISettings,
     terminal::{
         input::MenuPositioning,
@@ -355,7 +354,7 @@ impl CommandSearchView {
     }
 
     fn blur(&self, ctx: &mut ViewContext<Self>) {
-        let buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
+        let _buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
         ctx.emit(CommandSearchEvent::Blur);
     }
 
@@ -367,11 +366,11 @@ impl CommandSearchView {
     ) {
         match event {
             SearchBarEvent::Close => {
-                let buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
+                let _buffer_length = self.search_bar.as_ref(ctx).query(ctx).len();
                 self.close(ctx);
             }
             // ctrl-c should close the command search view
-            SearchBarEvent::BufferCleared { buffer_len } => {
+            SearchBarEvent::BufferCleared { buffer_len: _ } => {
                 self.close(ctx);
             }
             SearchBarEvent::ResultAccepted { index, action } => {
@@ -381,7 +380,7 @@ impl CommandSearchView {
                 self.state.list_state.scroll_to(*index);
                 ctx.notify();
             }
-            SearchBarEvent::QueryFilterChanged { new_filter } => {
+            SearchBarEvent::QueryFilterChanged { new_filter: _ } => {
             }
             SearchBarEvent::SelectionUpdateInZeroState { .. } => {}
             SearchBarEvent::EnterInZeroState { .. } => {}
@@ -448,7 +447,7 @@ impl CommandSearchView {
 
             // Recompute the result index - the incoming index is the index in the
             // uniform list, but what we want is the "distance from first result".
-            let result_index = match self.search_bar_state.as_ref(ctx).query_result_renderers() {
+            let _result_index = match self.search_bar_state.as_ref(ctx).query_result_renderers() {
                 Some(renderers) => renderers.len() - result_index - 1,
                 None => result_index,
             };

@@ -26,9 +26,7 @@ use crate::terminal::ssh::error::SshErrorBlockAction;
 use crate::terminal::view::inline_banner::AgentModeSetupSpeedbumpBannerAction;
 use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
 use crate::terminal::view::RichContentSecretTooltipInfo;
-use crate::{
-    server::ids::SyncId,
-    terminal::{
+use crate::terminal::{
         block_list_element::{
             BlockHoverAction, BlockListMenuSource, BlockSelectAction, BlockTextSelectAction,
         },
@@ -40,8 +38,7 @@ use crate::{
             terminal_model::{BlockIndex, WithinModel},
             SecretHandle,
         },
-    },
-};
+    };
 
 use super::inline_banner::{
     AnonymousUserLoginBannerAction, OpenInWarpBannerAction, VimModeBannerAction,

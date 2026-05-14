@@ -13,8 +13,6 @@ mod nav_bar;
 pub mod scroll;
 pub mod view;
 
-pub use comment_editor::CommentEditorEvent;
-pub use comments::EditorCommentsModel;
 pub use comments::EditorReviewComment;
 pub(crate) use diff::{add_color, remove_color};
 pub use element::GutterHoverTarget;

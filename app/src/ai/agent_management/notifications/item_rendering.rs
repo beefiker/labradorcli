@@ -19,7 +19,6 @@ use warp_core::ui::theme::color::internal_colors;
 use crate::ai::agent::conversation::ConversationStatus;
 use crate::ai::agent_management::notifications::item::NotificationSourceAgent;
 use crate::ai::agent_management::notifications::{NotificationCategory, NotificationItem};
-use crate::ai::agent_management::telemetry::{AgentManagementTelemetryEvent, ArtifactType};
 use crate::ai::artifacts::{
     open_screenshot_lightbox, Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent,
 };
@@ -29,7 +28,6 @@ use crate::ui_components::icon_with_status::{
 };
 use crate::util::time_format::format_elapsed_since;
 use crate::view_components::action_button::ActionButtonTheme;
-use crate::workspace::WorkspaceAction;
 
 const COLLAPSED_MAX_CHARS: usize = 100;
 const EXPANDED_MAX_CHARS: usize = 500;

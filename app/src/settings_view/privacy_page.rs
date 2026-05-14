@@ -45,7 +45,7 @@ use crate::{
     appearance::Appearance,
     auth::auth_manager::AuthManager,
     channel::ChannelState,
-    report_if_error,     server::telemetry::TelemetryEvent,
+    report_if_error,
     settings::{AISettings, PrivacySettings},
     terminal::safe_mode_settings::{SafeModeEnabled, SafeModeSettings},
     ui_components::icons::Icon,

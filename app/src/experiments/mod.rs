@@ -11,7 +11,7 @@ mod rendering;
 pub use block_onboarding_layer::{BlockOnboarding, BLOCK_ONBOARDING_LAYER};
 pub use free_tier_default_model_layer::{FreeTierDefaultModel, FREE_TIER_DEFAULT_MODEL_LAYER};
 pub use improved_palette_search_layer::{ImprovedPaletteSearch, IMPROVED_PALETTE_SEARCH_LAYER};
-pub use login_layer::{AuthFlowInstructions, LOGIN_LAYER};
+pub use login_layer::LOGIN_LAYER;
 use warp_core::user_preferences::GetUserPreferences as _;
 
 use crate::auth::auth_state::AuthStateProvider;
@@ -320,7 +320,7 @@ pub trait Experiment<T: Experiment<T>>: FromStr {
             assigned_group = Self::layer().get_assigned_group(&anonymous_id);
 
             if let Some(group) = assigned_group.as_ref() {
-                let group_assignment = group.variant();
+                let _group_assignment = group.variant();
                 // Send synchronously since this we rely on this event to collect experiment data.
             }
         }

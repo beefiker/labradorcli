@@ -24,7 +24,7 @@ use warpui::{
     assets::asset_cache::{AssetCache, AssetSource, AssetState},
     elements::{
         new_scrollable::{ScrollableAppearance, SingleAxisConfig},
-        Align, Axis, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox,
+        Align, Axis, Border, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox,
         Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler,
         Expanded, Fill, Flex, FormattedTextElement, HeadingFontSizeMultipliers, Hoverable,
         Image as WarpImage, MainAxisAlignment, MainAxisSize, MouseStateHandle, NewScrollable,

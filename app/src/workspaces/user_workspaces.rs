@@ -8,7 +8,7 @@ use super::{
 #[cfg(test)]
 use super::team::MembershipRole;
 use crate::{
-    auth::{AuthStateProvider, UserUid},
+    auth::UserUid,
     channel::ChannelState,
     report_error,
     server::{

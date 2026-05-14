@@ -3,7 +3,6 @@ use crate::{
     channel::ChannelState,
     features::FeatureFlag,
     resource_center::skip_tips_and_write_to_user_defaults,
-        server::telemetry::TelemetryEvent,
     themes::theme::{Blend, Fill as FillTheme},
 };
 use pathfinder_geometry::vector::vec2f;

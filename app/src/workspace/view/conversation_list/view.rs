@@ -4,10 +4,7 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use crate::ai::active_agent_views_model::{ActiveAgentViewsModel, ConversationOrTaskId};
-use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent_conversations_model::{AgentConversationsModel, ConversationOrTask};
-use crate::ai::agent_management::telemetry::{AgentManagementTelemetryEvent, OpenedFrom};
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::appearance::Appearance;
 use crate::editor::{
@@ -515,9 +512,9 @@ impl ConversationListView {
     }
 
     /// Send telemetry for opening a conversation or task
-    fn send_open_telemetry(id: &ConversationOrTaskId, ctx: &mut ViewContext<Self>) {
+    fn send_open_telemetry(id: &ConversationOrTaskId, _ctx: &mut ViewContext<Self>) {
         match id {
-            ConversationOrTaskId::ConversationId(conversation_id) => {
+            ConversationOrTaskId::ConversationId(_conversation_id) => {
             }
         }
     }

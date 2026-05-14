@@ -8,7 +8,6 @@ use crate::features::FeatureFlag;
 use crate::launch_configs::launch_config::LaunchConfig;
 use crate::menu::{MenuAction, MenuItem, MenuItemFields};
 use crate::pane_group::PaneGroup;
-use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
 use settings::Setting as _;
 use std::sync::Arc;
 use std::time::Duration;

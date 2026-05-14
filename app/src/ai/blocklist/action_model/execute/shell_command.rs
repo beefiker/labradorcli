@@ -36,7 +36,6 @@ use crate::{
         TerminalModel,
     },
 };
-use crate::{TelemetryEvent};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 
@@ -133,7 +132,7 @@ impl ShellCommandExecutor {
                     Some(self.terminal_view_id),
                     ctx,
                 );
-                if let CommandExecutionPermission::Allowed(reason) = autoexecution_permission {
+                if let CommandExecutionPermission::Allowed(_reason) = autoexecution_permission {
                 } else if let CommandExecutionPermission::Denied(reason) = autoexecution_permission
                 {
                     if AppExecutionMode::as_ref(ctx).is_autonomous() {

@@ -1,5 +1,4 @@
 use crate::ai::blocklist::view_util::render_provider_icon_button;
-use crate::ai::skills::{SkillOpenOrigin, SkillTelemetryEvent};
 use anyhow::Result;
 use lazy_static::lazy_static;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
@@ -60,10 +59,7 @@ use crate::{
         },
         blocklist::{
             action_model::{
-                AIActionStatus, BlocklistAIActionEvent, BlocklistAIActionModel,
-                EditAcceptAndContinueClickedEvent, EditAcceptClickedEvent, EditResolvedEvent,
-                EditStats, MalformedFinalLineProxyEvent, RequestFileEditsFormatKind,
-                RequestFileEditsTelemetryEvent,
+                AIActionStatus, BlocklistAIActionEvent, BlocklistAIActionModel, RequestFileEditsFormatKind,
             },
             history_model::BlocklistAIHistoryModel,
             inline_action::{
@@ -98,7 +94,6 @@ use crate::{
         pane::{view, PaneId},
         BackingView, PaneEvent,
     },
-        server::telemetry::{AgentModeCodeFileNavigationSource, ToggleCodeSuggestionsSettingSource},
     settings::AISettings,
     terminal::{input::SET_INPUT_MODE_AGENT_ACTION_NAME, ShellLaunchData},
     ui_components::{blended_colors, icons::Icon},
@@ -670,7 +665,7 @@ impl CodeDiffView {
                 }
                 me.user_edited_file_contents = true;
 
-                let Some(output_id) = me.server_output_id() else {
+                let Some(_output_id) = me.server_output_id() else {
                     return;
                 };
 
@@ -2093,7 +2088,7 @@ impl CodeDiffView {
                 .update(ctx, |v, ctx| v.navigate_previous_diff_hunk(ctx)),
         };
 
-        if let Some(output_id) = self.server_output_id() {
+        if let Some(_output_id) = self.server_output_id() {
         }
     }
 
@@ -2122,7 +2117,7 @@ impl CodeDiffView {
         });
         ctx.notify();
 
-        if let Some(output_id) = self.server_output_id() {
+        if let Some(_output_id) = self.server_output_id() {
         }
     }
 
@@ -2229,10 +2224,10 @@ impl CodeDiffView {
     /// Consolidates the common telemetry logic for reject operations.
     fn send_telemetry_for_edit_resolution(
         &self,
-        response: RequestedEditResolution,
+        _response: RequestedEditResolution,
         ctx: &mut ViewContext<Self>,
     ) {
-        let (lines_added, lines_removed) = self.pending_diffs_line_counts(ctx);
+        let (_lines_added, _lines_removed) = self.pending_diffs_line_counts(ctx);
     }
 
     /// We are processing unified diff and saving files concurrently. That's why
@@ -2728,7 +2723,7 @@ impl TypedActionView for CodeDiffView {
                     self.selected_tab = *idx;
                     ctx.notify();
 
-                    if let Some(output_id) = self.server_output_id() {
+                    if let Some(_output_id) = self.server_output_id() {
                     }
                 }
             }
@@ -2757,7 +2752,7 @@ impl TypedActionView for CodeDiffView {
                 });
                 ctx.notify();
 
-                if let Ok(checked) = checked {
+                if let Ok(_checked) = checked {
                 }
             }
             CodeDiffViewAction::OpenSettings => {

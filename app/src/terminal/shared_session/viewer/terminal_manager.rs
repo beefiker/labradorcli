@@ -7,7 +7,6 @@ use session_sharing_protocol::common::{
     TeamAccessLevelUpdateResponse, UniversalDeveloperInputContextUpdate,
     UpdatePendingUserRoleResponse,
 };
-use session_sharing_protocol::sharer::SessionSourceType;
 use session_sharing_protocol::viewer::SessionEndedReason;
 use settings::Setting as _;
 use std::any::Any;

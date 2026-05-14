@@ -87,7 +87,6 @@ use crate::{
             AIAgentActionResultType, AIAgentActionType, CancellationReason, FileContext,
             FileLocations, ServerOutputId,
         },
-        agent_sdk::AmbientAgentTaskId,
         get_relevant_files::controller::GetRelevantFilesController,
     },
     terminal::{

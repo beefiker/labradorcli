@@ -3,7 +3,6 @@ use warpui::{Entity, ModelContext, ModelHandle};
 
 use crate::{
     ai::blocklist::agent_view::{AgentViewController, AgentViewControllerEvent},
-    server::telemetry::TelemetryEvent,
     terminal::input::buffer_model::InputBufferModel,
 };
 

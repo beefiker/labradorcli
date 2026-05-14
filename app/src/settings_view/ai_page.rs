@@ -47,7 +47,7 @@ use warp_core::context_flag::ContextFlag;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
-    Border, ChildView, ConstrainedBox, CornerRadius, CrossAxisAlignment, Dismiss, Expanded, Fill,
+    ChildView, ConstrainedBox, CornerRadius, CrossAxisAlignment, Dismiss, Fill,
     HyperlinkLens, MainAxisAlignment, MainAxisSize, MouseStateHandle, Radius, Shrinkable, Text,
 };
 use warpui::fonts::{Properties, Weight};
@@ -108,10 +108,6 @@ impl AISubpage {
     }
 }
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::server::telemetry::{
-    AgentModeAutoDetectionSettingOrigin, AutonomySettingToggleSource,
-    ToggleCodeSuggestionsSettingSource,
-};
 use crate::ui_components::icons::Icon;
 use crate::view_components::dropdown::DropdownAction;
 use crate::workspaces::workspace::{AdminEnablementSetting, CustomerType};

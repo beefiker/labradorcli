@@ -21,7 +21,7 @@ use crate::terminal::shared_session::{
     COPY_LINK_TEXT,
 };
 use crate::terminal::view::{
-    ContextMenuAction, Event, InlineBannerItem, InlineBannerType, RichContentInsertionPosition,
+    ContextMenuAction, Event, InlineBannerItem, InlineBannerType,
     SharedSessionBanners, SizeUpdateBuilder, TerminalAction, TerminalView,
 };
 use crate::terminal::TerminalModel;
@@ -30,7 +30,6 @@ use crate::{
     menu::{MenuItem, MenuItemFields},
     terminal::shared_session::presence_manager::{Event as PresenceManagerEvent, PresenceManager},
 };
-use crate::{TelemetryEvent};
 use chrono::{DateTime, Local};
 use itertools::Itertools;
 use session_sharing_protocol::common::{
@@ -476,7 +475,7 @@ impl TerminalView {
             scrollback_type,
             source_type,
         });
-        if let Some(source) = source {
+        if let Some(_source) = source {
         }
     }
 
@@ -491,7 +490,7 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         let started_at = Local::now();
-        let self_handle = ctx.handle();
+        let _self_handle = ctx.handle();
         let adapter = Adapter::new_for_sharer(
             sharer_id,
             firebase_uid,
@@ -541,7 +540,7 @@ impl TerminalView {
 
     fn stop_sharing_session_for_reason(
         &mut self,
-        source: SharedSessionActionSource,
+        _source: SharedSessionActionSource,
         reason: SessionEndedReason,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -563,7 +562,7 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         let started_at = Local::now();
-        let self_handle = ctx.handle();
+        let _self_handle = ctx.handle();
         let adapter = Adapter::new_for_viewer(
             viewer_id.clone(),
             firebase_uid,
@@ -1158,8 +1157,8 @@ impl TerminalView {
 
     pub fn open_shared_session_on_desktop(
         &mut self,
-        source: SharedSessionActionSource,
-        ctx: &mut ViewContext<Self>,
+        _source: SharedSessionActionSource,
+        _ctx: &mut ViewContext<Self>,
     ) {
         #[cfg(target_family = "wasm")]
         {
@@ -1266,7 +1265,7 @@ impl TerminalView {
     // logic in TerminalView and Workspace (when starting a share).
     pub fn copy_shared_session_link(
         &mut self,
-        source: SharedSessionActionSource,
+        _source: SharedSessionActionSource,
         ctx: &mut ViewContext<Self>,
     ) {
         let manager = Manager::as_ref(ctx);
