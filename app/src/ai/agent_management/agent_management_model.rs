@@ -251,6 +251,17 @@ impl AgentNotificationsModel {
         }
     }
 
+    /// Drains and returns the pending artifacts for a conversation.
+    #[cfg(test)]
+    pub(crate) fn flush_pending_artifacts(
+        &mut self,
+        conversation_id: crate::ai::agent::conversation::AIConversationId,
+    ) -> Vec<crate::ai::artifacts::Artifact> {
+        self.pending_artifacts
+            .remove(&conversation_id)
+            .unwrap_or_default()
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn add_notification(
         &mut self,
