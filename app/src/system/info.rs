@@ -50,8 +50,6 @@ pub struct SystemInfo {
     stats: StatsBuffer,
     /// A helper structure for reporting resource usage via telemetry events.
     resource_usage_reporter: ResourceUsageReporter,
-    /// The long OS version.
-    long_os_version: Option<String>,
 }
 
 impl SystemInfo {
@@ -66,7 +64,6 @@ impl SystemInfo {
             has_emitted_memory_warning_event: false,
             stats: Default::default(),
             resource_usage_reporter: Default::default(),
-            long_os_version: sysinfo::System::long_os_version(),
         };
 
         // Initialize the underlying system info.  This is necessary in order
@@ -119,10 +116,6 @@ impl SystemInfo {
             .expect("current process should exist")
             .cpu_usage();
         total_usage / 100.
-    }
-
-    pub fn long_os_version(&self) -> Option<&str> {
-        self.long_os_version.as_deref()
     }
 
     fn schedule_refresh(ctx: &mut ModelContext<Self>) {
