@@ -166,20 +166,6 @@ impl NotificationItems {
         self.items.iter().find(|item| item.id == id)
     }
 
-    /// Marks all notifications from the given terminal view as read.
-    /// Returns true if any were changed.
-    pub(crate) fn mark_all_terminal_view_items_as_read(
-        &mut self,
-        terminal_view_id: EntityId,
-    ) -> bool {
-        let mut any_changed = false;
-        for item in &mut self.items {
-            if item.terminal_view_id == terminal_view_id {
-                any_changed |= item.mark_as_read();
-            }
-        }
-        any_changed
-    }
 
     pub(crate) fn mark_item_read(&mut self, id: NotificationId) -> bool {
         self.items

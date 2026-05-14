@@ -240,85 +240,6 @@ impl AgentNotificationsModel {
         });
     }
 
-    fn handle_history_event_for_mailbox(
-        &mut self,
-        status: &ConversationStatus,
-        conversation_id: AIConversationId,
-        latest_query: Option<String>,
-        terminal_view_id: EntityId,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let origin = NotificationOrigin::Conversation(conversation_id);
-
-        // If the conversation view is no longer open, don't create notifications for it
-        // (there's nothing to navigate to when clicking them).
-        if !ActiveAgentViewsModel::as_ref(ctx).is_conversation_open(conversation_id, ctx) {
-            self.pending_artifacts.remove(&conversation_id);
-            self.remove_notification_by_source(origin, ctx);
-            return;
-        }
-
-        let title = latest_query.unwrap_or_else(|| "Agent task".to_owned());
-
-        match status {
-            // When the agent resumes its work, clear stale notifications.
-            ConversationStatus::InProgress => {
-                self.remove_notification_by_source(origin, ctx);
-            }
-            ConversationStatus::Success => {
-                let artifacts = self.flush_pending_artifacts(conversation_id);
-                self.add_notification(
-                    title,
-                    "Task completed.".to_owned(),
-                    NotificationCategory::Complete,
-                    NotificationSourceAgent::Oz,
-                    origin,
-                    terminal_view_id,
-                    artifacts,
-                    ctx,
-                );
-            }
-            ConversationStatus::Cancelled => {
-                let artifacts = self.flush_pending_artifacts(conversation_id);
-                self.add_notification(
-                    title,
-                    "Task was cancelled.".to_owned(),
-                    NotificationCategory::Complete,
-                    NotificationSourceAgent::Oz,
-                    origin,
-                    terminal_view_id,
-                    artifacts,
-                    ctx,
-                );
-            }
-            ConversationStatus::Blocked { blocked_action } => {
-                self.add_notification(
-                    title,
-                    blocked_action.clone(),
-                    NotificationCategory::Request,
-                    NotificationSourceAgent::Oz,
-                    origin,
-                    terminal_view_id,
-                    vec![],
-                    ctx,
-                );
-            }
-            ConversationStatus::Error => {
-                let artifacts = self.flush_pending_artifacts(conversation_id);
-                self.add_notification(
-                    title,
-                    "Something went wrong.".to_owned(),
-                    NotificationCategory::Error,
-                    NotificationSourceAgent::Oz,
-                    origin,
-                    terminal_view_id,
-                    artifacts,
-                    ctx,
-                );
-            }
-        }
-    }
-
     /// Removes the existing notification for the given source (if any) and emits an update event.
     fn remove_notification_by_source(
         &mut self,
@@ -328,16 +249,6 @@ impl AgentNotificationsModel {
         if self.notifications.remove_by_origin(origin) {
             ctx.emit(AgentManagementEvent::NotificationUpdated);
         }
-    }
-
-    /// Drains and returns the pending artifacts for a conversation.
-    pub(crate) fn flush_pending_artifacts(
-        &mut self,
-        conversation_id: AIConversationId,
-    ) -> Vec<Artifact> {
-        self.pending_artifacts
-            .remove(&conversation_id)
-            .unwrap_or_default()
     }
 
     #[allow(clippy::too_many_arguments)]

@@ -93,14 +93,6 @@ impl AgentTodosPopupView {
         }
     }
 
-    /// Scroll to the in-progress item, if not currently visible.
-    pub fn scroll_to_in_progress_item(&self) {
-        self.scroll_state.scroll_to_position(ScrollTarget {
-            position_id: IN_PROGRESS_POSITION_ID.to_string(),
-            mode: ScrollToPositionMode::FullyIntoView,
-        });
-    }
-
     fn close(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.emit(AgentTodosPopupEvent::Close);
     }
