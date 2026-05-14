@@ -6,8 +6,8 @@ use warp_cli::agent::Harness;
 use warp_managed_secrets::ManagedSecretValue;
 
 use crate::ai::agent_sdk::{
-    driver::AgentDriverError, task_env_vars, validate_cli_installed, AgentConfigSnapshot,
-    AmbientAgentTaskId, ClaudeHarness, HarnessConfig, ThirdPartyHarness,
+    driver::AgentDriverError, task_env_vars, validate_cli_installed, AmbientAgentTaskId,
+    ClaudeHarness, ThirdPartyHarness,
 };
 use crate::server::server_api::ai::AIClient;
 use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
@@ -52,18 +52,6 @@ pub(super) fn build_local_claude_child_command(prompt: &str) -> String {
 pub(super) fn build_local_opencode_child_command(prompt: &str) -> String {
     let quoted_prompt = shell_quote(prompt);
     format!("opencode --prompt {quoted_prompt}")
-}
-
-fn local_child_task_config(harness: Harness) -> Option<AgentConfigSnapshot> {
-    match harness {
-        Harness::OpenCode | Harness::Codex | Harness::Unknown => None,
-        Harness::Claude => Some(AgentConfigSnapshot {
-            harness: Some(HarnessConfig {
-                harness_type: harness,
-            }),
-            ..Default::default()
-        }),
-    }
 }
 
 pub(super) async fn prepare_local_harness_child_launch(

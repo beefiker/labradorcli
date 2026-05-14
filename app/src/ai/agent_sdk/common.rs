@@ -71,13 +71,11 @@ pub fn resolve_owner(team_flag: bool, user_flag: bool, ctx: &AppContext) -> anyh
     }
 
     if user_flag {
-        let user_id = AuthStateProvider::as_ref(ctx)
+        AuthStateProvider::as_ref(ctx)
             .get()
             .user_id()
             .ok_or_else(|| anyhow::anyhow!("User should be logged in"))?;
-        return Ok(Owner::User {
-            user_uid: user_id.to_string(),
-        });
+        return Ok(Owner::User);
     }
 
     // Default: try team first, fall back to user
@@ -88,13 +86,11 @@ pub fn resolve_owner(team_flag: bool, user_flag: bool, ctx: &AppContext) -> anyh
     }
 
     log::warn!("Tried to default to creating team object, team could not be found.");
-    let user_id = AuthStateProvider::as_ref(ctx)
+    AuthStateProvider::as_ref(ctx)
         .get()
         .user_id()
         .ok_or_else(|| anyhow::anyhow!("User should be logged in"))?;
-    Ok(Owner::User {
-        user_uid: user_id.to_string(),
-    })
+    Ok(Owner::User)
 }
 
 /// Refresh workspace metadata before executing an operation.
@@ -170,7 +166,7 @@ pub(super) async fn fetch_and_validate_conversation_harness(
 pub fn format_owner(owner: &Owner) -> &'static str {
     // TODO: For potentially-shared objects, consider looking up the particular user/team name.
     match owner {
-        Owner::User { .. } => "Personal",
+        Owner::User => "Personal",
         Owner::Team { .. } => "Team",
     }
 }

@@ -1,4 +1,3 @@
-use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIAgentHarness, AIConversation, AIConversationId};
 use crate::ai::agent_conversations_model::{
     AgentConversationsModel, AgentConversationsModelEvent,
@@ -934,18 +933,6 @@ type InitialLayoutCallback = Box<
     ) -> (PaneData, InitialFocus),
 >;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AIDocumentPaneVisibilityAction {
-    /// Ensure the requested AI document pane is visible.
-    ///
-    /// If the requested pane is already open, this will keep it open.
-    Open,
-    /// Toggle visibility of the requested AI document pane.
-    ///
-    /// If the requested pane is open, this will close it. Otherwise it will open it.
-    Toggle,
-}
-
 impl PaneGroup {
     /// Executes the provided callback for each TerminalView contained within
     /// this pane group.
@@ -1829,12 +1816,6 @@ impl PaneGroup {
             .map(move |pane| (pane.id(), pane.file_view(app)))
     }
 
-    fn close_panes(&mut self, pane_ids: Vec<PaneId>, ctx: &mut ViewContext<Self>) {
-        for pane_id in pane_ids {
-            self.close_pane(pane_id, ctx);
-        }
-    }
-
     pub fn has_active_code_pane_with_unsaved_changes(&self, ctx: &AppContext) -> bool {
         self.focused_pane_id(ctx).is_code_pane()
             && self
@@ -2702,67 +2683,6 @@ impl PaneGroup {
         _event: &AgentConversationsModelEvent,
         _ctx: &mut ViewContext<Self>,
     ) {
-    }
-
-    /// Fetches conversation data and loads it into the given transcript viewer.
-    ///
-    /// Returns `true` if the conversation metadata was found and the async load
-    /// was kicked off, or `false` if the metadata isn't available yet (caller
-    /// should defer and retry later).
-    fn fetch_and_load_transcript(
-        target_view: ViewHandle<TerminalView>,
-        server_conversation_token: ServerConversationToken,
-        ctx: &mut ViewContext<Self>,
-    ) -> bool {
-        let history_model_handle = BlocklistAIHistoryModel::handle(ctx);
-        let ai_conversation_id = history_model_handle
-            .as_ref(ctx)
-            .find_conversation_id_by_server_token(&server_conversation_token);
-
-        let Some(ai_conversation_id) = ai_conversation_id else {
-            return false;
-        };
-
-        let future = history_model_handle
-            .as_ref(ctx)
-            .load_conversation_data(ai_conversation_id, ctx);
-        ctx.spawn(future, move |group, conversation, ctx| {
-            if let Some(conversation) = conversation {
-                group.load_data_into_transcript_viewer(target_view, conversation, ctx);
-            } else if let Some(pane_id) =
-                group.find_pane_id_for_terminal_view(target_view.id(), ctx)
-            {
-                log::error!(
-                    "Failed to restore ambient agent pane, replacing with new cloud conversation"
-                );
-                group.replace_pane_with_new_cloud_conversation(pane_id, ctx);
-            }
-        });
-        true
-    }
-
-    /// Replaces a pane with a new cloud conversation.
-    fn replace_pane_with_new_cloud_conversation(
-        &mut self,
-        pane_id: PaneId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let resources = TerminalViewResources {
-            tips_completed: self.tips_completed.clone(),
-            server_api: self.server_api.clone(),
-            model_event_sender: self.model_event_sender.clone(),
-        };
-        let view_size = Self::estimated_view_bounds(ctx).size();
-        let (view, terminal_manager) =
-            Self::create_ambient_agent_terminal(resources, view_size, ctx);
-        let new_pane = TerminalPane::new(
-            Uuid::new_v4().as_bytes().to_vec(),
-            terminal_manager,
-            view,
-            self.model_event_sender.clone(),
-            ctx,
-        );
-        self.replace_pane(pane_id, new_pane, false, ctx);
     }
 
     /// Initial layout for a [`PaneGroup`] with a single ambient agent pane.

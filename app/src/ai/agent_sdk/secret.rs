@@ -237,7 +237,7 @@ fn create_secret_with_input(
             };
 
             let secret_owner = match owner {
-                Owner::User { .. } => SecretOwner::CurrentUser,
+                Owner::User => SecretOwner::CurrentUser,
                 Owner::Team { team_uid } => SecretOwner::Team {
                     team_uid: team_uid.clone(),
                 },
@@ -289,7 +289,7 @@ fn delete_secret(ctx: &mut AppContext, args: DeleteSecretArgs) -> Result<()> {
             };
 
             let secret_owner = match &owner {
-                Owner::User { .. } => SecretOwner::CurrentUser,
+                Owner::User => SecretOwner::CurrentUser,
                 Owner::Team { team_uid } => SecretOwner::Team {
                     team_uid: team_uid.clone(),
                 },
@@ -307,7 +307,7 @@ fn delete_secret(ctx: &mut AppContext, args: DeleteSecretArgs) -> Result<()> {
                 }
 
                 let scope = match &owner {
-                    Owner::User { .. } => "personal",
+                    Owner::User => "personal",
                     Owner::Team { .. } => "team",
                 };
 
@@ -393,7 +393,7 @@ fn update_secret(ctx: &mut AppContext, args: UpdateSecretArgs) -> Result<()> {
             };
 
             let secret_owner = match owner {
-                Owner::User { .. } => SecretOwner::CurrentUser,
+                Owner::User => SecretOwner::CurrentUser,
                 Owner::Team { team_uid } => SecretOwner::Team {
                     team_uid: team_uid.clone(),
                 },
@@ -481,9 +481,7 @@ fn list_secrets(
             Ok(secrets) => {
                 let secret_infos = secrets.into_iter().map(|secret| {
                     let owner = match secret.owner.type_ {
-                        SpaceType::User => Owner::User {
-                            user_uid: secret.owner.uid.inner().to_string(),
-                        },
+                        SpaceType::User => Owner::User,
                         SpaceType::Team => Owner::Team {
                             team_uid: secret.owner.uid.inner().to_string(),
                         },

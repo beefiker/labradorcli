@@ -53,7 +53,7 @@ pub(crate) type AmbientAgentTaskId = uuid::Uuid;
 /// resolves the type name when validating personal/team flags.
 #[derive(Debug, Clone)]
 pub(crate) enum Owner {
-    User { user_uid: String },
+    User,
     Team { team_uid: String },
 }
 
