@@ -3,7 +3,6 @@ pub mod conversation_list;
 #[cfg(enable_crash_recovery)]
 mod crash_recovery;
 pub mod global_search;
-pub(crate) mod launch_modal;
 pub(crate) mod left_panel;
 pub(crate) mod onboarding;
 pub(crate) mod openwarp_launch_modal;

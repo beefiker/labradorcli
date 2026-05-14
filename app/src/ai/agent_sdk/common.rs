@@ -4,7 +4,6 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::TryFutureExt;
 use warp_cli::agent::Harness;
 use warpui::r#async::FutureExt;
 use warpui::{AppContext, GetSingletonModelHandle, SingletonEntity as _, UpdateModel};

@@ -21,7 +21,6 @@ use pathfinder_geometry::vector::vec2f;
 use std::path::PathBuf;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::color::blend::Blend;
-use warp_editor::model::CoreEditorModel;
 
 use warp_core::ui::theme::color::internal_colors::{
     accent_overlay_2, accent_overlay_3, neutral_1, neutral_3, neutral_4, neutral_6, text_main,
