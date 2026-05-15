@@ -24,7 +24,7 @@ use crate::server::server_api::auth::FetchUserResult;
 use crate::server::{
     server_api::{
         auth::{
-            AuthClient, MintCustomTokenError, UserAuthenticationError,
+            AuthClient, UserAuthenticationError,
         },
         ServerApi,
     },
@@ -58,8 +58,6 @@ pub enum AuthManagerEvent {
     AttemptedLoginGatedFeature {
         auth_view_variant: AuthViewVariant,
     },
-    /// Failed to mint a new custom token for an anonymous user.
-    MintCustomTokenFailed(MintCustomTokenError),
     /// Received a device authorization code as part of the device auth flow.
     ReceivedDeviceAuthorizationCode {
         #[cfg_attr(target_family = "wasm", allow(unused))]
@@ -438,7 +436,7 @@ impl AuthManager {
                         }
                     }
                     Err(e) => {
-                        ctx.emit(AuthManagerEvent::MintCustomTokenFailed(e));
+                        log::warn!("Failed to mint a custom token: {e:?}");
                     }
                 }
             },
