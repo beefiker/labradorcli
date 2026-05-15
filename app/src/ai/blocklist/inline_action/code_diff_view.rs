@@ -66,7 +66,6 @@ use crate::{
                 inline_action_icons::{cancelled_icon, green_check_icon, icon_size, reverted_icon},
             },
             model::{AIBlockModel, AIBlockModelHelper},
-            RequestedEditResolution,
         },
         mcp::{mcp_provider_from_file_path, MCPProvider},
         paths::host_native_absolute_path,
@@ -492,7 +491,6 @@ pub struct CodeDiffView {
     focus_handle: Option<PaneFocusHandle>,
     /// Client and server identifiers for the AI output associated with the code diffs.
     identifiers: AIIdentifiers,
-    edit_format_kind: RequestFileEditsFormatKind,
     /// `False` until a user makes the first edit to one of the diffs in the view.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     user_edited_file_contents: bool,
@@ -775,7 +773,7 @@ impl CodeDiffView {
         initial_state: CodeDiffState,
         title: Option<String>,
         identifiers: AIIdentifiers,
-        edit_format_kind: RequestFileEditsFormatKind,
+        _edit_format_kind: RequestFileEditsFormatKind,
         should_show_speedbump: bool,
         session_platform: Option<SessionPlatform>,
         ctx: &mut ViewContext<Self>,
@@ -930,7 +928,6 @@ impl CodeDiffView {
             title,
             focus_handle: None,
             identifiers,
-            edit_format_kind,
             user_edited_file_contents: false,
             original_pane_id: None,
             scrollable_state: Default::default(),
@@ -1105,7 +1102,7 @@ impl CodeDiffView {
 
         // Handled in `CodeDiffView` instead of `CodeDiffModel` so we emit one event for all files.
         // This isn't emitted in the executor because rejected diffs aren't executed.
-        self.send_telemetry_for_edit_resolution(RequestedEditResolution::Reject, ctx);
+        self.send_telemetry_for_edit_resolution(ctx);
     }
 
     /// Revert all changes by replacing file contents with the base version.
@@ -2219,13 +2216,10 @@ impl CodeDiffView {
         self.identifiers.server_output_id.clone()
     }
 
-    /// Helper function to send telemetry for edit resolution.
-    /// Consolidates the common telemetry logic for reject operations.
-    fn send_telemetry_for_edit_resolution(
-        &self,
-        _response: RequestedEditResolution,
-        ctx: &mut ViewContext<Self>,
-    ) {
+    /// Helper function to send telemetry for edit resolution. No-op stub:
+    /// telemetry was removed but the call site still pulls line-count metrics
+    /// in case we wire something back later.
+    fn send_telemetry_for_edit_resolution(&self, ctx: &mut ViewContext<Self>) {
         let (_lines_added, _lines_removed) = self.pending_diffs_line_counts(ctx);
     }
 

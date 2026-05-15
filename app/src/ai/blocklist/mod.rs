@@ -35,7 +35,7 @@ pub(crate) use action_model::{
 
 #[cfg(any(test, feature = "integration_tests"))]
 pub(crate) use block::model::testing::FakeAIBlockModel;
-pub(crate) use block::{init, model, AIBlock, AIBlockEvent, RequestedEditResolution};
+pub(crate) use block::{init, model, AIBlock, AIBlockEvent};
 
 pub(crate) use context_model::{
     block_context_from_terminal_model, AttachmentType, BlocklistAIContextEvent,

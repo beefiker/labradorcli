@@ -4644,12 +4644,7 @@ impl TerminalView {
                     ctx,
                 );
             }
-            LegacyPassiveSuggestionsEvent::PassiveCodeDiffRequestStarted {
-                prompt_suggestion_id: _,
-                code_exchange_id: _,
-                block_id: _,
-            } => {
-            }
+            LegacyPassiveSuggestionsEvent::PassiveCodeDiffRequestStarted => {}
             LegacyPassiveSuggestionsEvent::PassiveCodeDiffFailed { reason } => {
                 self.try_clear_prompt_suggestions_banner_code_state(*reason, ctx);
             }

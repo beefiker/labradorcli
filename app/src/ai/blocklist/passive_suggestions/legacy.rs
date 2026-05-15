@@ -7,12 +7,12 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use super::static_prompt_suggestions::static_suggested_query;
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::agent::PassiveSuggestionTrigger;
-use crate::ai::agent::{AIAgentExchangeId, CancellationReason};
+use crate::ai::agent::CancellationReason;
 use crate::ai::blocklist::controller::{
     response_stream::ResponseStreamId, BlocklistAIController, BlocklistAIControllerEvent,
 };
 use crate::ai::blocklist::{
-    read_local_file_context, BlocklistAIHistoryModel, BlocklistAIPermissions,
+    read_local_file_context, BlocklistAIPermissions,
 };
 use crate::ai::paths::host_native_absolute_path;
 use crate::ai::predict::generate_am_query_suggestions::{
@@ -55,11 +55,7 @@ pub enum PassiveSuggestionsEvent {
         command: String,
         request_duration_ms: u64,
     },
-    PassiveCodeDiffRequestStarted {
-        prompt_suggestion_id: String,
-        code_exchange_id: Option<AIAgentExchangeId>,
-        block_id: BlockId,
-    },
+    PassiveCodeDiffRequestStarted,
     PassiveCodeDiffFailed {
         reason: PromptSuggestionFallbackReason,
     },
@@ -417,7 +413,7 @@ impl PassiveSuggestionsModel {
             return;
         }
 
-        let prompt_suggestion_id = query.id;
+        let _prompt_suggestion_id = query.id;
         let query_text = query.prompt;
         self.code_diff_preflight_future_handle = Some(ctx.spawn(
             async move {
@@ -494,17 +490,9 @@ impl PassiveSuggestionsModel {
                 });
 
                 match result {
-                    Ok((conversation_id, stream_id)) => {
+                    Ok((_conversation_id, stream_id)) => {
                         me.pending_code_diff_stream_id = Some(stream_id.clone());
-                        let code_exchange_id = BlocklistAIHistoryModel::as_ref(ctx)
-                            .conversation(&conversation_id)
-                            .and_then(|conversation| conversation.root_task_exchanges().next())
-                            .map(|exchange| exchange.id);
-                        ctx.emit(PassiveSuggestionsEvent::PassiveCodeDiffRequestStarted {
-                            prompt_suggestion_id: prompt_suggestion_id.clone(),
-                            code_exchange_id,
-                            block_id: block_id.clone(),
-                        });
+                        ctx.emit(PassiveSuggestionsEvent::PassiveCodeDiffRequestStarted);
                         me.start_code_diff_timeout(stream_id, ctx);
                     }
                     Err(_) => {

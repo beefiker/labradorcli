@@ -5278,12 +5278,6 @@ impl Entity for AIBlock {
     type Event = AIBlockEvent;
 }
 
-/// User's final response to an AI-suggested code edit.
-#[derive(Clone, Copy, Debug, Serialize)]
-pub enum RequestedEditResolution {
-    Accept,
-    Reject,
-}
 
 #[derive(Debug, Clone)]
 pub enum AIBlockAction {
