@@ -3,7 +3,6 @@
 
 mod ai;
 mod alloc;
-mod antivirus;
 #[cfg(target_os = "macos")]
 mod app_menus;
 mod app_services;
@@ -263,7 +262,6 @@ pub use warp_core::send_telemetry_from_ctx;
 // Re-export the safe logging macros at the crate root level for backwards compatibility
 pub use warp_core::{safe_debug, safe_error, safe_info, safe_warn};
 
-use crate::antivirus::AntivirusInfo;
 #[cfg(feature = "local_fs")]
 use warp_files::FileModel;
 use warpui::platform::TerminationMode;
@@ -1172,8 +1170,6 @@ fn initialize_app(
 
     // Initialize ApiKeyManager after UserWorkspaces so it can subscribe to workspace/settings changes
     ctx.add_singleton_model(::ai::api_keys::ApiKeyManager::new);
-
-    ctx.add_singleton_model(AntivirusInfo::new);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "crash_reporting")] {

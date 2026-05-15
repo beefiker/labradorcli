@@ -14,7 +14,6 @@ use sentry::{ClientInitGuard, IntoDsn, SessionMode};
 use warp_core::channel::Channel;
 use warpui::{r#async::block_on, AppContext, SingletonEntity};
 
-use crate::antivirus::{AntivirusInfo, AntivirusInfoEvent};
 use crate::auth::anonymous_id::get_or_create_anonymous_id;
 use crate::auth::{AuthStateProvider, UserUid};
 use crate::channel::ChannelState;
@@ -78,14 +77,6 @@ fn set_tag_internal(key: Cow<'_, str>, value: Cow<'_, str>) {
 /// Sets the [`GPUDeviceInfo`] of the last opened window for use in logging as a Sentry tag.
 pub(crate) fn set_gpu_device_info(gpu_device_info: GPUDeviceInfo) {
     for (key, value) in gpu_device_info.to_sentry_tags() {
-        set_tag(key, value);
-    }
-}
-
-/// Sets the [`AntivirusInfo`] for use in logging as a Sentry tag.
-/// Only reports the first detected antivirus product.
-pub fn set_antivirus_info(antivirus_info: &AntivirusInfo) {
-    for (key, value) in antivirus_info.to_sentry_tags() {
         set_tag(key, value);
     }
 }
@@ -192,14 +183,6 @@ pub(crate) fn init(ctx: &mut AppContext) -> bool {
             if current.stage != previous.stage {
                 set_lifecycle_stage(current.stage);
             }
-        }
-    });
-
-    let antivirus_info = AntivirusInfo::handle(ctx);
-    ctx.subscribe_to_model(&antivirus_info, |antivirus_info, event, ctx| match event {
-        AntivirusInfoEvent::ScannedComplete => {
-            let antivirus_info = antivirus_info.as_ref(ctx);
-            set_antivirus_info(antivirus_info);
         }
     });
 
@@ -599,11 +582,3 @@ impl ToSentryTags for Option<windowing::System> {
     }
 }
 
-impl ToSentryTags for &AntivirusInfo {
-    fn to_sentry_tags(&self) -> impl IntoIterator<Item = (&str, String)> {
-        [(
-            "warp.window.antivirus.name",
-            self.get().unwrap_or("none").into(),
-        )]
-    }
-}
