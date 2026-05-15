@@ -121,11 +121,6 @@ pub enum CodeEditorEvent {
     /// Emitted when a diff hunk is reverted
     DiffReverted,
     HiddenSectionExpanded,
-    /// Emitted when a comment is saved. This gets propagated up so that it
-    /// can be augmented with the file and repo paths and saved to the comment model.
-    CommentSaved {
-        comment: EditorReviewComment,
-    },
     RequestOpenComment(CommentId),
     /// Emitted when the viewport is updated after layout
     ViewportUpdated,
@@ -143,9 +138,6 @@ pub enum CodeEditorEvent {
         clamped: bool,
         /// Whether the mouse move event was covered by an element above the editor.
         is_covered: bool,
-    },
-    DeleteComment {
-        id: CommentId,
     },
     VimGotoDefinition,
     VimFindReferences,

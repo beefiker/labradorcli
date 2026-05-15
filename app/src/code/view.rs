@@ -522,9 +522,7 @@ impl CodeView {
                 }
                 me.focus_contents(ctx);
             }
-            LocalCodeEditorEvent::CommentSaved { .. }
-            | LocalCodeEditorEvent::RequestOpenComment(_)
-            | LocalCodeEditorEvent::DeleteComment { .. } => {
+            LocalCodeEditorEvent::RequestOpenComment(_) => {
                 // Comment events are handled by CodeReviewView, not CodeView
             }
             LocalCodeEditorEvent::RunTabConfigSkill { path } => {

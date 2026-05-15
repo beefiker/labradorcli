@@ -1,9 +1,8 @@
-use chrono::{DateTime, Local};
 use warpui::Entity;
 
 use crate::code::editor::line::EditorLineLocation;
 use crate::code_review::comments::{
-    AttachedReviewComment, AttachedReviewCommentTarget, CommentId, LineDiffContent,
+    AttachedReviewComment, AttachedReviewCommentTarget, CommentId,
 };
 
 #[derive(Debug, Clone)]
@@ -28,9 +27,6 @@ impl Entity for EditorCommentsModel {
 pub struct EditorReviewComment {
     pub id: CommentId,
     pub line: EditorLineLocation,
-    pub diff_content: LineDiffContent,
-    pub comment_content: String,
-    pub last_update_time: DateTime<Local>,
 }
 
 impl TryFrom<AttachedReviewComment> for EditorReviewComment {
@@ -38,12 +34,9 @@ impl TryFrom<AttachedReviewComment> for EditorReviewComment {
 
     fn try_from(comment: AttachedReviewComment) -> Result<Self, Self::Error> {
         match comment.target {
-            AttachedReviewCommentTarget::Line { content, line, .. } => Ok(EditorReviewComment {
+            AttachedReviewCommentTarget::Line { line, .. } => Ok(EditorReviewComment {
                 id: comment.id,
                 line,
-                diff_content: content,
-                comment_content: comment.content,
-                last_update_time: comment.last_update_time,
             }),
             _ => Err(()),
         }

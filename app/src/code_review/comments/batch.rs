@@ -107,17 +107,6 @@ impl ReviewCommentBatch {
             .collect()
     }
 
-    pub(crate) fn upsert_comment(
-        &mut self,
-        comment: AttachedReviewComment,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.upsert_comments_inner(vec![comment]);
-        ctx.emit(ReviewCommentBatchEvent::Changed {
-            should_reposition_comments: false,
-        });
-    }
-
     #[cfg(feature = "local_fs")]
     pub(crate) fn upsert_imported_comments(
         &mut self,

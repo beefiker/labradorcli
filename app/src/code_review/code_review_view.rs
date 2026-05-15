@@ -2953,30 +2953,6 @@ impl CodeReviewView {
             .and_then(|model| model.read(app, |batch, _| batch.diffset_comment().cloned()))
     }
 
-    /// Updates or adds a review comment.
-    fn update_review_comment(
-        &mut self,
-        comment: AttachedReviewComment,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let Some(model) = self.active_comment_model.clone() else {
-            return;
-        };
-
-        let is_existing = model.read(ctx, |batch, _| {
-            batch.get_review_comment_by_id(comment.id).is_some()
-        });
-
-        model.update(ctx, move |batch, ctx| {
-            batch.upsert_comment(comment.clone(), ctx);
-        });
-
-        // Telemetry: record whether this was a new comment or an edit.
-        if is_existing {
-        } else {
-        }
-    }
-
     /// Clears all review comments.
     fn clear_review_comments(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(model) = self.active_comment_model.clone() {
@@ -3410,27 +3386,6 @@ impl CodeReviewView {
                 GlobalBufferModel::handle(ctx).update(ctx, |global_buffer, ctx| {
                     global_buffer.discard_unsaved_changes(_path, ctx);
                 });
-            }
-            LocalCodeEditorEvent::CommentSaved { comment } => {
-                let Some(file_path) = editor.as_ref(ctx).file_path() else {
-                    log::error!(
-                        "Attempted to attach code review comment to a LocalCodeEditorView without a file path"
-                    );
-                    return;
-                };
-                let base = self.get_diff_base(ctx).ok();
-                let head = self.get_current_head(ctx);
-                let comment_with_file_context = AttachedReviewComment::from_editor_review_comment(
-                    comment.clone(),
-                    file_path.to_path_buf(),
-                    base,
-                    head,
-                );
-                self.update_review_comment(comment_with_file_context, ctx);
-                ctx.notify();
-            }
-            LocalCodeEditorEvent::DeleteComment { id } => {
-                self.delete_comment_by_id(*id, ctx);
             }
             LocalCodeEditorEvent::RequestOpenComment(comment_id) => {
                 let Some(existing_comment) = self.get_comment_by_id(*comment_id, ctx) else {

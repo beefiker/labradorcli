@@ -1,6 +1,6 @@
 use crate::{
     ai::agent::{CurrentHead, DiffBase},
-    code::editor::{line::EditorLineLocation, EditorReviewComment},
+    code::editor::line::EditorLineLocation,
 };
 use chrono::{DateTime, Local};
 use std::fmt::{Display, Formatter};
@@ -189,28 +189,6 @@ impl AttachedReviewCommentTarget {
 }
 
 impl AttachedReviewComment {
-    pub(crate) fn from_editor_review_comment(
-        comment: EditorReviewComment,
-        absolute_file_path: PathBuf,
-        base: Option<DiffBase>,
-        head: Option<CurrentHead>,
-    ) -> AttachedReviewComment {
-        AttachedReviewComment {
-            id: comment.id,
-            content: comment.comment_content,
-            base,
-            head,
-            target: AttachedReviewCommentTarget::Line {
-                absolute_file_path,
-                line: comment.line,
-                content: comment.diff_content,
-            },
-            last_update_time: comment.last_update_time,
-            outdated: false,
-            origin: CommentOrigin::Native,
-        }
-    }
-
     pub fn head(&self) -> Option<&CurrentHead> {
         self.head.as_ref()
     }

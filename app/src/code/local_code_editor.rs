@@ -63,7 +63,7 @@ use crate::{
     util::sync::Condition,
 };
 use crate::{
-    code::{editor::EditorReviewComment, global_buffer_model::GlobalBufferModelEvent},
+    code::global_buffer_model::GlobalBufferModelEvent,
     code_review::comments::CommentId,
 };
 use ai::diff_validation::DiffType;
@@ -140,15 +140,7 @@ pub enum LocalCodeEditorEvent {
         /// Used to register external files with the correct server.
         source_server_id: LanguageServerId,
     },
-    /// Emitted when a comment is saved. This propagates the comment content
-    /// changes to the CodeReviewView, which will update the comment model.
-    CommentSaved {
-        comment: EditorReviewComment,
-    },
     RequestOpenComment(CommentId),
-    DeleteComment {
-        id: CommentId,
-    },
     /// Emitted when the viewport is updated after layout
     ViewportUpdated,
     /// Emitted when the render state layout has been updated.
@@ -424,14 +416,6 @@ impl LocalCodeEditorView {
                         me.lsp_hover_state = LspHoverState::Loading(None);
                     }
                 }
-            }
-            CodeEditorEvent::CommentSaved { comment } => {
-                ctx.emit(LocalCodeEditorEvent::CommentSaved {
-                    comment: comment.clone(),
-                });
-            }
-            CodeEditorEvent::DeleteComment { id } => {
-                ctx.emit(LocalCodeEditorEvent::DeleteComment { id: *id });
             }
             CodeEditorEvent::RequestOpenComment(uuid) => {
                 ctx.emit(LocalCodeEditorEvent::RequestOpenComment(*uuid));
