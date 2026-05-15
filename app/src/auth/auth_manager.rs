@@ -9,27 +9,22 @@ use settings::Setting as _;
 use uuid::Uuid;
 use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
-use warp_graphql::mutations::create_anonymous_user::{
-    AnonymousUserType, CreateAnonymousUserResult,
-};
-use warpui::{clipboard::ClipboardContent, Entity, ModelContext, SingletonEntity, UpdateModel};
+use warpui::{Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use super::auth_state::{AuthState, PersistAction};
 use super::auth_view_modal::{AuthRedirectPayload, AuthViewVariant};
-use super::credentials::{Credentials, FirebaseToken, LoginToken};
+use super::credentials::{Credentials, LoginToken};
 use super::user::User;
 use super::AuthStateProvider;
-use super::UserUid;
 use crate::ai::llms::LLMPreferences;
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::autoupdate::AutoupdateState;
 use crate::persistence::ModelEvent;
 use crate::server::server_api::auth::FetchUserResult;
 use crate::server::{
-    graphql::get_user_facing_error_message,
     server_api::{
         auth::{
-            AnonymousUserCreationError, AuthClient, MintCustomTokenError, UserAuthenticationError,
+            AuthClient, MintCustomTokenError, UserAuthenticationError,
         },
         ServerApi,
     },
@@ -128,26 +123,6 @@ impl AuthManager {
             auth_client: server_api,
             pending_auth_state: None,
         }
-    }
-
-    /// Fetches and ultimately sets the user's auth state from an auth payload.
-    /// Typically, this function is triggered when a user clicks the intent link from their browser
-    /// back to Warp after login (or pastes the URL in the app).
-    pub fn initialize_user_from_auth_payload(
-        &mut self,
-        _auth_payload: AuthRedirectPayload,
-        _enforce_state_validation: bool,
-        _ctx: &mut ModelContext<Self>,
-    ) {
-        // Local-only fork: no Warp Cloud login flow to consume an auth redirect.
-    }
-
-    pub fn resume_interrupted_auth_payload(
-        &mut self,
-        _auth_payload: AuthRedirectPayload,
-        _ctx: &mut ModelContext<Self>,
-    ) {
-        // Local-only fork: no Warp Cloud login flow to resume.
     }
 
     #[cfg(target_family = "wasm")]
@@ -425,68 +400,6 @@ impl AuthManager {
         }
     }
 
-    pub fn create_anonymous_user(
-        &self,
-        referral_code: Option<String>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let anonymous_user_type = AnonymousUserType::NativeClientAnonymousUserFeatureGated;
-
-        let auth_client = self.auth_client.clone();
-        let _ = ctx.spawn(
-            async move {
-                auth_client
-                    .create_anonymous_user(referral_code, anonymous_user_type)
-                    .await
-            },
-            Self::on_create_anonymous_user,
-        );
-    }
-
-    fn on_create_anonymous_user(
-        &mut self,
-        response: Result<CreateAnonymousUserResult>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let custom_token = match response {
-            Ok(response_data) => match response_data {
-                CreateAnonymousUserResult::CreateAnonymousUserOutput(output) => Ok(output.id_token),
-                CreateAnonymousUserResult::UserFacingError(user_facing_error) => {
-                    Err(AnonymousUserCreationError::UserFacingError(
-                        get_user_facing_error_message(user_facing_error),
-                    ))
-                }
-                CreateAnonymousUserResult::Unknown => Err(AnonymousUserCreationError::Unknown),
-            },
-            Err(_) => Err(AnonymousUserCreationError::CreationFailed),
-        };
-
-        match custom_token {
-            Ok(custom_token) => {
-                // Exchange the custom token for an ID token.
-                let auth_client = self.auth_client.clone();
-                let _ = ctx.spawn(
-                    async move {
-                        auth_client
-                            .fetch_user(
-                                LoginToken::Firebase(FirebaseToken::Custom(custom_token)),
-                                false, /* for_refresh */
-                            )
-                            .await
-                    },
-                    Self::on_user_fetched,
-                );
-            }
-
-            Err(err) => {
-                report_error!(
-                    anyhow!(err).context("Encountered an error trying to create anonymous users")
-                );
-                ctx.emit(AuthManagerEvent::CreateAnonymousUserFailed);
-            }
-        }
-    }
-
     pub fn attempt_login_gated_feature(
         &self,
         _feature: LoginGatedFeature,
@@ -577,33 +490,6 @@ impl AuthManager {
         );
     }
 
-    pub fn copy_anonymous_user_linking_url_to_clipboard(&self, ctx: &mut ModelContext<Self>) {
-        if !self.auth_state.is_user_anonymous().unwrap_or_default() {
-            return;
-        }
-        let auth_client = self.auth_client.clone();
-        let _ = ctx.spawn(
-            async move { auth_client.fetch_new_custom_token().await },
-            move |me, response, ctx| {
-                let custom_token = me.auth_client.on_custom_token_fetched(response);
-
-                match custom_token {
-                    Ok(custom_token) => {
-                        let login_options_url = me.login_options_url(&custom_token);
-                        ctx.clipboard().write(ClipboardContent {
-                            plain_text: login_options_url,
-                            paths: None,
-                            ..Default::default()
-                        });
-                    }
-                    Err(e) => {
-                        ctx.emit(AuthManagerEvent::MintCustomTokenFailed(e));
-                    }
-                };
-            },
-        );
-    }
-
     /// Generates a unique state parameter for the authentication flow.
     fn generate_auth_state(&mut self) -> String {
         let state = Uuid::new_v4().to_string();
@@ -652,43 +538,6 @@ impl AuthManager {
             custom_token,
             state,
         )
-    }
-
-    pub fn link_sso_url(&mut self, email: &str) -> String {
-        let state = self.generate_auth_state();
-        format!(
-            "{}/link_sso?email={}&state={}",
-            ChannelState::server_root_url(),
-            email,
-            state,
-        )
-    }
-
-    /// Validates and consumes the pending auth state token. Returns `true` if the
-    /// provided state matches; in that case the pending state is cleared so the
-    /// CSRF token is single-use. A subsequent call with the same value will fail.
-    fn consume_auth_state(&mut self, received_state: &str) -> bool {
-        if self.pending_auth_state.as_deref() == Some(received_state) {
-            self.pending_auth_state = None;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Returns whether an auth redirect that failed state validation should be
-    /// silently dropped rather than surfaced as an error. This covers the
-    /// "user clicks the browser's 'Take me to Warp' button twice" case: once
-    /// they're fully logged in, a second redirect targeting the same user is
-    /// redundant and should not produce a user-visible error.
-    fn should_silently_ignore_stale_redirect(&self, incoming_user_uid: &Option<UserUid>) -> bool {
-        if self.auth_state.is_anonymous_or_logged_out() {
-            return false;
-        }
-        match (self.auth_state.user_id(), incoming_user_uid) {
-            (Some(current_uid), Some(incoming_uid)) => current_uid == *incoming_uid,
-            _ => false,
-        }
     }
 
     /// Sets the user as onboarded both on the server and locally.
