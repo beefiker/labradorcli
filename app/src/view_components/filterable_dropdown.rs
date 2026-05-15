@@ -35,13 +35,6 @@ pub enum FilterableDropdownEvent {
     Close,
 }
 
-#[derive(Default, Debug, PartialEq)]
-pub enum FilterableDropdownOrientation {
-    Up,
-    #[default]
-    Down,
-}
-
 pub struct FilterableDropdown<A: Action + Clone> {
     is_expanded: bool,
     disabled: bool,
@@ -52,7 +45,6 @@ pub struct FilterableDropdown<A: Action + Clone> {
     filter_editor: ViewHandle<EditorView>,
     selected_item: Option<MenuItem<DropdownAction<A>>>,
     items: Vec<DropdownItem<A>>,
-    orientation: FilterableDropdownOrientation,
     static_menu_header: Option<&'static str>,
     button_variant: ButtonVariant,
     style_override: Option<UiComponentStyles>,
@@ -115,7 +107,6 @@ where
             main_axis_size: MainAxisSize::Max,
             selected_item: None,
             items: Default::default(),
-            orientation: Default::default(),
             static_menu_header: None,
             button_variant: ButtonVariant::Outlined,
             style_override: None,
@@ -705,23 +696,13 @@ where
         if self.is_expanded {
             dropdown_stack.add_positioned_overlay_child(
                 dropdown_menu,
-                if self.orientation == FilterableDropdownOrientation::Down {
-                    OffsetPositioning::offset_from_save_position_element(
-                        self.top_bar_label(),
-                        vec2f(0., 0.),
-                        PositionedElementOffsetBounds::WindowByPosition,
-                        PositionedElementAnchor::BottomLeft,
-                        ChildAnchor::TopLeft,
-                    )
-                } else {
-                    OffsetPositioning::offset_from_save_position_element(
-                        self.top_bar_label(),
-                        vec2f(0., 0.),
-                        PositionedElementOffsetBounds::WindowByPosition,
-                        PositionedElementAnchor::TopLeft,
-                        ChildAnchor::BottomLeft,
-                    )
-                },
+                OffsetPositioning::offset_from_save_position_element(
+                    self.top_bar_label(),
+                    vec2f(0., 0.),
+                    PositionedElementOffsetBounds::WindowByPosition,
+                    PositionedElementAnchor::BottomLeft,
+                    ChildAnchor::TopLeft,
+                ),
             );
         }
         Container::new(dropdown_stack.finish())
