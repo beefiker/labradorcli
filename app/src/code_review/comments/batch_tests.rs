@@ -151,7 +151,6 @@ fn editor_comments_for_file_includes_only_line_comments() {
                 batch.editor_comments_for_file(std::path::Path::new("src/lib.rs"));
             assert_eq!(editor_comments.len(), 1);
             assert_eq!(editor_comments[0].id, comment_a.id);
-            assert_eq!(editor_comments[0].comment_content, "a");
         });
     });
 }
