@@ -46,8 +46,6 @@ impl AuthView {
     }
 
     pub fn skip_to_browser_open_step(&mut self, _ctx: &mut ViewContext<Self>) {}
-
-    pub fn set_variant(&mut self, _variant: AuthViewVariant, _ctx: &mut ViewContext<Self>) {}
 }
 
 impl Entity for AuthView {

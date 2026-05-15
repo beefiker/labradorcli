@@ -51,12 +51,6 @@ impl View for RichTextEditorView {
 }
 
 impl RichTextEditorView {
-    /// Placeholder: the rich-text editor was removed from this fork, so the
-    /// backing model handle is no longer available.
-    pub fn model(&self) -> Option<&()> {
-        None
-    }
-
     pub fn selected_text(&self, _app: &AppContext) -> Option<String> {
         None
     }

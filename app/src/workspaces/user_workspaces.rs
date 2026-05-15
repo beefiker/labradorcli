@@ -86,7 +86,6 @@ pub struct WorkspacesMetadataResponse {
 // independent queries.
 pub struct WorkspacesMetadataWithPricing {
     pub metadata: WorkspacesMetadataResponse,
-    pub pricing_info: Option<warp_graphql::billing::PricingInfo>,
 }
 
 impl UserWorkspaces {
@@ -466,10 +465,7 @@ impl UserWorkspaces {
     ) {
         match result {
             Ok(result) => {
-                let wrapped = WorkspacesMetadataWithPricing {
-                    metadata: result,
-                    pricing_info: None,
-                };
+                let wrapped = WorkspacesMetadataWithPricing { metadata: result };
                 self.on_workspaces_updated(Ok(wrapped), ctx);
                 ctx.emit(UserWorkspacesEvent::UpdateWorkspaceSettingsSuccess);
             }

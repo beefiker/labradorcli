@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cynic::QueryBuilder;
 use warp_graphql::queries::get_workspaces_metadata_for_user::{
-    GetWorkspacesMetadataForUser, GetWorkspacesMetadataForUserVariables, PricingInfoResult,
+    GetWorkspacesMetadataForUser, GetWorkspacesMetadataForUserVariables,
 };
 
 use crate::server::graphql::get_request_context;
@@ -38,16 +38,6 @@ impl TeamClient for ServerApi {
             }
         };
 
-        let pricing_info = match response.pricing_info {
-            PricingInfoResult::PricingInfoOutput(pricing_output) => {
-                Some(pricing_output.pricing_info)
-            }
-            PricingInfoResult::Unknown => None,
-        };
-
-        Ok(WorkspacesMetadataWithPricing {
-            metadata,
-            pricing_info,
-        })
+        Ok(WorkspacesMetadataWithPricing { metadata })
     }
 }

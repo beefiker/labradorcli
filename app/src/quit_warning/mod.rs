@@ -9,7 +9,7 @@ use warpui::{
 use crate::{
     code::editor_management::{CodeEditorStatus, CodeEditorSummary},
     pane_group::{CodePane, PaneGroup, PaneId, TerminalPane},
-    report_if_error,     server::telemetry::CloseTarget,
+    report_if_error,
     session_management::{RunningSessionSummary, SessionNavigationData},
     terminal::general_settings::GeneralSettings,
     workspace::Workspace,
@@ -189,15 +189,6 @@ impl QuitScope<'_> {
         }
     }
 
-    fn close_target(&self) -> CloseTarget {
-        match self {
-            Self::Pane { .. } => CloseTarget::Pane,
-            Self::Tabs(_) => CloseTarget::Tab,
-            Self::Window(_) => CloseTarget::Window,
-            Self::App => CloseTarget::App,
-            Self::EditorTab { .. } => CloseTarget::EditorTab,
-        }
-    }
 }
 
 impl UnsavedStateSummary<'static> {

@@ -109,7 +109,6 @@ impl TeamUpdateManager {
                     workspaces: vec![],
                     feature_model_choices: None,
                 },
-                pricing_info: None,
             })
         });
 
