@@ -5,7 +5,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use warp_core::user_preferences::GetUserPreferences;
 use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 
 use crate::ai::llms::LLMId;
@@ -69,9 +68,6 @@ pub enum DefaultProfileState {
         id: ClientProfileId,
         profile: AIExecutionProfile,
     },
-    Synced {
-        id: ClientProfileId,
-    },
     /// Currently, the behavior of the CLI default is that it
     /// cannot be updated and will never be synced.
     #[allow(dead_code)]
@@ -85,7 +81,6 @@ impl std::fmt::Display for DefaultProfileState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DefaultProfileState::Unsynced { .. } => write!(f, "Unsynced"),
-            DefaultProfileState::Synced { .. } => write!(f, "Synced"),
             DefaultProfileState::Cli { .. } => write!(f, "CLI"),
         }
     }
@@ -95,7 +90,6 @@ impl DefaultProfileState {
     pub fn id(&self) -> ClientProfileId {
         match self {
             DefaultProfileState::Unsynced { id, .. } => *id,
-            DefaultProfileState::Synced { id } => *id,
             DefaultProfileState::Cli { id, .. } => *id,
         }
     }
@@ -166,47 +160,14 @@ impl AIExecutionProfilesModel {
             "Initialized execution profile model with state: {default_profile_state}",
         );
 
-        let mut model = Self {
+        let model = Self {
             default_profile_state,
             profile_id_to_sync_id,
             active_profiles_per_session,
         };
 
-        model.maybe_inherit_from_legacy_settings(ctx);
+        let _ = ctx;
         model
-    }
-
-    /// This function performs one-time migrations from legacy settings into the default profile.
-    /// The issue this solves is that, whenever we migrate an existing setting into the profile object,
-    /// users will initialize the new field to its default value. We need to manually check to see if
-    /// the legacy setting hasn't been migrated and, if it hasn't, do a one-time overwrite on the new profile
-    /// field.
-    fn maybe_inherit_from_legacy_settings(&mut self, ctx: &mut ModelContext<Self>) {
-        let DefaultProfileState::Synced {
-            id: default_profile_id,
-        } = self.default_profile_state
-        else {
-            return;
-        };
-
-        if let Some(base_llm_id) = ctx
-            .private_user_preferences()
-            .read_value("PreferredAgentModeLLMId")
-            .ok()
-            .flatten()
-            .map(|s| serde_json::from_str::<Option<LLMId>>(&s))
-            .and_then(|res| res.ok())
-            .flatten()
-        {
-            if let Err(e) = ctx
-                .private_user_preferences()
-                .remove_value("PreferredAgentModeLLMId")
-            {
-                log::error!("Failed to remove old PreferredAgentModeLLMId user pref: {e}");
-            }
-            self.set_base_model(default_profile_id, Some(base_llm_id.clone()), ctx);
-            log::info!("Overwrote default profile with legacy setting for base llm: {base_llm_id}");
-        }
     }
 
     pub fn create_profile(&mut self, ctx: &mut ModelContext<Self>) -> Option<ClientProfileId> {
@@ -262,18 +223,12 @@ impl AIExecutionProfilesModel {
     }
 
     pub fn default_profile(&self, _ctx: &AppContext) -> AIExecutionProfileInfo {
-        match &self.default_profile_state {
-            DefaultProfileState::Unsynced { id, profile }
-            | DefaultProfileState::Cli { id, profile } => AIExecutionProfileInfo {
-                id: *id,
-                sync_id: None,
-                data: profile.clone(),
-            },
-            DefaultProfileState::Synced { id } => AIExecutionProfileInfo {
-                id: *id,
-                sync_id: None,
-                data: AIExecutionProfile::default(),
-            },
+        let (DefaultProfileState::Unsynced { id, profile }
+        | DefaultProfileState::Cli { id, profile }) = &self.default_profile_state;
+        AIExecutionProfileInfo {
+            id: *id,
+            sync_id: None,
+            data: profile.clone(),
         }
     }
 
@@ -297,18 +252,14 @@ impl AIExecutionProfilesModel {
         _ctx: &AppContext,
     ) -> Option<AIExecutionProfileInfo> {
         // Handle an unsynced default profile (including CLI)
-        match &self.default_profile_state {
-            DefaultProfileState::Unsynced { id, profile }
-            | DefaultProfileState::Cli { id, profile } => {
-                if profile_id == *id {
-                    return Some(AIExecutionProfileInfo {
-                        id: *id,
-                        sync_id: None,
-                        data: profile.clone(),
-                    });
-                }
-            }
-            DefaultProfileState::Synced { .. } => {}
+        let (DefaultProfileState::Unsynced { id, profile }
+        | DefaultProfileState::Cli { id, profile }) = &self.default_profile_state;
+        if profile_id == *id {
+            return Some(AIExecutionProfileInfo {
+                id: *id,
+                sync_id: None,
+                data: profile.clone(),
+            });
         }
         None
     }
