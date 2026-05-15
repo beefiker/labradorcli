@@ -52,8 +52,6 @@ pub enum UserWorkspacesEvent {
     UpdateWorkspaceSettingsSuccess,
     UpdateWorkspaceSettingsRejected(anyhow::Error),
     AiOveragesUpdated,
-    PurchaseAddonCreditsSuccess,
-    PurchaseAddonCreditsRejected(anyhow::Error),
     /// Fired whenever the set of teams the user is on changes.
     TeamsChanged,
     CodebaseContextEnablementChanged,
@@ -158,18 +156,6 @@ impl UserWorkspaces {
         )
     }
 
-    pub fn team_from_uid(&self, team_uid: ServerId) -> Option<&Team> {
-        self.current_workspace()
-            .and_then(|w| w.teams.iter().find(|t| t.uid == team_uid))
-    }
-
-    pub fn team_from_uid_across_all_workspaces(&self, team_uid: ServerId) -> Option<&Team> {
-        self.workspaces
-            .iter()
-            .flat_map(|w| w.teams.iter())
-            .find(|t| t.uid == team_uid)
-    }
-
     pub fn workspace_from_uid(&self, workspace_uid: WorkspaceUid) -> Option<&Workspace> {
         self.workspaces.iter().find(|w| w.uid == workspace_uid)
     }
@@ -225,23 +211,6 @@ impl UserWorkspaces {
     ) {
         *self.current_workspace_uid = Some(workspace_uid);
         self.notify_and_emit_teams_changed(ctx);
-    }
-
-    /// Returns `true` if active AI is allowed for the current workspace, based on billing config.
-    ///
-    /// In the future, we should store active AI enablement on the policy directly. For now, we
-    /// proxy whether active AI by checking if prompt suggestions, next command, or code suggestions are enabled.
-    pub fn is_active_ai_allowed(&self) -> bool {
-        self.current_team().is_none_or(|team| {
-            team.billing_metadata
-                .tier
-                .warp_ai_policy
-                .is_none_or(|policy| {
-                    policy.is_prompt_suggestions_toggleable
-                        || policy.is_next_command_enabled
-                        || policy.is_code_suggestions_toggleable
-                })
-        })
     }
 
     /// Returns `true` if the current team's enterprise status allows AI features that have an
@@ -353,18 +322,6 @@ impl UserWorkspaces {
                 true
             }
         })
-    }
-
-    pub fn has_teams(&self) -> bool {
-        if let Some(workspace) = self.current_workspace() {
-            !workspace.teams.is_empty()
-        } else {
-            false
-        }
-    }
-
-    pub fn has_workspaces(&self) -> bool {
-        !self.workspaces.is_empty()
     }
 
     pub fn update_workspaces(&mut self, workspaces: Vec<Workspace>, ctx: &mut ModelContext<Self>) {
@@ -502,28 +459,6 @@ impl UserWorkspaces {
         );
     }
 
-    pub fn update_usage_based_pricing_settings(
-        &mut self,
-        team_uid: ServerId,
-        usage_based_pricing_enabled: bool,
-        max_monthly_spend_cents: Option<u32>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let workspace_client = self.workspace_client.clone();
-        let _ = ctx.spawn(
-            async move {
-                workspace_client
-                    .update_usage_based_pricing_settings(
-                        team_uid,
-                        usage_based_pricing_enabled,
-                        max_monthly_spend_cents,
-                    )
-                    .await
-            },
-            Self::on_update_workspace_metadata,
-        );
-    }
-
     fn on_update_workspace_metadata(
         &mut self,
         result: Result<WorkspacesMetadataResponse>,
@@ -543,46 +478,6 @@ impl UserWorkspaces {
                 self.on_workspaces_updated(Err(err), ctx);
                 ctx.emit(UserWorkspacesEvent::UpdateWorkspaceSettingsRejected(
                     err_for_event,
-                ));
-            }
-        };
-        ctx.notify();
-    }
-
-    pub fn purchase_addon_credits(
-        &mut self,
-        team_uid: ServerId,
-        credits: i32,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let workspace_client = self.workspace_client.clone();
-        let _ = ctx.spawn(
-            async move {
-                workspace_client
-                    .purchase_addon_credits(team_uid, credits)
-                    .await
-            },
-            Self::on_purchase_addon_credits,
-        );
-    }
-
-    fn on_purchase_addon_credits(
-        &mut self,
-        result: Result<WorkspacesMetadataResponse>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        match result {
-            Ok(result) => {
-                let wrapped = WorkspacesMetadataWithPricing {
-                    metadata: result,
-                    pricing_info: None,
-                };
-                self.on_workspaces_updated(Ok(wrapped), ctx);
-                ctx.emit(UserWorkspacesEvent::PurchaseAddonCreditsSuccess);
-            }
-            Err(err) => {
-                ctx.emit(UserWorkspacesEvent::PurchaseAddonCreditsRejected(
-                    anyhow::anyhow!(err),
                 ));
             }
         };
