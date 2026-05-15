@@ -8,14 +8,12 @@ use crate::ai::active_agent_views_model::{ActiveAgentViewsEvent, ActiveAgentView
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::agent_management::notifications::{
     NotificationCategory, NotificationId, NotificationItem, NotificationItems, NotificationOrigin,
-    NotificationSourceAgent,
 };
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::BlocklistAIHistoryEvent;
 use crate::terminal::cli_agent_sessions::{
     CLIAgentSessionStatus, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
-use crate::terminal::CLIAgent;
 use crate::workspace::util::is_terminal_view_in_same_tab;
 use crate::workspace::{Workspace, WorkspaceRegistry};
 use crate::BlocklistAIHistoryModel;
@@ -62,18 +60,6 @@ impl AgentNotificationsModel {
 
     pub(crate) fn notifications(&self) -> &NotificationItems {
         &self.notifications
-    }
-
-    pub(crate) fn mark_item_read(&mut self, id: NotificationId, ctx: &mut ModelContext<Self>) {
-        if self.notifications.mark_item_read(id) {
-            ctx.emit(AgentManagementEvent::NotificationUpdated);
-        }
-    }
-
-    pub(crate) fn mark_all_items_read(&mut self, ctx: &mut ModelContext<Self>) {
-        if self.notifications.mark_all_items_read() {
-            ctx.emit(AgentManagementEvent::AllNotificationsMarkedRead);
-        }
     }
 
     /// Marks all notifications from the given terminal view as read.
@@ -124,38 +110,20 @@ impl AgentNotificationsModel {
                     );
                 }
                 CLIAgentSessionStatus::Success => {
-                    let title = session_context
-                        .display_title()
-                        .unwrap_or_else(|| format!("{} completed", agent.display_name()));
-                    let message = match agent {
-                        CLIAgent::Codex => "Notification from Codex",
-                        _ => "Task completed.",
-                    };
+                    let _ = (session_context, agent);
                     self.add_notification(
-                        title,
-                        message.to_owned(),
                         NotificationCategory::Complete,
-                        NotificationSourceAgent::CLI(*agent),
                         NotificationOrigin::CLISession(*terminal_view_id),
                         *terminal_view_id,
-                        vec![],
                         ctx,
                     );
                 }
                 CLIAgentSessionStatus::Blocked { message } => {
-                    let title = session_context
-                        .display_title()
-                        .unwrap_or_else(|| format!("{} needs attention", agent.display_name()));
+                    let _ = (session_context, agent, message);
                     self.add_notification(
-                        title,
-                        message
-                            .clone()
-                            .unwrap_or_else(|| "Waiting for input.".to_owned()),
                         NotificationCategory::Request,
-                        NotificationSourceAgent::CLI(*agent),
                         NotificationOrigin::CLISession(*terminal_view_id),
                         *terminal_view_id,
-                        vec![],
                         ctx,
                     );
                 }
@@ -262,16 +230,11 @@ impl AgentNotificationsModel {
             .unwrap_or_default()
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn add_notification(
         &mut self,
-        title: String,
-        message: String,
         category: NotificationCategory,
-        agent: NotificationSourceAgent,
         origin: NotificationOrigin,
         terminal_view_id: EntityId,
-        artifacts: Vec<Artifact>,
         ctx: &mut ModelContext<Self>,
     ) {
         if !*AISettings::as_ref(ctx).show_agent_notifications {
@@ -279,18 +242,7 @@ impl AgentNotificationsModel {
         }
 
         let is_visible = is_terminal_view_visible(terminal_view_id, ctx);
-        let branch = resolve_git_branch_for_terminal_view(terminal_view_id, ctx);
-        let item = NotificationItem::new(
-            title,
-            message,
-            category,
-            agent,
-            origin,
-            is_visible,
-            terminal_view_id,
-            artifacts,
-            branch,
-        );
+        let item = NotificationItem::new(category, origin, is_visible, terminal_view_id);
 
         let id = item.id;
         self.notifications.push(item);

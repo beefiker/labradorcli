@@ -2,36 +2,25 @@ use warpui::EntityId;
 
 use super::*;
 use crate::ai::agent::conversation::AIConversationId;
-use crate::terminal::CLIAgent;
 
 fn make_conversation_notification(
     conversation_id: AIConversationId,
     terminal_view_id: EntityId,
 ) -> NotificationItem {
     NotificationItem::new(
-        "test".to_owned(),
-        "msg".to_owned(),
         NotificationCategory::Complete,
-        NotificationSourceAgent::Oz,
         NotificationOrigin::Conversation(conversation_id),
         false,
         terminal_view_id,
-        vec![],
-        None,
     )
 }
 
 fn make_cli_session_notification(terminal_view_id: EntityId) -> NotificationItem {
     NotificationItem::new(
-        "cli test".to_owned(),
-        "cli msg".to_owned(),
         NotificationCategory::Complete,
-        NotificationSourceAgent::CLI(CLIAgent::Claude),
         NotificationOrigin::CLISession(terminal_view_id),
         false,
         terminal_view_id,
-        vec![],
-        None,
     )
 }
 

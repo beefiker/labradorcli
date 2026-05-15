@@ -1,10 +1,8 @@
 use enum_iterator::Sequence;
-use instant::Instant;
 use uuid::Uuid;
 use warpui::EntityId;
 
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::artifacts::Artifact;
 use crate::terminal::CLIAgent;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -32,16 +30,6 @@ pub enum NotificationFilter {
     Errors,
 }
 
-impl NotificationFilter {
-    pub(crate) fn label(&self) -> &'static str {
-        match self {
-            NotificationFilter::All => "All tabs",
-            NotificationFilter::Unread => "Unread",
-            NotificationFilter::Errors => "Errors",
-        }
-    }
-}
-
 /// Identifies the agent that produced a notification.
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
@@ -64,57 +52,27 @@ pub enum NotificationOrigin {
 pub struct NotificationItem {
     pub id: NotificationId,
     pub origin: NotificationOrigin,
-    pub title: String,
-    pub message: String,
     pub category: NotificationCategory,
-    pub agent: NotificationSourceAgent,
     /// Whether the user has already seen this notification
     /// (either because they clicked into it or because it was emitted for a conversation
     /// that they've since navigated to).
     pub is_read: bool,
-    pub created_at: Instant,
     pub terminal_view_id: EntityId,
-    pub artifacts: Vec<Artifact>,
-    /// The git branch associated with this notification's conversation/session.
-    /// When present, the notification renders in "rich" layout with a branch header row.
-    /// When absent, it falls back to the "simple" layout.
-    pub branch: Option<String>,
 }
 
 impl NotificationItem {
-    /// Marks this notification as read. Returns true if it was previously unread.
-    fn mark_as_read(&mut self) -> bool {
-        if self.is_read {
-            return false;
-        }
-        self.is_read = true;
-        true
-    }
-
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        title: String,
-        message: String,
         category: NotificationCategory,
-        agent: NotificationSourceAgent,
         origin: NotificationOrigin,
         is_read: bool,
         terminal_view_id: EntityId,
-        artifacts: Vec<Artifact>,
-        branch: Option<String>,
     ) -> Self {
         Self {
             id: NotificationId::new(),
             origin,
-            title,
-            message,
             category,
-            agent,
             is_read,
-            created_at: Instant::now(),
             terminal_view_id,
-            artifacts,
-            branch,
         }
     }
 }
@@ -152,34 +110,6 @@ impl NotificationItems {
 
     pub(crate) fn filtered_count(&self, filter: NotificationFilter) -> usize {
         self.items_filtered(filter).count()
-    }
-
-    /// Returns the filters that should be shown as tabs.
-    /// "All" is always included; other filters are included only when they have at least one item.
-    pub(crate) fn visible_filters(&self) -> Vec<NotificationFilter> {
-        enum_iterator::all::<NotificationFilter>()
-            .filter(|f| *f == NotificationFilter::All || self.filtered_count(*f) > 0)
-            .collect()
-    }
-
-    pub(crate) fn get_by_id(&self, id: NotificationId) -> Option<&NotificationItem> {
-        self.items.iter().find(|item| item.id == id)
-    }
-
-
-    pub(crate) fn mark_item_read(&mut self, id: NotificationId) -> bool {
-        self.items
-            .iter_mut()
-            .find(|item| item.id == id)
-            .is_some_and(|item| item.mark_as_read())
-    }
-
-    pub(crate) fn mark_all_items_read(&mut self) -> bool {
-        let mut any_changed = false;
-        for item in &mut self.items {
-            any_changed |= item.mark_as_read();
-        }
-        any_changed
     }
 
     pub(crate) fn has_unread_for_terminal_view(&self, terminal_view_id: EntityId) -> bool {
