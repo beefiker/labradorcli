@@ -4919,7 +4919,7 @@ impl Workspace {
         _ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            AgentManagementViewEvent::OpenPlanNotebook { .. } => {}
+            AgentManagementViewEvent::OpenPlanNotebook => {}
         }
     }
 

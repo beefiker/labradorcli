@@ -944,10 +944,8 @@ impl AgentManagementView {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            ArtifactButtonsRowEvent::OpenPlan { notebook_uid } => {
-                ctx.emit(AgentManagementViewEvent::OpenPlanNotebook {
-                    notebook_uid: notebook_uid.clone(),
-                });
+            ArtifactButtonsRowEvent::OpenPlan { notebook_uid: _ } => {
+                ctx.emit(AgentManagementViewEvent::OpenPlanNotebook);
             }
             ArtifactButtonsRowEvent::CopyBranch { branch } => {
                 ctx.clipboard()
@@ -1117,10 +1115,8 @@ impl AgentManagementView {
                 self.selected_item_id = None;
                 ctx.notify();
             }
-            ConversationDetailsPanelEvent::OpenPlanNotebook { notebook_uid } => {
-                ctx.emit(AgentManagementViewEvent::OpenPlanNotebook {
-                    notebook_uid: notebook_uid.clone(),
-                });
+            ConversationDetailsPanelEvent::OpenPlanNotebook { notebook_uid: _ } => {
+                ctx.emit(AgentManagementViewEvent::OpenPlanNotebook);
             }
         }
     }
@@ -1883,7 +1879,7 @@ pub enum AgentManagementViewAction {
 }
 
 pub enum AgentManagementViewEvent {
-    OpenPlanNotebook { notebook_uid: String },
+    OpenPlanNotebook,
 }
 
 impl TypedActionView for AgentManagementView {
