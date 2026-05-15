@@ -51,10 +51,6 @@ impl View for RichTextEditorView {
 }
 
 impl RichTextEditorView {
-    pub fn selected_text(&self, _app: &AppContext) -> Option<String> {
-        None
-    }
-
     pub fn clear_text_selection(&mut self, _ctx: &mut ViewContext<Self>) {}
 }
 

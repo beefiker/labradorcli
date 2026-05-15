@@ -263,8 +263,6 @@ pub enum AgentManagementEvent {
     NotificationAdded { id: NotificationId },
     /// A notification's read state changed.
     NotificationUpdated,
-    /// All notifications were marked as read.
-    AllNotificationsMarkedRead,
 }
 
 impl ConversationStatus {
@@ -317,25 +315,6 @@ fn window_and_tab_idx_id_for_conversation(
                         })
                 })
         })
-}
-
-fn resolve_git_branch_for_terminal_view(
-    terminal_view_id: EntityId,
-    app: &AppContext,
-) -> Option<String> {
-    for (_, workspace_handle) in WorkspaceRegistry::as_ref(app).all_workspaces(app) {
-        for pane_group in workspace_handle.as_ref(app).tab_views() {
-            let pane_group = pane_group.as_ref(app);
-            for pane_id in pane_group.terminal_pane_ids() {
-                if let Some(terminal_view) = pane_group.terminal_view_from_pane_id(pane_id, app) {
-                    if terminal_view.id() == terminal_view_id {
-                        return terminal_view.as_ref(app).current_git_branch(app);
-                    }
-                }
-            }
-        }
-    }
-    None
 }
 
 fn active_focused_terminal_id(app: &AppContext) -> Option<EntityId> {
