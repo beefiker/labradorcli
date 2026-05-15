@@ -114,8 +114,6 @@ struct PanelMouseStates {
     copy_conversation_id: MouseStateHandle,
     copy_run_id: MouseStateHandle,
     copy_error: MouseStateHandle,
-    inference_info_tooltip: MouseStateHandle,
-    compute_info_tooltip: MouseStateHandle,
     skill_link: MouseStateHandle,
     skill_source_link: MouseStateHandle,
 }
@@ -159,7 +157,6 @@ impl CreatorInfo {
 #[derive(Debug, Clone)]
 enum CreditsInfo {
     LocalConversation(f32),
-    AmbientConversation { inference: f32, compute: f32 },
 }
 
 /// Data model for the conversation details panel.
@@ -190,20 +187,6 @@ pub struct ConversationDetailsData {
 }
 
 impl ConversationDetailsData {
-    fn directory_for_task(task_id: AmbientAgentTaskId, app: &AppContext) -> Option<String> {
-        let history_model = BlocklistAIHistoryModel::as_ref(app);
-        let conversation_id = history_model
-            .conversation_id_for_agent_id(&task_id.to_string())?;
-
-        history_model
-            .conversation(&conversation_id)
-            .and_then(|conversation| conversation.initial_working_directory())
-            .or_else(|| {
-                history_model
-                    .get_conversation_metadata(&conversation_id)
-                    .and_then(|metadata| metadata.initial_working_directory.clone())
-            })
-    }
     #[cfg(target_family = "wasm")]
     pub fn from_conversation(conversation: &AIConversation, app: &AppContext) -> Self {
         let mut directory = None;
@@ -275,6 +258,7 @@ impl ConversationDetailsData {
     }
 
     /// `AmbientAgentTask` struct was removed; callers should use `from_task_id` instead.
+    #[cfg(target_family = "wasm")]
     pub fn from_task(
         task_id: AmbientAgentTaskId,
         open_action: Option<WorkspaceAction>,
@@ -306,6 +290,7 @@ impl ConversationDetailsData {
 
     /// Minimal details data for when we only know the task id (e.g. shared sessions)
     /// but have not loaded the full `AmbientAgentTask` yet.
+    #[cfg(target_family = "wasm")]
     pub fn from_task_id(task_id: AmbientAgentTaskId) -> Self {
         ConversationDetailsData {
             mode: PanelMode::Task {
@@ -1096,99 +1081,6 @@ impl ConversationDetailsPanel {
             .finish()
     }
 
-    /// Renders the credits section with a breakdown of inference and compute costs.
-    fn render_credits_with_split(
-        &self,
-        inference: f32,
-        compute: f32,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-
-        let label_text = Text::new(
-            "Credits used".to_string(),
-            appearance.ui_font_family(),
-            appearance.ui_font_size(),
-        )
-        .with_color(blended_colors::text_sub(theme, theme.surface_1()))
-        .finish();
-
-        let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Start);
-        column.add_child(
-            Container::new(label_text)
-                .with_margin_bottom(LABEL_VALUE_GAP)
-                .finish(),
-        );
-
-        let inference_row = self.render_cost_sub_row(
-            "Inference",
-            inference,
-            "Credits spent on AI model requests",
-            self.mouse_states.inference_info_tooltip.clone(),
-            appearance,
-        );
-        column.add_child(
-            Container::new(inference_row)
-                .with_margin_bottom(LABEL_VALUE_GAP)
-                .finish(),
-        );
-
-        let compute_row = self.render_cost_sub_row(
-            "Compute",
-            compute,
-            "Credits spent on sandbox compute time",
-            self.mouse_states.compute_info_tooltip.clone(),
-            appearance,
-        );
-        column.add_child(compute_row);
-
-        column.finish()
-    }
-
-    fn render_cost_sub_row(
-        &self,
-        label: &str,
-        value: f32,
-        tooltip: &str,
-        tooltip_mouse_state: MouseStateHandle,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-
-        let label_text = Text::new(
-            format!("{label}: "),
-            appearance.ui_font_family(),
-            appearance.ui_font_size(),
-        )
-        .with_color(blended_colors::text_sub(theme, theme.surface_1()))
-        .finish();
-
-        let value_text = Text::new(
-            format!("{value:.1}"),
-            appearance.ui_font_family(),
-            appearance.ui_font_size(),
-        )
-        .with_color(theme.foreground().into())
-        .with_selectable(true)
-        .finish();
-
-        let info_icon = appearance
-            .ui_builder()
-            .info_button_with_tooltip(
-                appearance.ui_font_size() * 0.85,
-                tooltip,
-                tooltip_mouse_state,
-            )
-            .finish();
-
-        Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(label_text)
-            .with_child(value_text)
-            .with_child(Container::new(info_icon).with_margin_left(4.).finish())
-            .finish()
-    }
-
     /// Returns the mouse state handle for the given copy button kind.
     fn mouse_state_for_copy_button(&self, kind: CopyButtonKind) -> MouseStateHandle {
         match kind {
@@ -1454,29 +1346,13 @@ impl View for ConversationDetailsPanel {
             }
         }
 
-        match &self.data.credits {
-            Some(CreditsInfo::AmbientConversation { inference, compute }) => {
-                content.add_child(
-                    Container::new(
-                        self.render_credits_with_split(*inference, *compute, appearance),
-                    )
+        if let Some(CreditsInfo::LocalConversation(credits)) = &self.data.credits {
+            let formatted = format!("{credits:.1}");
+            content.add_child(
+                Container::new(self.render_simple_field("Credits used", &formatted, appearance))
                     .with_margin_bottom(FIELD_SPACING)
                     .finish(),
-                );
-            }
-            Some(CreditsInfo::LocalConversation(credits)) => {
-                let formatted = format!("{credits:.1}");
-                content.add_child(
-                    Container::new(self.render_simple_field(
-                        "Credits used",
-                        &formatted,
-                        appearance,
-                    ))
-                    .with_margin_bottom(FIELD_SPACING)
-                    .finish(),
-                );
-            }
-            None => {}
+            );
         }
 
         if let Some(duration) = self.data.run_time {
