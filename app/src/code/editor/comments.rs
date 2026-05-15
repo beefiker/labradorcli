@@ -3,19 +3,11 @@ use warpui::{Entity, ModelContext};
 
 use crate::code::editor::line::EditorLineLocation;
 use crate::code_review::comments::{
-    AttachedReviewComment, AttachedReviewCommentTarget, CommentId, CommentOrigin, LineDiffContent,
+    AttachedReviewComment, AttachedReviewCommentTarget, CommentId, LineDiffContent,
 };
 
 #[derive(Debug, Clone)]
-pub enum PendingCommentEvent {
-    NewPendingComment(EditorLineLocation),
-    ReopenPendingComment {
-        id: CommentId,
-        line: EditorLineLocation,
-        comment_text: String,
-        origin: CommentOrigin,
-    },
-}
+pub enum PendingCommentEvent {}
 
 pub enum PendingComment {
     Closed,
@@ -47,37 +39,6 @@ pub struct EditorReviewComment {
     pub diff_content: LineDiffContent,
     pub comment_content: String,
     pub last_update_time: DateTime<Local>,
-}
-
-impl EditorReviewComment {
-    pub(crate) fn new(
-        line: EditorLineLocation,
-        diff_content: LineDiffContent,
-        comment_content: String,
-    ) -> Self {
-        Self {
-            id: CommentId::new(),
-            line,
-            diff_content,
-            comment_content,
-            last_update_time: Local::now(),
-        }
-    }
-
-    pub(crate) fn new_with_id(
-        id: CommentId,
-        line: EditorLineLocation,
-        diff_content: LineDiffContent,
-        comment_content: String,
-    ) -> Self {
-        Self {
-            id,
-            line,
-            diff_content,
-            comment_content,
-            last_update_time: Local::now(),
-        }
-    }
 }
 
 impl TryFrom<AttachedReviewComment> for EditorReviewComment {

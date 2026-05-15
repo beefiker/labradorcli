@@ -72,7 +72,7 @@ use warpui::text::{point::Point, TextBuffer};
 use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::super::DiffResult;
-use super::comments::{EditorCommentsModel, PendingComment, PendingCommentEvent};
+use super::comments::{EditorCommentsModel, PendingComment};
 use super::diff::{
     add_inline_overlay_color, DiffModel, DiffModelEvent, DiffStatus, RenderableDiffHunk,
 };
@@ -3814,32 +3814,21 @@ impl CoreEditorModel for CodeEditorModel {
 
 impl CodeEditorModel {
     pub fn open_comment_line(&mut self, line: &EditorLineLocation, ctx: &mut ModelContext<Self>) {
-        // Telemetry: comment editor opened for a new inline review comment.
-
-        self.comments.update(ctx, |comments, ctx| {
+        self.comments.update(ctx, |comments, _ctx| {
             comments.pending_comment = PendingComment::Open { line: line.clone() };
-            ctx.emit(PendingCommentEvent::NewPendingComment(line.clone()));
         });
     }
 
     pub fn reopen_comment_line(
         &mut self,
-        id: &CommentId,
+        _id: &CommentId,
         line: &EditorLineLocation,
-        comment_text: &str,
-        origin: &CommentOrigin,
+        _comment_text: &str,
+        _origin: &CommentOrigin,
         ctx: &mut ModelContext<Self>,
     ) {
-        // Telemetry: comment editor opened for editing an existing inline review comment.
-
-        self.comments.update(ctx, |comments, ctx| {
+        self.comments.update(ctx, |comments, _ctx| {
             comments.pending_comment = PendingComment::Open { line: line.clone() };
-            ctx.emit(PendingCommentEvent::ReopenPendingComment {
-                id: *id,
-                line: line.to_owned(),
-                comment_text: comment_text.to_owned(),
-                origin: origin.to_owned(),
-            });
         });
     }
 }

@@ -1096,39 +1096,6 @@ impl CodeEditorView {
         }
     }
 
-    fn save_comment(
-        &mut self,
-        id: Option<CommentId>,
-        comment_text: &str,
-        line: &EditorLineLocation,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let line_content = self.model.as_ref(ctx).get_diff_content_for_line(line, ctx);
-
-        let review_comment = match id {
-            Some(id) => EditorReviewComment::new_with_id(
-                id,
-                line.to_owned(),
-                line_content,
-                comment_text.to_owned(),
-            ),
-            None => {
-                EditorReviewComment::new(line.to_owned(), line_content, comment_text.to_owned())
-            }
-        };
-
-        self.comment_locations.push(SavedComment {
-            uuid: review_comment.id,
-            location: line.to_owned(),
-            mouse_state: MouseStateHandle::default(),
-        });
-
-        ctx.emit(CodeEditorEvent::CommentSaved {
-            comment: review_comment,
-        });
-        ctx.notify();
-    }
-
     /// Update all comment locations in this editor.
     pub fn set_comment_locations(
         &mut self,
