@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local};
-use warpui::{Entity, ModelContext};
+use warpui::Entity;
 
 use crate::code::editor::line::EditorLineLocation;
 use crate::code_review::comments::{
@@ -16,14 +16,6 @@ pub enum PendingComment {
 
 pub struct EditorCommentsModel {
     pub pending_comment: PendingComment,
-}
-
-impl EditorCommentsModel {
-    pub fn new(_ctx: &mut ModelContext<Self>) -> Self {
-        Self {
-            pending_comment: PendingComment::Closed,
-        }
-    }
 }
 
 impl Entity for EditorCommentsModel {

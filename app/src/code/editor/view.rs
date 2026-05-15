@@ -16,8 +16,8 @@ use crate::code::editor::{
     scroll::{ScrollPosition, ScrollTrigger, ScrollWheelBehavior},
 };
 use crate::code::{
-    editor::EditorReviewComment, DiffResult, NoopCommentEditorProvider,
-    NoopFindReferencesCardProvider, ShowCommentEditorProvider, ShowFindReferencesCardProvider,
+    editor::EditorReviewComment, DiffResult,
+    NoopFindReferencesCardProvider, ShowFindReferencesCardProvider,
 };
 use crate::{
     appearance::Appearance,
@@ -212,7 +212,6 @@ pub struct CodeEditorRenderOptions {
     vertical_expansion_behavior: VerticalExpansionBehavior,
     line_height_override: Option<f32>,
     lazy_layout: bool,
-    show_comment_editor_provider: Box<dyn ShowCommentEditorProvider>,
     show_find_references_provider: Box<dyn ShowFindReferencesCardProvider>,
 }
 
@@ -222,7 +221,6 @@ impl CodeEditorRenderOptions {
             vertical_expansion_behavior,
             line_height_override: None,
             lazy_layout: false,
-            show_comment_editor_provider: Box::new(NoopCommentEditorProvider),
             show_find_references_provider: Box::new(NoopFindReferencesCardProvider),
         }
     }
@@ -234,14 +232,6 @@ impl CodeEditorRenderOptions {
 
     pub fn line_height_override(mut self, line_height: f32) -> Self {
         self.line_height_override = Some(line_height);
-        self
-    }
-
-    pub fn with_show_comment_editor_provider(
-        mut self,
-        comment_editor_provider: impl ShowCommentEditorProvider,
-    ) -> Self {
-        self.show_comment_editor_provider = Box::new(comment_editor_provider);
         self
     }
 
@@ -273,7 +263,6 @@ pub struct CodeEditorView {
     comment_locations: Vec<SavedComment>,
     /// Save position of the comment button rendered within this code editor view.
     comment_save_position_id: String,
-    show_comment_editor_provider: Box<dyn ShowCommentEditorProvider>,
     /// Save position of the anchor point for find references card.
     find_references_save_position_id: String,
     show_find_references_provider: Box<dyn ShowFindReferencesCardProvider>,
@@ -407,7 +396,6 @@ impl CodeEditorView {
             vim_model,
             last_search_direction: Direction::Forward,
             comment_save_position_id: format!("code_editor_comment_{}", ctx.view_id()),
-            show_comment_editor_provider: render_options.show_comment_editor_provider,
             find_references_save_position_id: format!(
                 "code_editor_find_references_{}",
                 ctx.view_id()

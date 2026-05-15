@@ -103,7 +103,6 @@ use string_offset::CharOffset;
 
 use indexmap::IndexMap;
 use itertools::Itertools;
-use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use rand::{distributions::Alphanumeric, Rng};
 use warp_core::{
@@ -180,7 +179,6 @@ use super::{
     git_dialog::{GitDialog, GitDialogEvent, GitDialogKind},
     GlobalCodeReviewEvent, GlobalCodeReviewModel,
 };
-use crate::code::ShowCommentEditorProvider;
 #[cfg(not(target_family = "wasm"))]
 use crate::code::ShowFindReferencesCard;
 use crate::code_review::comments::CommentId;
@@ -3196,12 +3194,6 @@ impl CodeReviewView {
                                 )
                                 .lazy_layout()
                                 .line_height_override(CODE_REVIEW_EDITOR_LINE_HEIGHT_RATIO)
-                                .with_show_comment_editor_provider(ShowCommentEditor {
-                                    comment_list_save_position_id: self
-                                        .code_review_list_position_id
-                                        .clone(),
-                                    window_id: ctx.window_id(),
-                                })
                                 .with_show_find_references_provider(ShowFindReferencesCard {
                                     editor_window_id: ctx.window_id(),
                                     parent_scrollable_position_id: Some(
@@ -3289,13 +3281,7 @@ impl CodeReviewView {
                     None,
                     CodeEditorRenderOptions::new(VerticalExpansionBehavior::InfiniteHeight)
                         .lazy_layout()
-                        .line_height_override(CODE_REVIEW_EDITOR_LINE_HEIGHT_RATIO)
-                        .with_show_comment_editor_provider(ShowCommentEditor {
-                            comment_list_save_position_id: self
-                                .code_review_list_position_id
-                                .clone(),
-                            window_id: ctx.window_id(),
-                        }),
+                        .line_height_override(CODE_REVIEW_EDITOR_LINE_HEIGHT_RATIO),
                     ctx,
                 )
                 .with_add_context_button() // Enable add context button for code review
@@ -7589,25 +7575,6 @@ impl BackingView for CodeReviewView {
     }
 }
 
-#[derive(Debug)]
-struct ShowCommentEditor {
-    comment_list_save_position_id: String,
-    window_id: WindowId,
-}
-
-impl ShowCommentEditorProvider for ShowCommentEditor {
-    fn should_show_comment_editor(&self, editor_line_location: RectF, app: &AppContext) -> bool {
-        let Some(comment_list_view_position) = app.element_position_by_id_at_last_frame(
-            self.window_id,
-            &self.comment_list_save_position_id,
-        ) else {
-            return false;
-        };
-
-        comment_list_view_position.contains_point(editor_line_location.upper_right())
-            || comment_list_view_position.contains_point(editor_line_location.lower_left())
-    }
-}
 
 #[path = "scroll_preservation.rs"]
 mod scroll_preservation;
