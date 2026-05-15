@@ -152,7 +152,7 @@ use crate::ai::blocklist::inline_action::requested_command::{
 use crate::ai::blocklist::permissions::{
     CommandExecutionPermission, CommandExecutionPermissionDeniedReason,
 };
-use crate::ai::blocklist::suggestion_chip_view::{SuggestedChipViewEvent, SuggestionChipView};
+use crate::ai::blocklist::suggestion_chip_view::SuggestionChipView;
 use crate::server::ids::SyncId;
 use ai::document::{AIDocumentId, AIDocumentVersion};
 use crate::ai::get_relevant_files::controller::{
@@ -2066,17 +2066,6 @@ impl AIBlock {
 
                 let rule_view =
                     ctx.add_typed_action_view(|ctx| SuggestionChipView::new_rule_chip(rule, ctx));
-                ctx.subscribe_to_view(&rule_view, |_me, _view, event, ctx| match event {
-                    SuggestedChipViewEvent::OpenAIFactCollection { sync_id } => {
-                        ctx.emit(AIBlockEvent::OpenAIFactCollection { sync_id: *sync_id });
-                    }
-                    SuggestedChipViewEvent::ShowSuggestedRuleDialog { rule_and_id } => {
-                        ctx.emit(AIBlockEvent::OpenSuggestedRuleDialog {
-                            rule_and_id: rule_and_id.clone(),
-                        });
-                    }
-                    _ => {}
-                });
                 self.suggested_rules.push(rule_view);
             }
         }
@@ -2087,19 +2076,6 @@ impl AIBlock {
             if let Some(workflow) = suggestions.agent_mode_workflows.first() {
                 let workflow_view = ctx.add_typed_action_view(|ctx| {
                     SuggestionChipView::new_agent_mode_workflow_chip(workflow.clone(), ctx)
-                });
-                ctx.subscribe_to_view(&workflow_view, |_me, _view, event, ctx| match event {
-                    SuggestedChipViewEvent::OpenWorkflow { sync_id } => {
-                        ctx.emit(AIBlockEvent::OpenWorkflow { sync_id: *sync_id });
-                    }
-                    SuggestedChipViewEvent::ShowSuggestedAgentModeWorkflowModal {
-                        workflow_and_id,
-                    } => {
-                        ctx.emit(AIBlockEvent::OpenSuggestedAgentModeWorkflowModal {
-                            workflow_and_id: workflow_and_id.clone(),
-                        });
-                    }
-                    _ => {}
                 });
                 self.suggested_agent_mode_workflow = Some(workflow_view);
             }

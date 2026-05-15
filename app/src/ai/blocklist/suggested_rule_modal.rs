@@ -12,11 +12,7 @@ use warpui::{
 pub fn init(_app: &mut AppContext) {}
 
 #[derive(Debug, Clone)]
-pub enum SuggestedRuleModalEvent {
-    AddNewRule { rule: SuggestedRule },
-    OpenRuleForEditing { rule: SuggestedRule },
-    Close,
-}
+pub enum SuggestedRuleModalEvent {}
 
 #[derive(Debug, Clone)]
 pub struct SuggestedRuleAndId {
@@ -47,9 +43,7 @@ impl View for SuggestedRuleView {
 }
 
 #[derive(Debug, Clone)]
-pub enum SuggestedRuleDialogAction {
-    Close,
-}
+pub enum SuggestedRuleDialogAction {}
 
 impl TypedActionView for SuggestedRuleView {
     type Action = SuggestedRuleDialogAction;

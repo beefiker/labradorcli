@@ -2,7 +2,6 @@
 //! are removed; the public types remain so dependents continue to compile.
 
 use crate::ai::agent::{SuggestedAgentModeWorkflow, SuggestedLoggingId, SuggestedRule};
-use crate::server::ids::SyncId;
 use crate::view_components::action_button::ActionButtonTheme;
 use pathfinder_color::ColorU;
 use warp_core::ui::appearance::Appearance;
@@ -13,8 +12,6 @@ use warpui::{
 
 use crate::ui_components::blended_colors;
 
-use super::suggested_agent_mode_workflow_modal::SuggestedAgentModeWorkflowAndId;
-use super::suggested_rule_modal::SuggestedRuleAndId;
 
 pub struct SuggestionDismissButtonTheme;
 
@@ -41,17 +38,10 @@ impl ActionButtonTheme for SuggestionDismissButtonTheme {
 }
 
 #[derive(Debug, Clone)]
-pub enum SuggestedChipViewEvent {
-    ShowSuggestedRuleDialog { rule_and_id: SuggestedRuleAndId },
-    OpenAIFactCollection { sync_id: Option<SyncId> },
-    OpenWorkflow { sync_id: SyncId },
-    ShowSuggestedAgentModeWorkflowModal { workflow_and_id: SuggestedAgentModeWorkflowAndId },
-}
+pub enum SuggestedChipViewEvent {}
 
 #[derive(Debug, Clone)]
-pub enum SuggestedViewAction {
-    ChipClicked,
-}
+pub enum SuggestedViewAction {}
 
 pub struct SuggestionChipView {
     logging_id: SuggestedLoggingId,

@@ -1411,23 +1411,10 @@ impl Workspace {
 
     fn handle_suggested_rule_modal_event(
         &mut self,
-        event: &SuggestedRuleModalEvent,
-        ctx: &mut ViewContext<Self>,
+        _event: &SuggestedRuleModalEvent,
+        _ctx: &mut ViewContext<Self>,
     ) {
-        match event {
-            SuggestedRuleModalEvent::AddNewRule { rule: _ } => {
-                self.current_workspace_state.is_suggested_rule_modal_open = false;
-            }
-            SuggestedRuleModalEvent::OpenRuleForEditing { rule: _ } => {
-                self.current_workspace_state.is_suggested_rule_modal_open = false;
-                self.open_ai_fact_collection_pane(Some(Direction::Right), None, ctx);
-            }
-            SuggestedRuleModalEvent::Close => {
-                self.current_workspace_state.is_suggested_rule_modal_open = false;
-                self.focus_active_tab(ctx);
-            }
-        }
-        ctx.notify();
+        // SuggestedRuleModalEvent has no variants in the local-only fork.
     }
 
     fn build_close_session_confirmation_dialog(
