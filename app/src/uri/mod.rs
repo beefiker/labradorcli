@@ -14,7 +14,7 @@ use crate::util::openable_file_type::{is_file_openable_in_warp, is_markdown_file
 use crate::workspace::ToastStack;
 use crate::workspace::{Workspace, WorkspaceAction, WorkspaceRegistry};
 use crate::view_components::DismissibleToast;
-use crate::{features::FeatureFlag, workspace::active_terminal_in_window};
+use crate::workspace::active_terminal_in_window;
 
 use crate::settings_view::SettingsSection;
 use crate::user_config::load_launch_configs;

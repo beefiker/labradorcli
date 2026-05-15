@@ -165,7 +165,6 @@ pub fn merge_with_precedence(
         worker_host,
         skill_spec: cli.skill_spec,
         computer_use_enabled,
-        harness: cli.harness,
         harness_auth_secrets: cli.harness_auth_secrets,
     }
 }

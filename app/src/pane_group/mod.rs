@@ -62,7 +62,7 @@ use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use serde::{Deserialize, Serialize};
 use session_sharing_protocol::common::{
-    ParticipantId, Role, RoleRequestId, RoleRequestRejectedReason, RoleRequestResponse, SessionId,
+    ParticipantId, Role, RoleRequestId, RoleRequestRejectedReason, RoleRequestResponse,
 };
 use tree::DEFAULT_FLEX_VALUE;
 use typed_path::TypedPath;
@@ -123,7 +123,7 @@ use crate::terminal::shared_session::role_change_modal::{
     RoleChangeCloseSource, RoleChangeModal, RoleChangeModalEvent,
 };
 use crate::terminal::shared_session::share_modal::{ShareSessionModal, ShareSessionModalEvent};
-use crate::terminal::shared_session::{self, IsSharedSessionCreator, SharedSessionActionSource};
+use crate::terminal::shared_session::{IsSharedSessionCreator, SharedSessionActionSource};
 use crate::terminal::view::ssh_file_upload::FileUploadId;
 use crate::terminal::view::{
     BlockNotification, ConversationRestorationInNewPaneType, ExecuteCommandEvent,

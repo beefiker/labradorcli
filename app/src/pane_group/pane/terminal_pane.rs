@@ -5,7 +5,6 @@ use std::{collections::HashMap, sync::mpsc::SyncSender};
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use url::Url;
-use warp_cli::agent::Harness;
 use warp_multi_agent_api as multi_agent_api;
 
 use warpui::{
@@ -19,7 +18,6 @@ use crate::{
             conversation::{AIConversationId, ConversationStatus},
             LifecycleEventType, StartAgentExecutionMode,
         },
-        agent_sdk::HarnessConfig,
         blocklist::{
             agent_view::AgentViewEntryOrigin, orchestration_events::OrchestrationEventService,
             BlocklistAIHistoryModel,
@@ -1227,40 +1225,13 @@ fn handle_terminal_view_event(
                                     return;
                                 }
                             };
-                            // Treat an empty environment_id as "no environment specified" so the
-                            // spawn request leaves the config.environment_id field unset. The
-                            // server's StartAgent producer defaults to the parent's environment
-                            // when available, so an empty value here means the caller explicitly
-                            // opted into running with an empty environment.
-                            let environment_id =
-                                Some(environment_id).filter(|s| !s.trim().is_empty());
-                            // Unrecognized harness types collapse to None so the server picks
-                            // its default, matching the behavior of an empty `harness_type`.
-                            // We deliberately do NOT round-trip `Harness::Unknown` to the server;
-                            // that variant is for representing server-originated unknowns to the
-                            // user, not for writes.
-                            let harness_override = if harness_type.is_empty() {
-                                None
-                            } else {
-                                match <Harness as clap::ValueEnum>::from_str(&harness_type, true) {
-                                    Ok(harness) => Some(HarnessConfig {
-                                        harness_type: harness,
-                                    }),
-                                    Err(_) => {
-                                        log::warn!(
-                                            "Unknown harness type from StartAgentV2 proto: {harness_type:?}; omitting harness override so the server picks its default"
-                                        );
-                                        None
-                                    }
-                                }
-                            };
                             // Cloud-hosted child agent spawning was removed; drop the request.
                             let _ = (
                                 environment_id,
+                                harness_type,
                                 model_id,
                                 worker_host,
                                 computer_use_enabled,
-                                harness_override,
                                 title,
                                 parent_run_id,
                                 runtime_skills,

@@ -57,13 +57,6 @@ pub(crate) enum Owner {
     Team { team_uid: String },
 }
 
-/// Placeholder for the deleted `HarnessConfig`. Only the `harness_type` field
-/// was meaningful for local agent runs.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct HarnessConfig {
-    pub harness_type: warp_cli::agent::Harness,
-}
-
 /// Placeholder for the deleted `AgentConfigSnapshot`. The cloud-hosted task
 /// runner is gone; this stub keeps signatures readable without depending on
 /// the deleted ai_client surface.
@@ -78,7 +71,6 @@ pub(crate) struct AgentConfigSnapshot {
     pub worker_host: Option<String>,
     pub skill_spec: Option<String>,
     pub computer_use_enabled: Option<bool>,
-    pub harness: Option<HarnessConfig>,
     pub harness_auth_secrets: Option<std::collections::HashMap<String, String>>,
 }
 
@@ -93,7 +85,6 @@ impl AgentConfigSnapshot {
             && self.worker_host.is_none()
             && self.skill_spec.is_none()
             && self.computer_use_enabled.is_none()
-            && self.harness.is_none()
             && self.harness_auth_secrets.is_none()
     }
 }
@@ -325,10 +316,6 @@ fn build_merged_config_and_task(
         None => (None, None),
     };
 
-    let harness_override = Some(HarnessConfig {
-        harness_type: args.harness,
-    });
-
     let mut merged_config = AgentConfigSnapshot {
         // CLI name > skill name > file name
         name: args.name.clone().or(skill_name).or(file_merged.name),
@@ -344,7 +331,6 @@ fn build_merged_config_and_task(
             .computer_use
             .computer_use_override()
             .or(file_merged.computer_use_enabled),
-        harness: harness_override,
         harness_auth_secrets: None,
     };
 
@@ -407,10 +393,6 @@ fn build_server_side_task(
         .map(|model_id| common::validate_agent_mode_base_model_id(model_id, ctx))
         .transpose()?;
 
-    let harness_override = Some(HarnessConfig {
-        harness_type: args.harness,
-    });
-
     let skill_name = resolved_skill.as_ref().map(|s| s.name.clone());
     let model_id_string = model_override.as_ref().map(|id| id.to_string());
     let profile = args.profile.clone();
@@ -426,7 +408,6 @@ fn build_server_side_task(
         worker_host: None,
         skill_spec: None,
         computer_use_enabled: args.computer_use.computer_use_override(),
-        harness: harness_override,
         harness_auth_secrets: None,
     };
 

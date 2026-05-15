@@ -61,7 +61,6 @@ use crate::terminal::shell::{ShellName, ShellType};
 
 use crate::terminal::model::secrets::ObfuscateSecrets;
 use session_sharing_protocol::sharer::SessionSourceType;
-use warp_core::report_error;
 #[cfg(not(target_family = "wasm"))]
 use warpui::util::save_as_file;
 
