@@ -1,6 +1,6 @@
 pub(crate) mod item;
 
 pub(crate) use item::{
-    NotificationCategory, NotificationFilter, NotificationId, NotificationItem, NotificationItems,
+    NotificationCategory, NotificationFilter, NotificationItem, NotificationItems,
     NotificationOrigin, NotificationSourceAgent,
 };

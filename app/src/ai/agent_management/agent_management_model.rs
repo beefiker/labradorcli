@@ -7,7 +7,7 @@ use crate::settings::AISettings;
 use crate::ai::active_agent_views_model::{ActiveAgentViewsEvent, ActiveAgentViewsModel};
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::agent_management::notifications::{
-    NotificationCategory, NotificationId, NotificationItem, NotificationItems, NotificationOrigin,
+    NotificationCategory, NotificationItem, NotificationItems, NotificationOrigin,
 };
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::BlocklistAIHistoryEvent;
@@ -244,9 +244,8 @@ impl AgentNotificationsModel {
         let is_visible = is_terminal_view_visible(terminal_view_id, ctx);
         let item = NotificationItem::new(category, origin, is_visible, terminal_view_id);
 
-        let id = item.id;
         self.notifications.push(item);
-        ctx.emit(AgentManagementEvent::NotificationAdded { id });
+        ctx.emit(AgentManagementEvent::NotificationAdded);
     }
 }
 
@@ -260,7 +259,7 @@ pub enum AgentManagementEvent {
         conversation_id: AIConversationId,
     },
     /// A new notification was added to the persistent notification center.
-    NotificationAdded { id: NotificationId },
+    NotificationAdded,
     /// A notification's read state changed.
     NotificationUpdated,
 }

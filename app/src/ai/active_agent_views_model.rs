@@ -20,7 +20,7 @@ struct ActiveAgentViewHandles {
 #[derive(Clone)]
 pub enum ActiveAgentViewsEvent {
     /// A conversation was closed (exited from the agent view or its pane was removed).
-    ConversationClosed { conversation_id: AIConversationId },
+    ConversationClosed,
     /// A conversation was entered within a terminal view.
     TerminalViewFocused,
     /// A window was closed and its focused state was removed.
@@ -135,9 +135,8 @@ impl ActiveAgentViewsModel {
                     }
                 }
                 // Emit so subscribers can move this conversation to the Past section.
-                ctx.emit(ActiveAgentViewsEvent::ConversationClosed {
-                    conversation_id: *conversation_id,
-                });
+                let _ = conversation_id;
+                ctx.emit(ActiveAgentViewsEvent::ConversationClosed);
             }
             _ => {}
         });
@@ -168,8 +167,8 @@ impl ActiveAgentViewsModel {
                 self.last_focused_terminal_state = None;
             }
 
-            if let Some(conversation_id) = closed_conversation_id {
-                ctx.emit(ActiveAgentViewsEvent::ConversationClosed { conversation_id });
+            if closed_conversation_id.is_some() {
+                ctx.emit(ActiveAgentViewsEvent::ConversationClosed);
             }
         }
     }

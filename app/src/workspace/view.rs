@@ -2764,7 +2764,7 @@ impl Workspace {
                     });
                 ctx.notify();
             }
-            AgentManagementEvent::NotificationAdded { .. }
+            AgentManagementEvent::NotificationAdded
             | AgentManagementEvent::NotificationUpdated => {
                 // Re-render so the vertical tabs panel can update unread-activity dots.
                 ctx.notify();

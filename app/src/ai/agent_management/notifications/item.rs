@@ -1,18 +1,8 @@
 use enum_iterator::Sequence;
-use uuid::Uuid;
 use warpui::EntityId;
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::terminal::CLIAgent;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NotificationId(Uuid);
-
-impl NotificationId {
-    fn new() -> Self {
-        Self(Uuid::new_v4())
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotificationCategory {
@@ -50,7 +40,6 @@ pub enum NotificationOrigin {
 
 #[derive(Debug, Clone)]
 pub struct NotificationItem {
-    pub id: NotificationId,
     pub origin: NotificationOrigin,
     pub category: NotificationCategory,
     /// Whether the user has already seen this notification
@@ -68,7 +57,6 @@ impl NotificationItem {
         terminal_view_id: EntityId,
     ) -> Self {
         Self {
-            id: NotificationId::new(),
             origin,
             category,
             is_read,
