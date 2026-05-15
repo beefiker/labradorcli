@@ -948,9 +948,7 @@ impl MCPServersListPageView {
         match event {
             TemplatableMCPServerManagerEvent::StateChanged { uuid: _, state: _ }
             | TemplatableMCPServerManagerEvent::ServerInstallationAdded(_)
-            | TemplatableMCPServerManagerEvent::ServerInstallationDeleted(_)
-            | TemplatableMCPServerManagerEvent::TemplatableMCPServersUpdated
-            | TemplatableMCPServerManagerEvent::LegacyServerConverted => {
+            | TemplatableMCPServerManagerEvent::ServerInstallationDeleted(_) => {
                 self.refresh_server_cards(ctx);
                 self.refresh_file_based_server_cards(ctx);
             }

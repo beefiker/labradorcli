@@ -332,8 +332,6 @@ pub enum TemplatableMCPServerManagerEvent {
     ServerInstallationAdded(Uuid),
     #[allow(dead_code)]
     ServerInstallationDeleted(Uuid),
-    TemplatableMCPServersUpdated,
-    LegacyServerConverted,
 }
 
 impl Entity for TemplatableMCPServerManager {
