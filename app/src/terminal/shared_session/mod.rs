@@ -356,17 +356,6 @@ impl From<&Role> for InteractionState {
     }
 }
 
-/// Decode scrollback blocks from their JSON wire format into [`SerializedBlock`]s.
-///
-/// Blocks that fail to deserialize are silently dropped.
-pub(crate) fn decode_scrollback(scrollback: &Scrollback) -> Vec<SerializedBlock> {
-    scrollback
-        .blocks
-        .iter()
-        .filter_map(|block| serde_json::from_slice(&block.raw).ok())
-        .collect()
-}
-
 #[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;
