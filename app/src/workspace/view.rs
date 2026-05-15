@@ -8109,15 +8109,10 @@ impl Workspace {
 
     fn handle_require_login_modal_event(
         &mut self,
-        event: &AuthViewEvent,
-        ctx: &mut ViewContext<Self>,
+        _event: &AuthViewEvent,
+        _ctx: &mut ViewContext<Self>,
     ) {
-        match event {
-            AuthViewEvent::Close => {
-                self.current_workspace_state.is_require_login_modal_open = false;
-                ctx.notify();
-            }
-        }
+        // AuthViewEvent has no variants in the local-only fork.
     }
 
     fn handle_theme_creator_modal_event(

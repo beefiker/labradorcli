@@ -2,11 +2,9 @@
 //!
 //! The actual login modal (signup, anonymous user, email auth, etc.) was
 //! deleted when dwarf forked from warp. These types remain as inert shells so
-//! that consumer code that still references `AuthView`, `AuthViewVariant`, and
-//! `AuthRedirectPayload` compiles without needing a wholesale refactor of
-//! every login-gated feature.
+//! that consumer code that still references `AuthView` and `AuthViewVariant`
+//! compiles without needing a wholesale refactor of every login-gated feature.
 
-use serde::{Deserialize, Serialize};
 use warpui::{
     elements::Empty, AppContext, Element, Entity, TypedActionView, View, ViewContext,
 };
@@ -17,26 +15,11 @@ pub enum AuthViewVariant {
     ShareRequirementCloseable,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct AuthRedirectPayload {
-    pub variant_override: Option<String>,
-    pub user_id: Option<String>,
-    pub token: Option<String>,
-    pub refresh_token: Option<String>,
-    pub user_uid: Option<String>,
-    pub deleted_anonymous_user: Option<String>,
-    pub state: Option<String>,
-}
+#[derive(Clone, Debug)]
+pub enum AuthViewEvent {}
 
 #[derive(Clone, Debug)]
-pub enum AuthViewEvent {
-    Close,
-}
-
-#[derive(Clone, Debug)]
-pub enum AuthViewAction {
-    Close,
-}
+pub enum AuthViewAction {}
 
 pub struct AuthView;
 
