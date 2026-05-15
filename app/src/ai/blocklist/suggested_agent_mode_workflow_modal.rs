@@ -17,28 +17,14 @@ pub struct SuggestedAgentModeWorkflowAndId {
 }
 
 #[derive(Debug, Clone)]
-pub enum SuggestedAgentModeWorkflowModalAction {
-    /// Triggered when the modal should be cancelled/closed
-    Cancel,
-}
+pub enum SuggestedAgentModeWorkflowModalAction {}
 
 #[derive(Debug, Clone)]
-pub enum SuggestedAgentModeWorkflowModalEvent {
-    /// Emitted when the modal should be closed
-    Close,
-    /// Emitted when a new workflow is successfully created
-    WorkflowCreated,
-    /// Emitted when the workflow should be run
-    RunWorkflow,
-}
+pub enum SuggestedAgentModeWorkflowModalEvent {}
 
 pub fn init(_app: &mut AppContext) {}
 
 impl SuggestedAgentModeWorkflowModal {
-    pub fn close(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.emit(SuggestedAgentModeWorkflowModalEvent::Close);
-    }
-
     pub fn open_workflow(
         &mut self,
         _workflow_and_id: &SuggestedAgentModeWorkflowAndId,

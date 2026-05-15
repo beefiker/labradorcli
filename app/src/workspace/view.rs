@@ -4733,19 +4733,10 @@ impl Workspace {
 
     fn handle_suggested_agent_mode_workflow_modal_event(
         &mut self,
-        event: &SuggestedAgentModeWorkflowModalEvent,
-        ctx: &mut ViewContext<Self>,
+        _event: &SuggestedAgentModeWorkflowModalEvent,
+        _ctx: &mut ViewContext<Self>,
     ) {
-        match event {
-            SuggestedAgentModeWorkflowModalEvent::Close
-            | SuggestedAgentModeWorkflowModalEvent::WorkflowCreated => {
-                self.current_workspace_state
-                    .is_suggested_agent_mode_workflow_modal_open = false;
-                self.focus_active_tab(ctx);
-                ctx.notify();
-            }
-            SuggestedAgentModeWorkflowModalEvent::RunWorkflow { .. } => {}
-        }
+        // SuggestedAgentModeWorkflowModalEvent has no variants in the local-only fork.
     }
 
     /// Handle the call-to-action event from the reward modal view
