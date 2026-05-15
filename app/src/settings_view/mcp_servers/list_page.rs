@@ -958,16 +958,6 @@ impl MCPServersListPageView {
     }
 
 
-    fn refresh_gallery_cards(&mut self, ctx: &mut ViewContext<Self>) {
-        self.gallery_server_cards = Self::create_gallery_server_cards(ctx);
-        for server_card_handle in self.gallery_server_cards.values() {
-            ctx.subscribe_to_view(server_card_handle, |me, _, event, ctx| {
-                me.handle_server_card_event(event, ctx);
-            });
-        }
-        ctx.notify();
-    }
-
     pub fn get_modal_content(&self) -> Option<Box<dyn Element>> {
         if self.update_modal_state.is_open() {
             Some(self.update_modal_state.render())
