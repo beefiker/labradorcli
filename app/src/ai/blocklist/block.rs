@@ -404,9 +404,6 @@ pub(super) struct AIBlockStateHandles {
     /// Mouse state handle for the invalid API key button
     invalid_api_key_button_handle: MouseStateHandle,
 
-    /// Mouse state handle for AI document created block
-    ai_document_handle: MouseStateHandle,
-
     /// Mouse state handle for 'open skill' button
     /// from an OpenSkill action banner
     open_skill_button_handle: MouseStateHandle,

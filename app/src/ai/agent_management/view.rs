@@ -96,7 +96,6 @@ const STATUS_ICON_SIZE: f32 = 12.;
 const BUTTON_SIZE: f32 = 20.;
 const CREATOR_AVATAR_FONT_SIZE: f32 = 10.;
 
-const SESSION_EXPIRED_TEXT: &str = "Sessions expire after one week and cannot be opened.";
 
 pub fn init(app: &mut AppContext) {
     use crate::util::bindings::cmd_or_ctrl_shift;

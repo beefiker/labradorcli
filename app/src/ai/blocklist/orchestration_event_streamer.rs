@@ -22,9 +22,6 @@ use warp_multi_agent_api as api;
 use warpui::r#async::Timer;
 use warpui::{Entity, ModelContext, SingletonEntity};
 
-/// Backoff schedule (seconds) reused for the post-restore
-/// `get_ambient_agent_task` retry: 1s, 2s, 5s, then 10s max.
-const RESTORE_FETCH_BACKOFF_STEPS: &[u64] = &[1, 2, 5, 10];
 /// How often (milliseconds) the drain timer checks for SSE events.
 const SSE_DRAIN_INTERVAL_MS: u64 = 500;
 
@@ -341,40 +338,6 @@ impl OrchestrationEventStreamer {
         _sqlite_cursor: i64,
     ) {
         // Server-side AmbientAgentTask fetch removed; nothing to do.
-    }
-
-    /// Schedules a retry of the post-restore `get_ambient_agent_task` fetch
-    /// after an exponential backoff. The backoff schedule reuses
-    /// `RESTORE_FETCH_BACKOFF_STEPS` (1s, 2s, 5s, 10s capped) keyed on a
-    /// per-conversation failure counter. The counter resets on success.
-    fn start_restore_fetch_retry_timer(
-        &mut self,
-        conv_id: AIConversationId,
-        task_id: crate::ai::agent_sdk::AmbientAgentTaskId,
-        sqlite_cursor: i64,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let failures = self
-            .restore_fetch_failures
-            .entry(conv_id)
-            .and_modify(|c| *c += 1)
-            .or_insert(1);
-        let step_index = failures
-            .saturating_sub(1)
-            .min(RESTORE_FETCH_BACKOFF_STEPS.len() - 1);
-        let backoff = Duration::from_secs(RESTORE_FETCH_BACKOFF_STEPS[step_index]);
-        ctx.spawn(
-            async move { Timer::after(backoff).await },
-            move |me, _, ctx| {
-                // The conversation may have been removed in the meantime;
-                // if so, drop the retry. Otherwise re-issue the fetch.
-                if !me.event_cursor.contains_key(&conv_id) {
-                    me.restore_fetch_failures.remove(&conv_id);
-                    return;
-                }
-                me.spawn_restore_fetch(conv_id, task_id, sqlite_cursor, ctx);
-            },
-        );
     }
 
     /// Starts event delivery for a restored conversation if the parent is
