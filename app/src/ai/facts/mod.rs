@@ -1,17 +1,22 @@
-use crate::ai::agent::SuggestedLoggingId;
-use serde::{Deserialize, Serialize};
 
 pub mod manager;
 pub mod view;
 pub use manager::AIFactManager;
 pub use view::{AIFactView, AIFactViewEvent};
 
+#[cfg(feature = "integration_tests")]
+use crate::ai::agent::SuggestedLoggingId;
+#[cfg(feature = "integration_tests")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "integration_tests")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AIFact {
     #[serde(rename = "memory")]
     Memory(AIMemory),
 }
 
+#[cfg(feature = "integration_tests")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AIMemory {
     #[serde(default)]
