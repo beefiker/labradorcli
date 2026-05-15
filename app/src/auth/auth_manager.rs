@@ -334,8 +334,6 @@ impl AuthManager {
                     }
                     UserAuthenticationError::UserAccountDisabled(_) => {}
                     UserAuthenticationError::Unexpected(_) => {}
-                    UserAuthenticationError::InvalidStateParameter => {}
-                    UserAuthenticationError::MissingStateParameter => {}
                 }
 
                 ctx.emit(AuthManagerEvent::AuthFailed(error));

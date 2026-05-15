@@ -732,10 +732,6 @@ pub enum UserAuthenticationError {
     /// be deleted per their GDPR/CCPA rights.
     #[error("Firebase returned a user error when fetching an ID token")]
     UserAccountDisabled(FirebaseError),
-    #[error("Invalid state parameter in auth redirect")]
-    InvalidStateParameter,
-    #[error("Missing state parameter in auth redirect")]
-    MissingStateParameter,
     #[error("unexpected error occurred when fetching an ID token: {0:#}")]
     Unexpected(#[from] anyhow::Error),
 }
@@ -756,15 +752,6 @@ impl ErrorExt for UserAuthenticationError {
                 false
             }
             UserAuthenticationError::Unexpected(err) => err.is_actionable(),
-            UserAuthenticationError::InvalidStateParameter
-            | UserAuthenticationError::MissingStateParameter => {
-                // For now, we're marking these as actionable, since a surplus of these errors
-                // could mean that something is wrong in our login flow (e.g. we're not properly
-                // passing the `state` variable back to the desktop client).
-                // But in general, someone attempting to trick another into logging into their
-                // account with a spoofed `state` variable is not actionable.
-                true
-            }
         }
     }
 }

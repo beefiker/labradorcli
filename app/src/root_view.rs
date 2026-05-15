@@ -2833,8 +2833,6 @@ impl RootView {
                 UserAuthenticationError::Unexpected(err) => {
                     log::error!("Encountered unexpected error when trying to fetch user: {err:#}");
                 }
-                UserAuthenticationError::InvalidStateParameter => {}
-                UserAuthenticationError::MissingStateParameter => {}
             },
             AuthManagerEvent::SkippedLogin => {
                 self.focus(ctx);
