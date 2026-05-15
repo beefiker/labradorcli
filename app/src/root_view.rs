@@ -2362,10 +2362,7 @@ impl RootView {
         ctx.subscribe_to_model(
             &AuthManager::handle(ctx),
             move |_, _auth_manager, event, ctx| {
-                if matches!(
-                    event,
-                    AuthManagerEvent::AuthComplete | AuthManagerEvent::SkippedLogin
-                ) {
+                if matches!(event, AuthManagerEvent::AuthComplete) {
                     let auth_state = current_onboarding_auth_state(ctx);
                     onboarding_view_for_auth.update(ctx, |onboarding_view, ctx| {
                         onboarding_view.set_auth_state(auth_state, ctx);
@@ -2834,12 +2831,6 @@ impl RootView {
                     log::error!("Encountered unexpected error when trying to fetch user: {err:#}");
                 }
             },
-            AuthManagerEvent::SkippedLogin => {
-                self.focus(ctx);
-            }
-            AuthManagerEvent::LoginOverrideDetected(_interrupted_auth_payload) => {
-                let _ = ctx;
-            }
             _ => {}
         }
     }

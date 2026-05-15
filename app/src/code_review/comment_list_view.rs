@@ -477,20 +477,11 @@ impl CommentListView {
 
     fn handle_comment_editor_selection_events(
         &mut self,
-        view: ViewHandle<RichTextEditorView>,
-        event: &EditorViewEvent,
-        ctx: &mut ViewContext<Self>,
+        _view: ViewHandle<RichTextEditorView>,
+        _event: &EditorViewEvent,
+        _ctx: &mut ViewContext<Self>,
     ) {
-        match event {
-            EditorViewEvent::TextSelectionChanged => {
-                if view.as_ref(ctx).selected_text(ctx).is_some() {
-                    self.clear_other_comment_selections(Some(view.id()), ctx);
-                }
-            }
-            EditorViewEvent::Focused => {
-                self.clear_other_comment_selections(Some(view.id()), ctx);
-            }
-        }
+        // EditorViewEvent has no variants in the local-only fork.
     }
 
     fn handle_static_diff_editor_selection_events(

@@ -8322,10 +8322,6 @@ impl Workspace {
             AuthManagerEvent::AttemptedLoginGatedFeature { auth_view_variant } => {
                 self.open_require_login_modal(*auth_view_variant, ctx)
             }
-            AuthManagerEvent::LoginOverrideDetected(_interrupted_auth_payload) => {
-                // The auth-override warning modal was removed; the auth override flow
-                // is handled by the larger AuthOnboardingState refactor in a follow-up.
-            }
             AuthManagerEvent::AuthComplete => {
                 // Only show the telemetry banner if the user is an existing user. The new user flow
                 // for this is handled in the onboarding flow.

@@ -68,10 +68,7 @@ fn create_readonly_comment_markdown_editor<V: View>(
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum EditorViewEvent {
-    TextSelectionChanged,
-    Focused,
-}
+pub(crate) enum EditorViewEvent {}
 
 /// Configuration for making the comment header clickable.
 pub(crate) struct HeaderClickHandler {

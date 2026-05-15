@@ -12,7 +12,7 @@ use warp_core::features::FeatureFlag;
 use warpui::{Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use super::auth_state::{AuthState, PersistAction};
-use super::auth_view_modal::{AuthRedirectPayload, AuthViewVariant};
+use super::auth_view_modal::AuthViewVariant;
 use super::credentials::{Credentials, LoginToken};
 use super::user::User;
 use super::AuthStateProvider;
@@ -50,10 +50,6 @@ pub enum AuthManagerEvent {
     AuthComplete,
     /// Failed to authenticate a user, due to a particular `UserAuthenticationError`.
     AuthFailed(UserAuthenticationError),
-    /// Failed to create an anonymous user.
-    CreateAnonymousUserFailed,
-    /// The user chose to skip login entirely (no Firebase user created).
-    SkippedLogin,
     /// The user now needs to reauthenticate. If the user needs to reauth, an `AuthFailed`
     /// event might be triggered instead, but there are some code paths where we don't
     /// refresh the entire user, only their token, which is when this event might be emitted.
@@ -62,9 +58,6 @@ pub enum AuthManagerEvent {
     AttemptedLoginGatedFeature {
         auth_view_variant: AuthViewVariant,
     },
-    // The current user is anonymous and the client has received a browser intent to sign in with a different Dwarf account.
-    // Holds an auth payload from the received browser intent.
-    LoginOverrideDetected(AuthRedirectPayload),
     /// Failed to mint a new custom token for an anonymous user.
     MintCustomTokenFailed(MintCustomTokenError),
     /// Received a device authorization code as part of the device auth flow.
