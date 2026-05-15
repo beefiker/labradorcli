@@ -4,10 +4,6 @@ use crate::workspaces::workspace::AiOverages;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cynic::{MutationBuilder, QueryBuilder};
-use warp_graphql::mutations::stripe_billing_portal::{
-    StripeBillingPortal, StripeBillingPortalInput, StripeBillingPortalResult,
-    StripeBillingPortalVariables,
-};
 use warp_graphql::mutations::update_workspace_settings::{
     AddonCreditsSettingsInput, UpdateWorkspaceSettings, UpdateWorkspaceSettingsInput,
     UpdateWorkspaceSettingsResult, UpdateWorkspaceSettingsVariables,
@@ -26,8 +22,6 @@ use mockall::{automock, predicate::*};
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 pub trait WorkspaceClient: 'static + Send + Sync {
-    async fn generate_stripe_billing_portal_link(&self, team_uid: ServerId) -> Result<String>;
-
     async fn refresh_ai_overages(&self) -> Result<AiOverages>;
 
     async fn update_addon_credits_settings(
@@ -42,25 +36,6 @@ pub trait WorkspaceClient: 'static + Send + Sync {
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 impl WorkspaceClient for ServerApi {
-    async fn generate_stripe_billing_portal_link(&self, team_uid: ServerId) -> Result<String> {
-        let variables = StripeBillingPortalVariables {
-            input: StripeBillingPortalInput {
-                team_uid: team_uid.into(),
-            },
-            request_context: get_request_context(),
-        };
-        let operation = StripeBillingPortal::build(variables);
-        let response = self.send_graphql_request(operation, None).await?;
-
-        match response.stripe_billing_portal {
-            StripeBillingPortalResult::StripeBillingPortalOutput(output) => Ok(output.url),
-            StripeBillingPortalResult::UserFacingError(error) => {
-                Err(anyhow!(get_user_facing_error_message(error)))
-            }
-            StripeBillingPortalResult::Unknown => Err(anyhow!("Unknown error")),
-        }
-    }
-
     async fn refresh_ai_overages(&self) -> Result<AiOverages> {
         let variables = GetAiOveragesForWorkspaceVariables {
             request_context: get_request_context(),
