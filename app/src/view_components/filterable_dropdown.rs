@@ -176,10 +176,6 @@ where
         self.button_variant = button_variant;
     }
 
-    pub fn set_orientation(&mut self, orientation: FilterableDropdownOrientation) {
-        self.orientation = orientation;
-    }
-
     pub fn add_items(&mut self, items: Vec<DropdownItem<A>>, ctx: &mut ViewContext<Self>) {
         self.items.extend(items.iter().cloned());
         self.set_filtered_items(ctx);
@@ -233,11 +229,6 @@ where
             dropdown.set_items(items, ctx);
         });
         ctx.notify();
-    }
-
-    /// The number of items in the dropdown.
-    pub fn len(&self) -> usize {
-        self.items.len()
     }
 
     #[expect(dead_code)]

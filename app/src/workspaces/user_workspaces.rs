@@ -19,7 +19,7 @@ use crate::{
         AISettings, AISettingsChangedEvent, CodeSettings, CodeSettingsChangedEvent, PrivacySettings,
     },
     workspaces::workspace::{
-        AiAutonomySettings, AiOverages, SandboxedAgentSettings, UsageBasedPricingSettings,
+        AiAutonomySettings, AiOverages, SandboxedAgentSettings,
     },
 };
 use anyhow::Result;
@@ -536,12 +536,6 @@ impl UserWorkspaces {
         }
     }
 
-    pub fn usage_based_pricing_settings(&self) -> UsageBasedPricingSettings {
-        self.current_workspace()
-            .map(|workspace| workspace.settings.usage_based_pricing_settings.clone())
-            .unwrap_or_default()
-    }
-
     pub fn is_telemetry_force_enabled(&self) -> bool {
         self.current_team()
             .map(|team| team.organization_settings.telemetry_settings.force_enabled)
@@ -606,26 +600,6 @@ impl UserWorkspaces {
                     .clone()
             })
             .unwrap_or_default()
-    }
-
-    pub fn is_anyone_with_link_sharing_enabled(&self) -> bool {
-        self.current_team()
-            .map(|team| {
-                team.organization_settings
-                    .link_sharing_settings
-                    .anyone_with_link_sharing_enabled
-            })
-            .unwrap_or(true)
-    }
-
-    pub fn is_direct_link_sharing_enabled(&self) -> bool {
-        self.current_team()
-            .map(|team| {
-                team.organization_settings
-                    .link_sharing_settings
-                    .direct_link_sharing_enabled
-            })
-            .unwrap_or(true)
     }
 
     /// Returns the codebase context settings, taking into account the organization,
