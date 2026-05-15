@@ -177,20 +177,10 @@ impl Workspace {
         }
 
         let terminal_view_id = terminal_view.id();
-        let task_id = terminal_view
-            .as_ref(ctx)
-            .ambient_agent_task_id_for_details_panel(ctx);
 
         self.transcript_details_panel.update(ctx, |panel, ctx| {
-            // If we have an ambient agent task ID, populate from task ID only (task struct removed).
-            if let Some(task_id) = task_id {
-                let details = ConversationDetailsData::from_task(task_id, None, None, ctx);
-                panel.set_conversation_details(details, ctx);
-                ctx.notify();
-                return;
-            }
-
-            // Otherwise, populate from conversation
+            // Populate from the active conversation; the ambient-agent task
+            // path was removed alongside the ambient agents subsystem.
             let history_model = BlocklistAIHistoryModel::handle(ctx).as_ref(ctx);
             if let Some(conversation) = history_model.active_conversation(terminal_view_id) {
                 let details = ConversationDetailsData::from_conversation(conversation, ctx);

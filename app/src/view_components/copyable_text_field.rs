@@ -74,12 +74,6 @@ impl<'a> CopyableTextFieldConfig<'a> {
         self
     }
 
-    /// Sets whether the text should soft-wrap instead of being ellipsized.
-    pub fn with_wrap_text(mut self, wrap_text: bool) -> Self {
-        self.wrap_text = wrap_text;
-        self
-    }
-
     /// Sets the mouse state handle for the copy button.
     pub fn with_mouse_state(mut self, mouse_state: MouseStateHandle) -> Self {
         self.copy_button_mouse_state = mouse_state;

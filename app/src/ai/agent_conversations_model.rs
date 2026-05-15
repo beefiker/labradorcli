@@ -163,10 +163,6 @@ impl AgentRunDisplayStatus {
         }
     }
 
-    pub fn is_working(&self) -> bool {
-        matches!(self, AgentRunDisplayStatus::ConversationInProgress)
-    }
-
     pub fn status_icon_and_color(&self, theme: &WarpTheme) -> (Icon, ColorU) {
         match self {
             AgentRunDisplayStatus::ConversationInProgress => {
