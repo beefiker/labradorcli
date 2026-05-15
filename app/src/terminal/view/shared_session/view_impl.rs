@@ -1615,21 +1615,6 @@ impl TerminalView {
         self.refresh_size(ctx);
     }
 
-    /// Forces a fresh viewer-size report to the sharer by clearing the dedup cache and
-    /// refreshing size. No-op when not an active viewer or when viewer-driven sizing is
-    /// not eligible. Used when a new process (e.g. the harness CLI starting for a non-oz
-    /// Cloud Mode run) needs the sharer to resize its PTY so the new process picks up
-    /// correct terminal dimensions at startup.
-    pub(in crate::terminal::view) fn force_report_viewer_terminal_size(
-        &mut self,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if let Some(viewer) = self.shared_session_viewer_mut() {
-            viewer.last_reported_natural_size = None;
-        }
-        self.refresh_size(ctx);
-    }
-
     /// Resizes the sharer's terminal to match the viewer's reported size,
     /// going through the normal view/model/PTY resize pipeline.
     #[cfg(not(target_arch = "wasm32"))]

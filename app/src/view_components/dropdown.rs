@@ -15,7 +15,7 @@ use warpui::{
         components::{Coords, UiComponent, UiComponentStyles},
     },
     Action, AppContext, BlurContext, Entity, SingletonEntity, TypedActionView, View, ViewContext,
-    ViewHandle, WeakViewHandle,
+    ViewHandle,
 };
 
 use crate::{
@@ -76,7 +76,6 @@ pub struct Dropdown<A: Action + Clone> {
     selected_item: Option<MenuItem<DropdownAction<A>>>,
     // Function for overriding the default closed-state text (the selected item)
     menu_header_text_override: Option<MenuHeaderTextFormatter>,
-    self_handle: WeakViewHandle<Self>,
     style: DropdownStyle,
     use_drop_shadow: bool,
     font_color: Option<ColorU>,
@@ -183,7 +182,6 @@ where
             top_bar_max_width: TOP_MENU_BAR_MAX_WIDTH,
             selected_item: None,
             menu_header_text_override: None,
-            self_handle: ctx.handle(),
             style: Default::default(),
             element_anchor: PositionedElementAnchor::BottomLeft,
             child_anchor: ChildAnchor::TopLeft,
