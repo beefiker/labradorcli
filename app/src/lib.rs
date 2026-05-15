@@ -214,7 +214,6 @@ use crate::vim_registers::VimRegisters;
 use crate::warp_managed_paths_watcher::{ensure_warp_watch_roots_exist, WarpManagedPathsWatcher};
 use crate::workspace::{ActiveSession, OneTimeModalModel, ToastStack};
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::user_profiles::UserProfiles;
 #[cfg(feature = "local_tty")]
 use anyhow::Context;
 use anyhow::{anyhow, Result};
@@ -1116,7 +1115,6 @@ fn initialize_app(
         current_workspace_uid,
         app_state,
         command_history,
-        restored_user_profiles,
         ai_queries,
         persisted_workspaces,
         workspace_language_servers,
@@ -1133,7 +1131,6 @@ fn initialize_app(
                 sqlite_data.current_workspace_uid,
                 Some(sqlite_data.app_state),
                 sqlite_data.command_history,
-                sqlite_data.user_profiles,
                 sqlite_data.ai_queries,
                 sqlite_data.codebase_indices,
                 sqlite_data.workspace_language_servers,
@@ -1147,7 +1144,6 @@ fn initialize_app(
         })
         .unwrap_or_else(|| {
             (
-                Default::default(),
                 Default::default(),
                 Default::default(),
                 Default::default(),
@@ -1500,8 +1496,6 @@ fn initialize_app(
             Some(DEFAULT_SYNC_REQUESTS_PER_MIN),
         )
     });
-
-    ctx.add_singleton_model(|_| UserProfiles::new(restored_user_profiles));
 
     ctx.add_singleton_model(|_| AudibleBell::new());
 

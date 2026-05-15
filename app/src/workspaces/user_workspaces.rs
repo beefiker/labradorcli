@@ -1,5 +1,5 @@
 use super::{
-    team::{DiscoverableTeam, Team},
+    team::Team,
     workspace::{
         AdminEnablementSetting, CustomerType, EnterpriseSecretRegex,
         UgcCollectionEnablementSetting, Workspace, WorkspaceUid,
@@ -68,7 +68,6 @@ pub enum UserWorkspacesEvent {
 pub struct UserWorkspaces {
     current_workspace_uid: Tracked<Option<WorkspaceUid>>,
     workspaces: Tracked<Vec<Workspace>>,
-    joinable_teams: Vec<DiscoverableTeam>,
     workspace_client: Arc<dyn WorkspaceClient>,
 }
 
@@ -77,8 +76,6 @@ pub struct UserWorkspaces {
 pub struct WorkspacesMetadataResponse {
     /// The list of workspaces the user is currently on.
     pub workspaces: Vec<Workspace>,
-    /// The list of discoverable teams that the user can join.
-    pub joinable_teams: Vec<DiscoverableTeam>,
     /// TODO(Tyler): Post-workspaces, move this into the workspace object.
     /// Feature model choices may change from user to user and while the app is open, so we need to periodically update this list.
     /// It makes most sense to fetch this in workspaces which is queried every 10 minutes.
@@ -104,7 +101,6 @@ impl UserWorkspaces {
         Self {
             current_workspace_uid: cached_workspaces.first().map(|w| w.uid).into(),
             workspaces: cached_workspaces.into(),
-            joinable_teams: Default::default(),
             workspace_client,
         }
     }
@@ -139,7 +135,6 @@ impl UserWorkspaces {
         Self {
             current_workspace_uid: current_workspace_uid.into(),
             workspaces: cached_workspaces.into(),
-            joinable_teams: Default::default(),
             workspace_client,
         }
     }
@@ -360,17 +355,6 @@ impl UserWorkspaces {
         })
     }
 
-    pub fn total_teammates_in_joinable_teams(&self) -> i64 {
-        self.joinable_teams
-            .iter()
-            .map(|team| team.num_members)
-            .sum()
-    }
-
-    pub fn num_joinable_teams(&self) -> usize {
-        self.joinable_teams.len()
-    }
-
     pub fn has_teams(&self) -> bool {
         if let Some(workspace) = self.current_workspace() {
             !workspace.teams.is_empty()
@@ -452,15 +436,6 @@ impl UserWorkspaces {
         ctx.notify();
     }
 
-    pub fn update_joinable_teams(
-        &mut self,
-        joinable_teams: Vec<DiscoverableTeam>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.joinable_teams = joinable_teams;
-        ctx.notify();
-    }
-
     // TODO follow up with moving other modifying calls out of UserWorkspaces to TeamUpdateManager
     fn on_workspaces_updated(
         &mut self,
@@ -470,10 +445,8 @@ impl UserWorkspaces {
         match result {
             Ok(response) => {
                 let workspaces = response.metadata.workspaces;
-                let joinable_teams = response.metadata.joinable_teams;
 
                 self.update_workspaces(workspaces.clone(), ctx);
-                self.update_joinable_teams(joinable_teams, ctx);
 
                 // Check if the current workspace is still in the list of workspaces.
                 // If it's not, then set the current workspace to the first workspace in the list.

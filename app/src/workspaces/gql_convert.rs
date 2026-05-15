@@ -1,6 +1,5 @@
 use super::{
-    team::{DiscoverableTeam, MembershipRole, Team, TeamMember},
-    user_profiles::UserProfileWithUID,
+    team::{MembershipRole, Team, TeamMember},
     user_workspaces::WorkspacesMetadataResponse,
     workspace::{
         AIAutonomyPolicy, AddonCreditsSettings, AdminEnablementSetting, AiAutonomySettings,
@@ -53,7 +52,6 @@ use warp_graphql::{
     queries::{
         get_conversation_usage as gql_usage, get_workspaces_metadata_for_user::User as GqlUser,
     },
-    user::{DiscoverableTeamData as GqlDiscoverableTeamData, PublicUserProfile},
     workspace::{
         AdminEnablementSetting as GqlAdminEnablementSetting, AiAutonomyValue as GqlAiAutonomyValue,
         AiPermissionsSettings as GqlAiPermissionsSettings,
@@ -925,40 +923,12 @@ impl From<GqlUser> for WorkspacesMetadataResponse {
             .map(|gql_workspace| gql_workspace.into())
             .collect();
 
-        let joinable_teams = gql_user
-            .discoverable_teams
-            .clone()
-            .into_iter()
-            .map(|gql_joinable_team| gql_joinable_team.into())
-            .collect();
-
         // TODO(skambashi) refactor to return back workspaces, and not teams
         WorkspacesMetadataResponse {
             workspaces,
-            joinable_teams,
             feature_model_choices,
         }
     }
 }
 
-impl From<PublicUserProfile> for UserProfileWithUID {
-    fn from(value: PublicUserProfile) -> Self {
-        UserProfileWithUID {
-            firebase_uid: UserUid::new(&value.uid),
-            display_name: value.display_name,
-            email: value.email.unwrap_or_default(),
-            photo_url: value.photo_url.unwrap_or_default(),
-        }
-    }
-}
 
-impl From<GqlDiscoverableTeamData> for DiscoverableTeam {
-    fn from(gql_discoverable_team: GqlDiscoverableTeamData) -> DiscoverableTeam {
-        Self {
-            team_uid: gql_discoverable_team.team_uid.into_inner(),
-            num_members: i64::from(gql_discoverable_team.num_members),
-            name: gql_discoverable_team.name,
-            team_accepting_invites: gql_discoverable_team.team_accepting_invites,
-        }
-    }
-}

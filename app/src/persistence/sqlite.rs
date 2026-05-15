@@ -82,7 +82,6 @@ use crate::{
         LeafSnapshot, PaneFlex, PaneNodeSnapshot, SplitDirection, TabSnapshot,
         TerminalPaneSnapshot, WindowSnapshot,
     },
-    workspaces::user_profiles::UserProfileWithUID,
 };
 use crate::{report_error, report_if_error, safe_info};
 use lsp::supported_servers::LSPServerType;
@@ -509,12 +508,6 @@ fn handle_model_event(event: ModelEvent, connection: &mut SqliteConnection) -> a
         }
         ModelEvent::UpdateFinishedCommand { metadata } => {
             update_finished_command(connection, metadata).context("error updating finished command")
-        }
-        ModelEvent::UpsertUserProfiles { profiles } => {
-            upsert_user_profiles(connection, profiles).context("error updating user profiles")
-        }
-        ModelEvent::ClearUserProfiles => {
-            clear_user_profiles(connection).context("error clearing user profiles")
         }
         ModelEvent::UpsertAIQuery { query } => {
             upsert_ai_query(connection, query).context("error upserting AI query")
@@ -2235,12 +2228,6 @@ fn read_sqlite_data(
         .map(PersistedCommand::from)
         .collect();
 
-    let user_profiles = schema::user_profiles::dsl::user_profiles
-        .load_iter::<model::UserProfile, DefaultLoadingMode>(conn)?
-        .filter_map(|user_profile| user_profile.ok())
-        .map(UserProfileWithUID::from)
-        .collect();
-
     let restored_blocks = get_all_restored_blocks(conn)?;
 
     let app_state = AppState {
@@ -2266,7 +2253,6 @@ fn read_sqlite_data(
         workspaces,
         current_workspace_uid,
         command_history: commands,
-        user_profiles,
         ai_queries,
         codebase_indices,
         workspace_language_servers,
@@ -2339,41 +2325,4 @@ fn update_finished_command(
     })
 }
 
-fn upsert_user_profiles(
-    conn: &mut SqliteConnection,
-    profiles: Vec<UserProfileWithUID>,
-) -> Result<(), Error> {
-    use schema::user_profiles::dsl::*;
-
-    conn.transaction::<(), Error, _>(|conn| {
-        for profile in profiles {
-            // Delete any stale profile with that uid
-            diesel::delete(
-                schema::user_profiles::dsl::user_profiles
-                    .filter(firebase_uid.eq(profile.firebase_uid.to_string())),
-            )
-            .execute(conn)?;
-
-            // Insert a new user profile row
-            let new_user_profile = UserProfile {
-                firebase_uid: profile.firebase_uid.to_string(),
-                photo_url: profile.photo_url,
-                display_name: profile.display_name,
-                email: profile.email,
-            };
-            diesel::insert_into(schema::user_profiles::dsl::user_profiles)
-                .values(new_user_profile)
-                .execute(conn)?;
-        }
-        Ok(())
-    })
-}
-
-fn clear_user_profiles(conn: &mut SqliteConnection) -> Result<(), Error> {
-    conn.transaction::<(), Error, _>(|conn| {
-        diesel::delete(schema::user_profiles::dsl::user_profiles).execute(conn)?;
-
-        Ok(())
-    })
-}
 

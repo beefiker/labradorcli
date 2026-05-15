@@ -40,7 +40,6 @@ use crate::suggestions::ignored_suggestions_model::SuggestionType;
 use crate::terminal::history::PersistedCommand;
 use crate::terminal::model::block::{SerializedAgentViewVisibility, SerializedBlock};
 use crate::terminal::model::session::SessionId;
-use crate::workspaces::user_profiles::UserProfileWithUID;
 use crate::workspaces::workspace::{Workspace as WorkspaceMetadata, WorkspaceUid};
 use ai::workspace::WorkspaceMetadata as CodeWorkspaceMetadata;
 
@@ -170,7 +169,6 @@ pub struct PersistedData {
     pub workspaces: Vec<WorkspaceMetadata>,
     pub current_workspace_uid: Option<WorkspaceUid>,
     pub command_history: Vec<PersistedCommand>,
-    pub user_profiles: Vec<UserProfileWithUID>,
     pub ai_queries: Vec<PersistedAIInput>,
     pub codebase_indices: Vec<CodeWorkspaceMetadata>,
     pub workspace_language_servers: HashMap<PathBuf, HashMap<LSPServerType, EnablementState>>,
@@ -232,10 +230,6 @@ pub enum ModelEvent {
     UpdateFinishedCommand {
         metadata: FinishedCommandMetadata,
     },
-    UpsertUserProfiles {
-        profiles: Vec<UserProfileWithUID>,
-    },
-    ClearUserProfiles,
     // `PauseAndRemoveDatabase` and `ReconstructAndResume` are used to pause and resume the writer thread.
     // These are employed as part of Logout v0 to ensure that the writer thread
     // does not continue writing to the DB after the user has logged out and the DB is deleted.
