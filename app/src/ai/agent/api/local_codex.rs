@@ -13,10 +13,7 @@ use serde_json::Value;
 use uuid::Uuid;
 use warp_multi_agent_api as api;
 
-use crate::ai::agent::{
-    AIAgentActionResultType, AIAgentInput, AskUserQuestionAnswerItem, AskUserQuestionResult,
-    RequestCommandOutputResult,
-};
+use crate::ai::agent::AIAgentInput;
 use crate::ai::predict::generate_ai_input_suggestions::{
     GenerateAIInputSuggestionsRequest, GenerateAIInputSuggestionsResponseV2,
 };
@@ -35,7 +32,6 @@ const LOCAL_AGENT_ENV_VAR: &str = "DWARF_LOCAL_AGENT";
 const LOCAL_AGENT_DISPLAY_NAME: &str = "Local Agent";
 const TOOL_CALL_PREFIX: &str = "DWARF_TOOL_CALL";
 const CLAUDE_DEFAULT_MODEL_ID: &str = "claude-code";
-const LOCAL_AUTH_PROVIDER_QUESTION_ID: &str = "dwarf-local-auth-provider";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LocalAgentRuntime {
@@ -47,12 +43,6 @@ enum LocalAgentRuntime {
 struct LocalAuthState {
     codex: bool,
     claude: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LocalAgentRoute {
-    Runtime(LocalAgentRuntime),
-    ChooseProvider,
 }
 
 impl LocalAgentRuntime {
@@ -105,247 +95,29 @@ impl LocalAuthState {
             _ => None,
         }
     }
-
-    fn is_empty(self) -> bool {
-        !self.codex && !self.claude
-    }
 }
 
-impl LocalAgentRoute {
-    fn for_request(params: &RequestParams, auth_state: LocalAuthState) -> Self {
-        if let Some(runtime) = configured_local_agent_runtime() {
-            return Self::Runtime(runtime);
-        }
-
-        if auth_state.is_empty() {
-            if let Some(runtime) = local_auth_setup_choice_from_inputs(&params.input) {
-                return Self::Runtime(runtime);
-            }
-        }
-
-        route_for_model(params.model.as_str(), auth_state)
+fn runtime_for_request(params: &RequestParams) -> LocalAgentRuntime {
+    if let Some(runtime) = configured_local_agent_runtime() {
+        return runtime;
     }
 
-    fn runtime_hint(self, params: &RequestParams) -> LocalAgentRuntime {
-        match self {
-            Self::Runtime(runtime) => runtime,
-            Self::ChooseProvider => local_agent_runtime_for_model(params.model.as_str()),
-        }
-    }
+    runtime_for_model(params.model.as_str(), LocalAuthState::current())
 }
 
-fn route_for_model(model: &str, auth_state: LocalAuthState) -> LocalAgentRoute {
-    if auth_state.is_empty() {
-        return LocalAgentRoute::ChooseProvider;
-    }
-
+fn runtime_for_model(model: &str, auth_state: LocalAuthState) -> LocalAgentRuntime {
     let requested_runtime = local_agent_runtime_for_model(model);
     if auth_state.has_runtime(requested_runtime) {
-        return LocalAgentRoute::Runtime(requested_runtime);
+        return requested_runtime;
     }
 
     if is_defaultish_model_for_runtime(model, requested_runtime) {
         if let Some(runtime) = auth_state.only_available_runtime() {
-            return LocalAgentRoute::Runtime(runtime);
+            return runtime;
         }
     }
 
-    LocalAgentRoute::Runtime(requested_runtime)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct LocalAuthSetup {
-    runtime: LocalAgentRuntime,
-}
-
-impl LocalAuthSetup {
-    fn message(self) -> &'static str {
-        match self.runtime {
-            LocalAgentRuntime::Codex => {
-                "Local Codex auth is not set up yet. I can run `codex login` in Dwarf to open Codex's sign-in flow and create ~/.codex/auth.json."
-            }
-            LocalAgentRuntime::Claude => {
-                "Local Claude auth is not set up yet. I can run `claude auth login --claudeai` in Dwarf to open Claude Code's sign-in flow and create ~/.claude.json."
-            }
-        }
-    }
-
-    fn command(self) -> &'static str {
-        match self.runtime {
-            LocalAgentRuntime::Codex => "codex login",
-            LocalAgentRuntime::Claude => "claude auth login --claudeai",
-        }
-    }
-
-    fn tool_call(self) -> LocalRunShellCommand {
-        LocalRunShellCommand {
-            command: self.command().to_string(),
-            is_read_only: false,
-            uses_pager: false,
-            is_risky: false,
-            wait_until_complete: true,
-        }
-    }
-
-    fn pending_message(self) -> &'static str {
-        match self.runtime {
-            LocalAgentRuntime::Codex => {
-                "`codex login` has already run. Finish the browser sign-in, wait for Codex to write ~/.codex/auth.json, then send your request again."
-            }
-            LocalAgentRuntime::Claude => {
-                "`claude auth login --claudeai` has already run. Finish the browser sign-in, wait for Claude Code to write ~/.claude.json, then send your request again."
-            }
-        }
-    }
-}
-
-fn missing_auth_setup_for_runtime(
-    runtime: LocalAgentRuntime,
-    auth_state: LocalAuthState,
-) -> Option<LocalAuthSetup> {
-    let is_missing = !auth_state.has_runtime(runtime);
-
-    is_missing.then_some(LocalAuthSetup { runtime })
-}
-
-fn missing_auth_setups_for_route(
-    route: LocalAgentRoute,
-    auth_state: LocalAuthState,
-) -> Vec<LocalAuthSetup> {
-    match route {
-        LocalAgentRoute::Runtime(runtime) => missing_auth_setup_for_runtime(runtime, auth_state)
-            .into_iter()
-            .collect(),
-        LocalAgentRoute::ChooseProvider => vec![
-            LocalAuthSetup {
-                runtime: LocalAgentRuntime::Codex,
-            },
-            LocalAuthSetup {
-                runtime: LocalAgentRuntime::Claude,
-            },
-        ],
-    }
-}
-
-fn auth_setup_command_was_attempted(inputs: &[AIAgentInput], setup: LocalAuthSetup) -> bool {
-    inputs.iter().any(|input| {
-        let Some(result) = input.action_result() else {
-            return false;
-        };
-
-        match &result.result {
-            AIAgentActionResultType::RequestCommandOutput(
-                RequestCommandOutputResult::Completed { command, .. }
-                | RequestCommandOutputResult::LongRunningCommandSnapshot { command, .. }
-                | RequestCommandOutputResult::Denylisted { command },
-            ) => command.trim() == setup.command(),
-            _ => false,
-        }
-    })
-}
-
-fn auth_setup_command_was_requested(tasks: &[api::Task], setup: LocalAuthSetup) -> bool {
-    tasks.iter().any(|task| {
-        task.messages.iter().any(|message| {
-            let Some(api::message::Message::ToolCall(tool_call)) = &message.message else {
-                return false;
-            };
-
-            let Some(api::message::tool_call::Tool::RunShellCommand(command)) = &tool_call.tool
-            else {
-                return false;
-            };
-
-            command.command.trim() == setup.command()
-        })
-    })
-}
-
-fn auth_setup_was_attempted_or_requested(params: &RequestParams, setup: LocalAuthSetup) -> bool {
-    auth_setup_command_was_attempted(&params.input, setup)
-        || auth_setup_command_was_requested(&params.tasks, setup)
-}
-
-fn local_auth_setup_choice_from_inputs(inputs: &[AIAgentInput]) -> Option<LocalAgentRuntime> {
-    let text = inputs
-        .iter()
-        .filter_map(AIAgentInput::user_query)
-        .collect::<Vec<_>>()
-        .join("\n");
-    local_auth_setup_choice_from_text(&text).or_else(|| {
-        inputs
-            .iter()
-            .filter_map(local_auth_setup_choice_from_action_result)
-            .next()
-    })
-}
-
-fn local_auth_setup_choice_from_action_result(input: &AIAgentInput) -> Option<LocalAgentRuntime> {
-    let result = input.action_result()?;
-    let AIAgentActionResultType::AskUserQuestion(AskUserQuestionResult::Success { answers }) =
-        &result.result
-    else {
-        return None;
-    };
-
-    let text = answers
-        .iter()
-        .filter_map(|answer| match answer {
-            AskUserQuestionAnswerItem::Answered {
-                question_id,
-                selected_options,
-                other_text,
-            } if question_id == LOCAL_AUTH_PROVIDER_QUESTION_ID => {
-                let mut parts = selected_options.clone();
-                if !other_text.trim().is_empty() {
-                    parts.push(other_text.clone());
-                }
-                Some(parts.join("\n"))
-            }
-            _ => None,
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    local_auth_setup_choice_from_text(&text)
-}
-
-fn local_auth_setup_choice_from_text(text: &str) -> Option<LocalAgentRuntime> {
-    let normalized = text.trim().to_ascii_lowercase();
-    if normalized.is_empty() {
-        return None;
-    }
-
-    let mentions_codex = normalized.contains("codex")
-        || normalized.contains("openai")
-        || normalized.contains("chatgpt")
-        || normalized == "gpt";
-    let mentions_claude = normalized.contains("claude") || normalized.contains("anthropic");
-
-    if mentions_codex == mentions_claude {
-        return None;
-    }
-
-    let short_provider_reply = normalized.split_whitespace().count() <= 3;
-    let setup_intent = normalized.contains("login")
-        || normalized.contains("log in")
-        || normalized.contains("sign in")
-        || normalized.contains("setup")
-        || normalized.contains("set up")
-        || normalized.contains("use ")
-        || normalized.contains("choose")
-        || normalized.contains("select")
-        || normalized.contains("provider");
-
-    if !short_provider_reply && !setup_intent {
-        return None;
-    }
-
-    if mentions_codex {
-        Some(LocalAgentRuntime::Codex)
-    } else {
-        Some(LocalAgentRuntime::Claude)
-    }
+    requested_runtime
 }
 
 fn configured_local_agent_runtime() -> Option<LocalAgentRuntime> {
@@ -377,9 +149,7 @@ pub(super) async fn generate_output(
     params: RequestParams,
     _cancellation_rx: futures::channel::oneshot::Receiver<()>,
 ) -> Result<ResponseStream, ConvertToAPITypeError> {
-    let auth_state = LocalAuthState::current();
-    let route = LocalAgentRoute::for_request(&params, auth_state);
-    let runtime = route.runtime_hint(&params);
+    let runtime = runtime_for_request(&params);
     let request_id = format!("local-{}-request-{}", runtime.slug(), Uuid::new_v4());
     let conversation_id = params
         .conversation_token
@@ -398,37 +168,11 @@ pub(super) async fn generate_output(
         .map(str::to_string);
 
     let direct_tool_call = direct_terminal_tool_call(&params.input, working_directory.as_deref());
-    let auth_setups = if direct_tool_call.is_none() {
-        missing_auth_setups_for_route(route, auth_state)
-    } else {
-        vec![]
-    };
-    let unattempted_auth_setups = auth_setups
-        .iter()
-        .copied()
-        .filter(|setup| !auth_setup_was_attempted_or_requested(&params, *setup))
-        .collect::<Vec<_>>();
     let output_text = if let Some(tool_call) = direct_tool_call.as_ref() {
         if tool_call.command.starts_with("target=$(mdfind ") {
             "I'll find the matching directory and switch Dwarf to it.".to_string()
         } else {
             format!("I'll run `{}` in Dwarf.", tool_call.command)
-        }
-    } else if !auth_setups.is_empty() {
-        if matches!(route, LocalAgentRoute::ChooseProvider) {
-            if unattempted_auth_setups.is_empty() {
-                "Finish one of the browser sign-ins, wait for the local auth file to be written, then send your request again.".to_string()
-            } else {
-                "Choose a local AI provider to set up first.".to_string()
-            }
-        } else if let Some(auth_setup) = auth_setups.first().copied() {
-            if unattempted_auth_setups.is_empty() {
-                auth_setup.pending_message().to_string()
-            } else {
-                auth_setup.message().to_string()
-            }
-        } else {
-            String::new()
         }
     } else {
         match runtime {
@@ -469,22 +213,8 @@ pub(super) async fn generate_output(
         }])));
     }
 
-    let should_ask_provider_question =
-        matches!(route, LocalAgentRoute::ChooseProvider) && !unattempted_auth_setups.is_empty();
     let (mut output_text, mut tool_calls) = if let Some(tool_call) = direct_tool_call {
         (output_text, vec![tool_call])
-    } else if !auth_setups.is_empty() {
-        (
-            output_text,
-            if matches!(route, LocalAgentRoute::ChooseProvider) {
-                vec![]
-            } else {
-                unattempted_auth_setups
-                    .into_iter()
-                    .map(LocalAuthSetup::tool_call)
-                    .collect()
-            },
-        )
     } else {
         extract_dwarf_tool_calls(&output_text)
     };
@@ -512,9 +242,6 @@ pub(super) async fn generate_output(
             api::message::AgentOutput { text: output_text },
         )),
     });
-    if should_ask_provider_question {
-        messages.push(local_auth_provider_question_message(&task_id, &request_id));
-    }
     for tool_call in tool_calls {
         messages.push(run_shell_command_message(&task_id, &request_id, tool_call));
     }
@@ -1224,45 +951,6 @@ fn run_shell_command_message(
     }
 }
 
-fn local_auth_provider_question_message(task_id: &str, request_id: &str) -> api::Message {
-    api::Message {
-        id: format!("local-auth-provider-message-{}", Uuid::new_v4()),
-        task_id: task_id.to_string(),
-        request_id: request_id.to_string(),
-        timestamp: None,
-        server_message_data: String::new(),
-        citations: vec![],
-        message: Some(api::message::Message::ToolCall(api::message::ToolCall {
-            tool_call_id: format!("local-auth-provider-tool-call-{}", Uuid::new_v4()),
-            tool: Some(api::message::tool_call::Tool::AskUserQuestion(
-                api::AskUserQuestion {
-                    questions: vec![api::ask_user_question::Question {
-                        question_id: LOCAL_AUTH_PROVIDER_QUESTION_ID.to_string(),
-                        question: "Which local AI provider should Dwarf set up?".to_string(),
-                        question_type: Some(
-                            api::ask_user_question::question::QuestionType::MultipleChoice(
-                                api::ask_user_question::MultipleChoice {
-                                    is_multiselect: false,
-                                    options: vec![
-                                        api::ask_user_question::Option {
-                                            label: "Codex / OpenAI".to_string(),
-                                        },
-                                        api::ask_user_question::Option {
-                                            label: "Claude Code".to_string(),
-                                        },
-                                    ],
-                                    recommended_option_index: -1,
-                                    supports_other: false,
-                                },
-                            ),
-                        ),
-                    }],
-                },
-            )),
-        })),
-    }
-}
-
 fn extract_dwarf_tool_calls(output_text: &str) -> (String, Vec<LocalRunShellCommand>) {
     let mut output_lines = Vec::new();
     let mut tool_calls = Vec::new();
@@ -1685,119 +1373,56 @@ mod tests {
     #[test]
     fn routes_default_codex_model_to_claude_when_only_claude_is_authed() {
         assert_eq!(
-            route_for_model(
+            runtime_for_model(
                 "gpt-5.5",
                 LocalAuthState {
                     codex: false,
                     claude: true,
                 }
             ),
-            LocalAgentRoute::Runtime(LocalAgentRuntime::Claude)
+            LocalAgentRuntime::Claude
         );
     }
 
     #[test]
-    fn routes_explicit_codex_model_to_codex_setup_when_codex_is_missing() {
+    fn routes_explicit_codex_model_to_codex_when_only_claude_is_authed() {
         assert_eq!(
-            route_for_model(
+            runtime_for_model(
                 "gpt-5.4",
                 LocalAuthState {
                     codex: false,
                     claude: true,
                 }
             ),
-            LocalAgentRoute::Runtime(LocalAgentRuntime::Codex)
+            LocalAgentRuntime::Codex
         );
     }
 
     #[test]
     fn routes_default_claude_model_to_codex_when_only_codex_is_authed() {
         assert_eq!(
-            route_for_model(
+            runtime_for_model(
                 "claude-code",
                 LocalAuthState {
                     codex: true,
                     claude: false,
                 }
             ),
-            LocalAgentRoute::Runtime(LocalAgentRuntime::Codex)
+            LocalAgentRuntime::Codex
         );
     }
 
     #[test]
-    fn routes_explicit_claude_model_to_claude_setup_when_claude_is_missing() {
+    fn routes_explicit_claude_model_to_claude_when_only_codex_is_authed() {
         assert_eq!(
-            route_for_model(
+            runtime_for_model(
                 "opus",
                 LocalAuthState {
                     codex: true,
                     claude: false,
                 }
             ),
-            LocalAgentRoute::Runtime(LocalAgentRuntime::Claude)
-        );
-    }
-
-    #[test]
-    fn routes_to_provider_selection_when_no_local_auth_exists() {
-        assert_eq!(
-            route_for_model(
-                "gpt-5.5",
-                LocalAuthState {
-                    codex: false,
-                    claude: false,
-                }
-            ),
-            LocalAgentRoute::ChooseProvider
-        );
-    }
-
-    #[test]
-    fn detects_codex_provider_setup_choice() {
-        assert_eq!(
-            local_auth_setup_choice_from_text("codex"),
-            Some(LocalAgentRuntime::Codex)
-        );
-        assert_eq!(
-            local_auth_setup_choice_from_text("use openai"),
-            Some(LocalAgentRuntime::Codex)
-        );
-    }
-
-    #[test]
-    fn detects_claude_provider_setup_choice() {
-        assert_eq!(
-            local_auth_setup_choice_from_text("claude"),
-            Some(LocalAgentRuntime::Claude)
-        );
-        assert_eq!(
-            local_auth_setup_choice_from_text("set up anthropic login"),
-            Some(LocalAgentRuntime::Claude)
-        );
-    }
-
-    #[test]
-    fn detects_provider_setup_choice_from_question_answer() {
-        assert_eq!(
-            local_auth_setup_choice_from_inputs(&[provider_answer("Codex / OpenAI")]),
-            Some(LocalAgentRuntime::Codex)
-        );
-        assert_eq!(
-            local_auth_setup_choice_from_inputs(&[provider_answer("Claude Code")]),
-            Some(LocalAgentRuntime::Claude)
-        );
-    }
-
-    #[test]
-    fn ignores_ambiguous_provider_setup_choice() {
-        assert_eq!(local_auth_setup_choice_from_text("codex or claude?"), None);
-        assert_eq!(
-            local_auth_setup_choice_from_text("compare codex and claude"),
-            None
-        );
-        assert_eq!(
-            local_auth_setup_choice_from_text("what is codex doing here"),
-            None
+            LocalAgentRuntime::Claude
         );
     }
 
@@ -1812,51 +1437,6 @@ mod tests {
             selected_claude_model(Some("opus".to_string()), "sonnet"),
             Some("opus".to_string())
         );
-    }
-
-    #[test]
-    fn codex_auth_setup_uses_interactive_login_command() {
-        let tool_call = LocalAuthSetup {
-            runtime: LocalAgentRuntime::Codex,
-        }
-        .tool_call();
-
-        assert_eq!(tool_call.command, "codex login");
-        assert!(!tool_call.is_read_only);
-        assert!(tool_call.wait_until_complete);
-    }
-
-    #[test]
-    fn claude_auth_setup_uses_interactive_login_command() {
-        let tool_call = LocalAuthSetup {
-            runtime: LocalAgentRuntime::Claude,
-        }
-        .tool_call();
-
-        assert_eq!(tool_call.command, "claude auth login --claudeai");
-        assert!(!tool_call.is_read_only);
-        assert!(tool_call.wait_until_complete);
-    }
-
-    #[test]
-    fn auth_setup_guard_detects_prior_setup_tool_call() {
-        let setup = LocalAuthSetup {
-            runtime: LocalAgentRuntime::Codex,
-        };
-        let task = api::Task {
-            id: "task".to_string(),
-            dependencies: None,
-            messages: vec![run_shell_command_message(
-                "task",
-                "request",
-                setup.tool_call(),
-            )],
-            description: String::new(),
-            summary: String::new(),
-            server_data: String::new(),
-        };
-
-        assert!(auth_setup_command_was_requested(&[task], setup));
     }
 
     #[test]
@@ -2095,23 +1675,6 @@ mod tests {
             user_query_mode: crate::ai::agent::UserQueryMode::Normal,
             running_command: None,
             intended_agent: None,
-        }
-    }
-
-    fn provider_answer(label: &str) -> AIAgentInput {
-        AIAgentInput::ActionResult {
-            result: crate::ai::agent::AIAgentActionResult {
-                id: "provider-question".to_string().into(),
-                task_id: crate::ai::agent::task::TaskId::new("task".to_string()),
-                result: AIAgentActionResultType::AskUserQuestion(AskUserQuestionResult::Success {
-                    answers: vec![AskUserQuestionAnswerItem::Answered {
-                        question_id: LOCAL_AUTH_PROVIDER_QUESTION_ID.to_string(),
-                        selected_options: vec![label.to_string()],
-                        other_text: String::new(),
-                    }],
-                }),
-            },
-            context: std::sync::Arc::from([]),
         }
     }
 }
