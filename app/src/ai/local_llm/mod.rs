@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use thiserror::Error;
 
+use crate::ai::{local_claude_auth, local_openai_auth};
 use crate::util::path::resolve_executable;
 
 pub use claude::ClaudeOneShot;
@@ -91,11 +92,58 @@ pub enum LocalLLMError {
 pub fn resolve_provider(default_preference: Provider) -> Option<Provider> {
     let codex = Provider::Codex.is_installed();
     let claude = Provider::Claude.is_installed();
-    match (codex, claude) {
+    let codex_authed = local_openai_auth::has_access_token();
+    let claude_authed = local_claude_auth::has_auth_state();
+
+    resolve_provider_from_state(
+        default_preference,
+        codex,
+        claude,
+        codex_authed,
+        claude_authed,
+    )
+}
+
+fn resolve_provider_from_state(
+    default_preference: Provider,
+    codex_installed: bool,
+    claude_installed: bool,
+    codex_authed: bool,
+    claude_authed: bool,
+) -> Option<Provider> {
+    match (codex_installed, claude_installed) {
         (true, true) => Some(default_preference),
         (true, false) => Some(Provider::Codex),
         (false, true) => Some(Provider::Claude),
         (false, false) => None,
+    }
+    .and_then(|provider| match provider {
+        Provider::Codex if !codex_authed && claude_installed && claude_authed => Some(Provider::Claude),
+        Provider::Claude if !claude_authed && codex_installed && codex_authed => Some(Provider::Codex),
+        p => Some(p),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Provider, resolve_provider_from_state};
+
+    #[test]
+    fn prefers_authenticated_provider_when_default_is_unauthenticated() {
+        let resolved = resolve_provider_from_state(Provider::Codex, true, true, false, true);
+        assert_eq!(resolved, Some(Provider::Claude));
+    }
+
+    #[test]
+    fn keeps_default_when_both_providers_are_authenticated() {
+        let resolved = resolve_provider_from_state(Provider::Codex, true, true, true, true);
+        assert_eq!(resolved, Some(Provider::Codex));
+    }
+
+    #[test]
+    fn falls_back_to_installed_provider_even_if_not_authenticated() {
+        let resolved = resolve_provider_from_state(Provider::Codex, true, false, false, false);
+        assert_eq!(resolved, Some(Provider::Codex));
     }
 }
 
