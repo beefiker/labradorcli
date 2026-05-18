@@ -2217,34 +2217,108 @@ impl View for CodeEditorView {
     }
 }
 
-// `code_text_styles` previously composed `notebooks::editor::rich_text_styles`
-// before applying code-editor-specific overrides. With the notebooks editor
-// gone, this helper has no body it can supply; call sites are broken in the
-// Dwarf fork until the rich-text editor is reimplemented or replaced.
+/// Builds the `RichTextStyles` used by the code editor. The deleted notebooks
+/// editor used to own this with markdown-aware styling (headers, lists, etc).
+/// In the Dwarf fork we only need enough of the bundle for the code editor's
+/// own rendering — paragraph styles, selection, table cells — so this assembles
+/// a minimal bundle from the live `Appearance` + theme.
 pub fn code_text_styles(
-    _appearance: &Appearance,
+    appearance: &Appearance,
     _font_settings: &FontSettings,
-    _line_height_override: Option<f32>,
+    line_height_override: Option<f32>,
 ) -> RichTextStyles {
-    rich_text_styles_placeholder()
-}
+    use warp_editor::render::model::{
+        BrokenLinkStyle, CheckBoxStyle, HorizontalRuleStyle, InlineCodeStyle, ParagraphStyles,
+        TableStyle, DEFAULT_BLOCK_SPACINGS, PARAGRAPH_MIN_HEIGHT,
+    };
+    use warpui::elements::{Border, DEFAULT_UI_LINE_HEIGHT_RATIO};
+    use warpui::fonts::Weight;
 
-/// Replacement for the deleted `notebooks::editor::rich_text_styles`. Returns
-/// a placeholder that panics on use, matching `code_text_styles` above.
-pub fn rich_text_styles(
-    _appearance: &Appearance,
-    _font_settings: &FontSettings,
-) -> RichTextStyles {
-    rich_text_styles_placeholder()
-}
+    let theme = appearance.theme();
+    let background = theme.background();
+    let main_text_color = theme.main_text_color(background).into_solid();
+    let disabled_text_color = theme.disabled_text_color(background).into_solid();
+    let outline_color = theme.outline().into_solid();
+    let outline_fill: Fill = theme.outline().into();
+    let ui_font_family = appearance.ui_font_family();
+    let monospace_font_family = appearance.monospace_font_family();
+    let ui_font_size = appearance.ui_font_size();
+    let monospace_font_size = appearance.monospace_font_size();
+    let monospace_font_weight = appearance.monospace_font_weight();
+    let line_height_ratio = line_height_override.unwrap_or(DEFAULT_UI_LINE_HEIGHT_RATIO);
+    let baseline_ratio = 0.8;
 
-fn rich_text_styles_placeholder() -> RichTextStyles {
-    // The underlying `RichTextStyles` constructor lived in the deleted
-    // `notebooks::editor` module. There is no surviving constructor; calling
-    // this function will panic at runtime.
-    panic!(
-        "rich text editor styling is unavailable in this fork; the notebooks editor was removed"
-    );
+    let base_text = ParagraphStyles {
+        font_family: ui_font_family,
+        font_size: ui_font_size,
+        font_weight: Weight::Normal,
+        line_height_ratio,
+        text_color: main_text_color,
+        baseline_ratio,
+        fixed_width_tab_size: None,
+    };
+    let code_text = ParagraphStyles {
+        font_family: monospace_font_family,
+        font_size: monospace_font_size,
+        font_weight: monospace_font_weight,
+        line_height_ratio,
+        text_color: main_text_color,
+        baseline_ratio,
+        fixed_width_tab_size: Some(4),
+    };
+
+    RichTextStyles {
+        base_text,
+        code_text,
+        embedding_text: code_text,
+        code_background: theme.surface_1().into(),
+        embedding_background: theme.surface_1().into(),
+        code_border: Border::all(1.).with_border_fill(outline_fill),
+        placeholder_color: disabled_text_color,
+        selection_fill: theme.text_selection_color().into(),
+        cursor_fill: Fill::None,
+        inline_code_style: InlineCodeStyle {
+            font_family: monospace_font_family,
+            background: background.into_solid(),
+            font_color: theme.terminal_colors().normal.green.into(),
+        },
+        check_box_style: CheckBoxStyle {
+            border_width: 2.,
+            border_color: disabled_text_color,
+            icon_path: "bundled/svg/check-thick.svg",
+            background: background.into_solid(),
+            hover_background: background.into_solid(),
+        },
+        horizontal_rule_style: HorizontalRuleStyle {
+            rule_height: 1.,
+            color: disabled_text_color,
+        },
+        broken_link_style: BrokenLinkStyle {
+            icon_path: "bundled/svg/link-broken-02.svg",
+            icon_color: disabled_text_color,
+        },
+        block_spacings: DEFAULT_BLOCK_SPACINGS,
+        show_placeholder_text_on_empty_block: false,
+        minimum_paragraph_height: Some(PARAGRAPH_MIN_HEIGHT),
+        cursor_width: 1.,
+        highlight_urls: true,
+        table_style: TableStyle {
+            border_color: outline_color,
+            header_background: theme.surface_1().into_solid(),
+            cell_background: background.into_solid(),
+            alternate_row_background: None,
+            text_color: main_text_color,
+            header_text_color: main_text_color,
+            scrollbar_nonactive_thumb_color: disabled_text_color,
+            scrollbar_active_thumb_color: main_text_color,
+            font_family: monospace_font_family,
+            font_size: monospace_font_size,
+            cell_padding: 8.,
+            outer_border: true,
+            column_dividers: true,
+            row_dividers: true,
+        },
+    }
 }
 
 #[cfg(feature = "integration_tests")]

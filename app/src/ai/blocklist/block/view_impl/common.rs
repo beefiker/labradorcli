@@ -109,7 +109,7 @@ use crate::{
 };
 use crate::{
     search::slash_command_menu::static_commands::commands,
-    settings::{FontSettings, InputSettings},
+    settings::InputSettings,
 };
 use warp_core::channel::ChannelState;
 use warp_editor::content::{
@@ -2293,9 +2293,9 @@ fn is_supported_blocklist_image_source(source: &str) -> bool {
 }
 
 fn visual_section_height(app: &AppContext) -> f32 {
-    crate::code::editor::view::rich_text_styles(Appearance::as_ref(app), FontSettings::as_ref(app))
-        .base_line_height()
-        .as_f32()
+    let appearance = Appearance::as_ref(app);
+    appearance.ui_font_size()
+        * warpui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO
         * BLOCKLIST_VISUAL_SECTION_HEIGHT_LINE_MULTIPLIER
 }
 
@@ -2320,7 +2320,6 @@ fn render_table_section(
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
     let table_appearance = markdown_table_appearance_placeholder(appearance);
-    let notebook_styles = crate::code::editor::view::rich_text_styles(appearance, FontSettings::as_ref(app));
     let table_font_family = appearance.ai_font_family();
     let table_font_size = appearance.monospace_font_size();
     let body_font_weight = appearance.monospace_font_weight();
@@ -2333,8 +2332,9 @@ fn render_table_section(
     } else {
         theme.text_selection_color().into_solid()
     };
-    let inline_code_text_color = notebook_styles.inline_code_style.font_color;
-    let inline_code_bg_color = notebook_styles.inline_code_style.background;
+    // Match the inline-code styling used by render_rich_text_output_text_section above.
+    let inline_code_text_color = theme.terminal_colors().normal.green.into();
+    let inline_code_bg_color = theme.background().into_solid();
     let Some(structured_table) = table.structured_table() else {
         return Empty::new().finish();
     };
