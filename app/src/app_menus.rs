@@ -354,7 +354,6 @@ fn make_new_view_menu(ctx: &AppContext) -> Menu {
         MenuItem::Separator,
         updateable_custom_item_without_checkmark(CustomAction::History, ctx),
         updateable_custom_item_without_checkmark(CustomAction::CommandSearch, ctx),
-        updateable_custom_item_without_checkmark(CustomAction::Workflows, ctx),
         MenuItem::Separator,
         MenuItem::Custom(CustomMenuItem::new(
             "Toggle Mouse Reporting",
