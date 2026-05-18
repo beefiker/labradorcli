@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::ai::{local_claude_auth, local_openai_auth};
+use ai::{local_claude_auth, local_openai_auth};
+
 use crate::util::path::resolve_executable;
 
 pub use claude::ClaudeOneShot;

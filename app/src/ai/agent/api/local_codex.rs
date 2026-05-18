@@ -1,12 +1,14 @@
 use std::{
     env,
     path::{Path, PathBuf},
-    process::Command as StdCommand,
+    process::{Command as StdCommand, Stdio},
 };
 
 use ai::{local_claude_auth, local_openai_auth};
 use command::r#async::Command;
-use futures_lite::stream;
+use futures::Stream;
+use futures_lite::{io::BufReader, stream, AsyncBufReadExt, StreamExt as _};
+use prost_types::FieldMask;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::Value;
@@ -167,34 +169,167 @@ pub(super) async fn generate_output(
         .as_deref()
         .map(str::to_string);
 
-    let direct_tool_call = direct_terminal_tool_call(&params.input, working_directory.as_deref());
-    let output_text = if let Some(tool_call) = direct_tool_call.as_ref() {
-        if tool_call.command.starts_with("target=$(mdfind ") {
+    // Fast path: when we can synthesize the tool call from the prompt alone, skip the CLI roundtrip
+    // and emit the whole exchange in one shot — there's nothing to stream.
+    if let Some(tool_call) = direct_terminal_tool_call(&params.input, working_directory.as_deref())
+    {
+        let output_text = if tool_call.command.starts_with("target=$(mdfind ") {
             "I'll find the matching directory and switch Dwarf to it.".to_string()
         } else {
             format!("I'll run `{}` in Dwarf.", tool_call.command)
+        };
+        return Ok(Box::pin(stream::iter(non_streaming_events(
+            conversation_id,
+            request_id,
+            task_id,
+            needs_create_task,
+            output_text,
+            vec![tool_call],
+            &params.input,
+            runtime,
+        ))));
+    }
+
+    // Streaming path: emit init + (optional) CreateTask + seed AddMessagesToTask with an empty
+    // AgentOutput, then drive the CLI and forward text deltas as AppendToMessageContent events.
+    let message_id = format!("local-{}-message-{}", runtime.slug(), Uuid::new_v4());
+    let inputs = params.input.clone();
+    let stream = async_stream::stream! {
+        yield Ok(init_event(conversation_id, request_id.clone()));
+        if needs_create_task {
+            yield Ok(client_actions_event(vec![api::ClientAction {
+                action: Some(api::client_action::Action::CreateTask(
+                    api::client_action::CreateTask {
+                        task: Some(api::Task {
+                            id: task_id.clone(),
+                            description: LOCAL_AGENT_DISPLAY_NAME.to_string(),
+                            dependencies: None,
+                            messages: vec![],
+                            summary: String::new(),
+                            server_data: String::new(),
+                        }),
+                    },
+                )),
+            }]));
         }
-    } else {
-        match runtime {
-            LocalAgentRuntime::Codex => {
-                let model = model_for_codex(&params);
-                let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
-                match run_codex(prompt, working_directory.as_deref(), model.as_deref()).await {
-                    Ok(text) => text,
-                    Err(error) => error,
+
+        let mut seed_messages = user_query_messages(&inputs, &task_id, &request_id);
+        seed_messages.push(api::Message {
+            id: message_id.clone(),
+            task_id: task_id.clone(),
+            request_id: request_id.clone(),
+            timestamp: None,
+            server_message_data: String::new(),
+            citations: vec![],
+            message: Some(api::message::Message::AgentOutput(
+                api::message::AgentOutput { text: String::new() },
+            )),
+        });
+        yield Ok(client_actions_event(vec![api::ClientAction {
+            action: Some(api::client_action::Action::AddMessagesToTask(
+                api::client_action::AddMessagesToTask {
+                    task_id: task_id.clone(),
+                    messages: seed_messages,
+                },
+            )),
+        }]));
+
+        let mut full_text = String::new();
+        let mut delta_stream: std::pin::Pin<Box<dyn Stream<Item = Result<String, String>> + Send>> =
+            match runtime {
+                LocalAgentRuntime::Codex => {
+                    let model = model_for_codex(&params);
+                    let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
+                    Box::pin(run_codex_streaming(
+                        prompt,
+                        working_directory.clone(),
+                        model,
+                    ))
+                }
+                LocalAgentRuntime::Claude => {
+                    let model = model_for_claude(&params);
+                    let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
+                    Box::pin(run_claude_streaming(
+                        prompt,
+                        working_directory.clone(),
+                        model,
+                    ))
+                }
+            };
+
+        while let Some(item) = delta_stream.next().await {
+            match item {
+                Ok(chunk) => {
+                    if chunk.is_empty() {
+                        continue;
+                    }
+                    full_text.push_str(&chunk);
+                    yield Ok(append_agent_text_event(&task_id, &message_id, chunk));
+                }
+                Err(error) => {
+                    full_text = error.clone();
+                    yield Ok(replace_agent_text_event(
+                        &task_id,
+                        &request_id,
+                        &message_id,
+                        error,
+                    ));
+                    break;
                 }
             }
-            LocalAgentRuntime::Claude => {
-                let model = model_for_claude(&params);
-                let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
-                match run_claude(prompt, working_directory.as_deref(), model.as_deref()).await {
-                    Ok(text) => text,
-                    Err(error) => error,
-                }
+        }
+
+        // Post-process: pull out DWARF_TOOL_CALL markers and any cwd-change tool call.
+        let (mut cleaned_text, mut tool_calls) = extract_dwarf_tool_calls(&full_text);
+        if let Some(target_dir) =
+            local_cwd_change_target(&inputs, &cleaned_text, working_directory.as_deref())
+        {
+            let command = format!("cd {}", shell_quote_path(&target_dir));
+            if !tool_calls.iter().any(|call| call.command == command) {
+                tool_calls.push(LocalRunShellCommand::read_only(command));
+            }
+            if tool_calls.len() == 1 {
+                cleaned_text = format!("I'll run `{}` in Dwarf.", tool_calls[0].command);
             }
         }
+
+        if cleaned_text != full_text {
+            yield Ok(replace_agent_text_event(
+                &task_id,
+                &request_id,
+                &message_id,
+                cleaned_text,
+            ));
+        }
+
+        if !tool_calls.is_empty() {
+            let messages = tool_calls
+                .into_iter()
+                .map(|tool_call| run_shell_command_message(&task_id, &request_id, tool_call))
+                .collect();
+            yield Ok(client_actions_event(vec![api::ClientAction {
+                action: Some(api::client_action::Action::AddMessagesToTask(
+                    api::client_action::AddMessagesToTask { task_id, messages },
+                )),
+            }]));
+        }
+
+        yield Ok(finished_event());
     };
 
+    Ok(Box::pin(stream))
+}
+
+fn non_streaming_events(
+    conversation_id: String,
+    request_id: String,
+    task_id: String,
+    needs_create_task: bool,
+    output_text: String,
+    tool_calls: Vec<LocalRunShellCommand>,
+    inputs: &[AIAgentInput],
+    runtime: LocalAgentRuntime,
+) -> Vec<super::Event> {
     let mut events = vec![Ok(init_event(conversation_id, request_id.clone()))];
     if needs_create_task {
         events.push(Ok(client_actions_event(vec![api::ClientAction {
@@ -213,24 +348,7 @@ pub(super) async fn generate_output(
         }])));
     }
 
-    let (mut output_text, mut tool_calls) = if let Some(tool_call) = direct_tool_call {
-        (output_text, vec![tool_call])
-    } else {
-        extract_dwarf_tool_calls(&output_text)
-    };
-    if let Some(target_dir) =
-        local_cwd_change_target(&params.input, &output_text, working_directory.as_deref())
-    {
-        let command = format!("cd {}", shell_quote_path(&target_dir));
-        if !tool_calls.iter().any(|call| call.command == command) {
-            tool_calls.push(LocalRunShellCommand::read_only(command));
-        }
-        if tool_calls.len() == 1 {
-            output_text = format!("I'll run `{}` in Dwarf.", tool_calls[0].command);
-        }
-    }
-
-    let mut messages = user_query_messages(&params.input, &task_id, &request_id);
+    let mut messages = user_query_messages(inputs, &task_id, &request_id);
     messages.push(api::Message {
         id: format!("local-{}-message-{}", runtime.slug(), Uuid::new_v4()),
         task_id: task_id.clone(),
@@ -251,8 +369,7 @@ pub(super) async fn generate_output(
         )),
     }])));
     events.push(Ok(finished_event()));
-
-    Ok(Box::pin(stream::iter(events)))
+    events
 }
 
 pub(crate) async fn maybe_generate_local_ai_input_suggestions(
@@ -447,49 +564,125 @@ fn working_directory_from_context_messages(context_messages: &[String]) -> Optio
         .find(|pwd| Path::new(pwd).is_dir())
 }
 
+fn run_codex_streaming(
+    prompt: String,
+    working_directory: Option<String>,
+    model: Option<String>,
+) -> impl Stream<Item = Result<String, String>> + Send {
+    async_stream::stream! {
+        let codex_bin = codex_bin();
+        let mut command = Command::new(codex_bin.clone());
+        command
+            .arg("exec")
+            .arg("--json")
+            .arg("--skip-git-repo-check")
+            .arg("--sandbox")
+            .arg("workspace-write");
+        if let Some(model) = model.as_deref() {
+            command.arg("--model").arg(model);
+        }
+        if let Some(wd) = working_directory.as_deref() {
+            command.arg("-C").arg(wd);
+        }
+        command.arg(prompt);
+        command
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(error) => {
+                yield Err(format!(
+                    "{LOCAL_AGENT_DISPLAY_NAME} failed to start. Tried `{codex_bin}`. Set {CODEX_BIN_ENV_VAR} to your Codex CLI path if it is not on PATH.\n\n```text\n{error}\n```"
+                ));
+                return;
+            }
+        };
+
+        let stdout = child.stdout.take().expect("stdout was piped");
+        let stderr = child.stderr.take().expect("stderr was piped");
+        let stdout_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
+            BufReader::new(stdout)
+                .lines()
+                .filter_map(|r| r.ok().map(MergedLine::Stdout)),
+        );
+        let stderr_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
+            BufReader::new(stderr)
+                .lines()
+                .filter_map(|r| r.ok().map(MergedLine::Stderr)),
+        );
+        let mut merged = futures::stream::select(stdout_stream, stderr_stream);
+
+        let mut messages_in_order: Vec<(String, String)> = Vec::new();
+        let mut emitted_total = String::new();
+        let mut stderr_buf = String::new();
+
+        while let Some(line) = merged.next().await {
+            match line {
+                MergedLine::Stdout(line) => {
+                    if let Some(delta) =
+                        ingest_codex_line(&line, &mut messages_in_order, &mut emitted_total)
+                    {
+                        if !delta.is_empty() {
+                            yield Ok(delta);
+                        }
+                    }
+                }
+                MergedLine::Stderr(line) => {
+                    if !stderr_buf.is_empty() {
+                        stderr_buf.push('\n');
+                    }
+                    stderr_buf.push_str(&line);
+                }
+            }
+        }
+
+        let status = match child.status().await {
+            Ok(status) => status,
+            Err(error) => {
+                yield Err(format!(
+                    "{LOCAL_AGENT_DISPLAY_NAME} failed waiting on Codex CLI.\n\n```text\n{error}\n```"
+                ));
+                return;
+            }
+        };
+
+        if status.success() {
+            if emitted_total.is_empty() {
+                yield Err(format!(
+                    "{LOCAL_AGENT_DISPLAY_NAME} finished without an agent message.\n\n```text\n{}\n```",
+                    truncate(&stderr_buf, 4_000)
+                ));
+            }
+        } else {
+            yield Err(format!(
+                "{LOCAL_AGENT_DISPLAY_NAME} exited with status {}.\n\n```text\n{}\n```",
+                status,
+                truncate(&stderr_buf, 4_000)
+            ));
+        }
+    }
+}
+
 async fn run_codex(
     prompt: String,
     working_directory: Option<&str>,
     model: Option<&str>,
 ) -> Result<String, String> {
-    let codex_bin = codex_bin();
-    let mut command = Command::new(codex_bin.clone());
-    command
-        .arg("exec")
-        .arg("--json")
-        .arg("--skip-git-repo-check")
-        .arg("--sandbox")
-        .arg("workspace-write");
-    if let Some(model) = model {
-        command.arg("--model").arg(model);
+    let mut stream = Box::pin(run_codex_streaming(
+        prompt,
+        working_directory.map(str::to_string),
+        model.map(str::to_string),
+    ));
+    let mut full = String::new();
+    while let Some(item) = stream.next().await {
+        match item {
+            Ok(chunk) => full.push_str(&chunk),
+            Err(error) => return Err(error),
+        }
     }
-    if let Some(working_directory) = working_directory {
-        command.arg("-C").arg(working_directory);
-    }
-    command.arg(prompt);
-
-    let output = command.output().await.map_err(|error| {
-        format!(
-            "{LOCAL_AGENT_DISPLAY_NAME} failed to start. Tried `{codex_bin}`. Set {CODEX_BIN_ENV_VAR} to your Codex CLI path if it is not on PATH.\n\n```text\n{error}\n```"
-        )
-    })?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    if output.status.success() {
-        extract_codex_agent_text(&stdout).ok_or_else(|| {
-            format!(
-                "{LOCAL_AGENT_DISPLAY_NAME} finished without an agent message.\n\n```text\n{}\n```",
-                truncate(&stdout, 4_000)
-            )
-        })
-    } else {
-        Err(format!(
-            "{LOCAL_AGENT_DISPLAY_NAME} exited with status {}.\n\n```text\n{}\n```",
-            output.status,
-            truncate(&stderr, 4_000)
-        ))
-    }
+    Ok(full)
 }
 
 async fn run_claude(
@@ -540,6 +733,183 @@ async fn run_claude(
             output.status,
             truncate(details, 4_000)
         ))
+    }
+}
+
+fn run_claude_streaming(
+    prompt: String,
+    working_directory: Option<String>,
+    model: Option<String>,
+) -> impl Stream<Item = Result<String, String>> + Send {
+    async_stream::stream! {
+        let claude_bin = claude_bin();
+        let mut command = Command::new(claude_bin.clone());
+        command
+            .arg("-p")
+            .arg("--output-format")
+            .arg("stream-json")
+            .arg("--verbose")
+            .arg("--tools")
+            .arg("")
+            .arg("--no-session-persistence");
+        if let Some(model) = model.as_deref() {
+            command.arg("--model").arg(model);
+        }
+        if let Some(wd) = working_directory.as_deref() {
+            command.current_dir(wd);
+        }
+        command.arg(prompt);
+        command
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(error) => {
+                yield Err(format!(
+                    "{LOCAL_AGENT_DISPLAY_NAME} failed to start Claude Code. Tried `{claude_bin}`. Set {CLAUDE_BIN_ENV_VAR} to your Claude Code CLI path if it is not on PATH.\n\n```text\n{error}\n```"
+                ));
+                return;
+            }
+        };
+
+        let stdout = child.stdout.take().expect("stdout was piped");
+        let stderr = child.stderr.take().expect("stderr was piped");
+        let stdout_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
+            BufReader::new(stdout)
+                .lines()
+                .filter_map(|r| r.ok().map(MergedLine::Stdout)),
+        );
+        let stderr_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
+            BufReader::new(stderr)
+                .lines()
+                .filter_map(|r| r.ok().map(MergedLine::Stderr)),
+        );
+        let mut merged = futures::stream::select(stdout_stream, stderr_stream);
+
+        let mut assistant_chunks: Vec<String> = Vec::new();
+        let mut emitted_total = String::new();
+        let mut stderr_buf = String::new();
+
+        while let Some(line) = merged.next().await {
+            match line {
+                MergedLine::Stdout(line) => {
+                    if let Some(delta) = ingest_claude_line(
+                        &line,
+                        &mut assistant_chunks,
+                        &mut emitted_total,
+                    ) {
+                        if !delta.is_empty() {
+                            yield Ok(delta);
+                        }
+                    }
+                }
+                MergedLine::Stderr(line) => {
+                    if !stderr_buf.is_empty() {
+                        stderr_buf.push('\n');
+                    }
+                    stderr_buf.push_str(&line);
+                }
+            }
+        }
+
+        let status = match child.status().await {
+            Ok(status) => status,
+            Err(error) => {
+                yield Err(format!(
+                    "{LOCAL_AGENT_DISPLAY_NAME} failed waiting on Claude Code.\n\n```text\n{error}\n```"
+                ));
+                return;
+            }
+        };
+
+        if status.success() {
+            if emitted_total.is_empty() {
+                yield Err(format!(
+                    "{LOCAL_AGENT_DISPLAY_NAME} finished without a Claude Code message.\n\n```text\n{}\n```",
+                    truncate(&stderr_buf, 4_000)
+                ));
+            }
+        } else {
+            yield Err(format!(
+                "{LOCAL_AGENT_DISPLAY_NAME} Claude Code exited with status {}.\n\n```text\n{}\n```",
+                status,
+                truncate(&stderr_buf, 4_000)
+            ));
+        }
+    }
+}
+
+enum MergedLine {
+    Stdout(String),
+    Stderr(String),
+}
+
+fn ingest_codex_line(
+    line: &str,
+    messages_in_order: &mut Vec<(String, String)>,
+    emitted_total: &mut String,
+) -> Option<String> {
+    let value: Value = serde_json::from_str(line).ok()?;
+    let item = value.get("item")?;
+    if item.get("type")?.as_str()? != "agent_message" {
+        return None;
+    }
+    let id = item.get("id")?.as_str()?.to_string();
+    let text = item.get("text")?.as_str()?.to_string();
+    if let Some(entry) = messages_in_order.iter_mut().find(|(eid, _)| eid == &id) {
+        entry.1 = text;
+    } else {
+        messages_in_order.push((id, text));
+    }
+    let running = messages_in_order
+        .iter()
+        .map(|(_, t)| t.as_str())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    if running.len() > emitted_total.len() && running.starts_with(&*emitted_total) {
+        let delta = running[emitted_total.len()..].to_string();
+        *emitted_total = running;
+        Some(delta)
+    } else {
+        None
+    }
+}
+
+fn ingest_claude_line(
+    line: &str,
+    assistant_chunks: &mut Vec<String>,
+    emitted_total: &mut String,
+) -> Option<String> {
+    let value: Value = serde_json::from_str(line).ok()?;
+    let event_type = value.get("type")?.as_str()?;
+    let text: String = match event_type {
+        "assistant" => {
+            let content = value.get("message")?.get("content")?.as_array()?;
+            content
+                .iter()
+                .filter_map(|c| c.get("text").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("")
+        }
+        "result" if assistant_chunks.is_empty() => value
+            .get("result")
+            .and_then(Value::as_str)?
+            .to_string(),
+        _ => return None,
+    };
+    if text.is_empty() {
+        return None;
+    }
+    assistant_chunks.push(text);
+    let running = assistant_chunks.join("\n\n");
+    if running.len() > emitted_total.len() && running.starts_with(&*emitted_total) {
+        let delta = running[emitted_total.len()..].to_string();
+        *emitted_total = running;
+        Some(delta)
+    } else {
+        None
     }
 }
 
@@ -1217,6 +1587,63 @@ fn client_actions_event(actions: Vec<api::ClientAction>) -> api::ResponseEvent {
     }
 }
 
+fn append_agent_text_event(
+    task_id: &str,
+    message_id: &str,
+    text: String,
+) -> api::ResponseEvent {
+    client_actions_event(vec![api::ClientAction {
+        action: Some(api::client_action::Action::AppendToMessageContent(
+            api::client_action::AppendToMessageContent {
+                task_id: task_id.to_string(),
+                message: Some(api::Message {
+                    id: message_id.to_string(),
+                    task_id: task_id.to_string(),
+                    request_id: String::new(),
+                    timestamp: None,
+                    server_message_data: String::new(),
+                    citations: vec![],
+                    message: Some(api::message::Message::AgentOutput(
+                        api::message::AgentOutput { text },
+                    )),
+                }),
+                mask: Some(FieldMask {
+                    paths: vec!["message.agent_output.text".to_string()],
+                }),
+            },
+        )),
+    }])
+}
+
+fn replace_agent_text_event(
+    task_id: &str,
+    request_id: &str,
+    message_id: &str,
+    text: String,
+) -> api::ResponseEvent {
+    client_actions_event(vec![api::ClientAction {
+        action: Some(api::client_action::Action::UpdateTaskMessage(
+            api::client_action::UpdateTaskMessage {
+                task_id: task_id.to_string(),
+                message: Some(api::Message {
+                    id: message_id.to_string(),
+                    task_id: task_id.to_string(),
+                    request_id: request_id.to_string(),
+                    timestamp: None,
+                    server_message_data: String::new(),
+                    citations: vec![],
+                    message: Some(api::message::Message::AgentOutput(
+                        api::message::AgentOutput { text },
+                    )),
+                }),
+                mask: Some(FieldMask {
+                    paths: vec!["message.agent_output.text".to_string()],
+                }),
+            },
+        )),
+    }])
+}
+
 fn finished_event() -> api::ResponseEvent {
     #[allow(deprecated)]
     let conversation_usage_metadata =
@@ -1243,20 +1670,6 @@ fn finished_event() -> api::ResponseEvent {
             },
         )),
     }
-}
-
-fn extract_codex_agent_text(stdout: &str) -> Option<String> {
-    let messages = stdout
-        .lines()
-        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .filter_map(|value| {
-            let item = value.get("item")?;
-            (value.get("type")?.as_str()? == "item.completed"
-                && item.get("type")?.as_str()? == "agent_message")
-                .then(|| item.get("text")?.as_str().map(str::to_string))?
-        })
-        .collect::<Vec<_>>();
-    (!messages.is_empty()).then(|| messages.join("\n\n"))
 }
 
 fn extract_claude_agent_text(stdout: &str) -> Option<String> {
@@ -1309,11 +1722,73 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extracts_codex_agent_text_from_jsonl() {
-        let stdout = r#"{"type":"thread.started","thread_id":"t"}
-{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"hello"}}"#;
+    fn ingests_codex_agent_message_jsonl_deltas() {
+        let mut messages: Vec<(String, String)> = Vec::new();
+        let mut emitted = String::new();
+        assert_eq!(
+            ingest_codex_line(
+                r#"{"type":"thread.started","thread_id":"t"}"#,
+                &mut messages,
+                &mut emitted,
+            ),
+            None
+        );
+        assert_eq!(
+            ingest_codex_line(
+                r#"{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"hel"}}"#,
+                &mut messages,
+                &mut emitted,
+            ),
+            Some("hel".to_string())
+        );
+        assert_eq!(
+            ingest_codex_line(
+                r#"{"type":"item.updated","item":{"id":"item_0","type":"agent_message","text":"hello"}}"#,
+                &mut messages,
+                &mut emitted,
+            ),
+            Some("lo".to_string())
+        );
+        assert_eq!(
+            ingest_codex_line(
+                r#"{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"world"}}"#,
+                &mut messages,
+                &mut emitted,
+            ),
+            Some("\n\nworld".to_string())
+        );
+        assert_eq!(emitted, "hello\n\nworld");
+    }
 
-        assert_eq!(extract_codex_agent_text(stdout).as_deref(), Some("hello"));
+    #[test]
+    fn ingests_claude_stream_json_deltas() {
+        let mut chunks: Vec<String> = Vec::new();
+        let mut emitted = String::new();
+        assert_eq!(
+            ingest_claude_line(
+                r#"{"type":"system","subtype":"init"}"#,
+                &mut chunks,
+                &mut emitted,
+            ),
+            None
+        );
+        assert_eq!(
+            ingest_claude_line(
+                r#"{"type":"assistant","message":{"content":[{"type":"text","text":"hello"}]}}"#,
+                &mut chunks,
+                &mut emitted,
+            ),
+            Some("hello".to_string())
+        );
+        assert_eq!(
+            ingest_claude_line(
+                r#"{"type":"assistant","message":{"content":[{"type":"text","text":"world"}]}}"#,
+                &mut chunks,
+                &mut emitted,
+            ),
+            Some("\n\nworld".to_string())
+        );
+        assert_eq!(emitted, "hello\n\nworld");
     }
 
     #[test]
