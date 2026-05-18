@@ -49,15 +49,15 @@ impl View for RichTextEditorView {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
-        Text::new(&self.content)
-            .with_size(12.0)
-            .with_line_height(1.4)
-            .with_fill(theme.text())
-            .with_clip_config(ClipConfig {
-                line_clamp: None,
-                max_width: None,
-            })
-            .finish()
+        let background = Fill::Solid(neutral_1(theme));
+        Text::new(
+            self.content.clone(),
+            appearance.ui_font_family(),
+            appearance.ui_font_size(),
+        )
+        .with_line_height_ratio(1.4)
+        .with_color(theme.main_text_color(background).into_solid())
+        .finish()
     }
 }
 
@@ -408,7 +408,7 @@ impl CommentViewCard {
         repo_path: Option<&Path>,
         ctx: &mut ViewContext<V>,
     ) {
-        let body = new_source.body.content.clone();
+        let body = new_source.content.clone();
         self.comment_editor.update(ctx, |editor, _| {
             editor.set_content(body);
         });
