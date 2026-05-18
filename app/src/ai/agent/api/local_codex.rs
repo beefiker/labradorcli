@@ -267,6 +267,7 @@ pub(super) async fn generate_output(
                     yield Ok(append_agent_text_event(&task_id, &message_id, chunk));
                 }
                 Err(error) => {
+                    log::warn!("Local agent CLI error: {error}");
                     full_text = error.clone();
                     yield Ok(replace_agent_text_event(
                         &task_id,
@@ -1608,7 +1609,7 @@ fn append_agent_text_event(
                     )),
                 }),
                 mask: Some(FieldMask {
-                    paths: vec!["message.agent_output.text".to_string()],
+                    paths: vec!["agent_output.text".to_string()],
                 }),
             },
         )),
@@ -1637,7 +1638,7 @@ fn replace_agent_text_event(
                     )),
                 }),
                 mask: Some(FieldMask {
-                    paths: vec!["message.agent_output.text".to_string()],
+                    paths: vec!["agent_output.text".to_string()],
                 }),
             },
         )),
@@ -1720,6 +1721,88 @@ fn truncate(value: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use field_mask::FieldMaskOperation;
+
+    fn test_agent_output_message(text: &str) -> api::Message {
+        api::Message {
+            id: "message".to_string(),
+            task_id: "task".to_string(),
+            request_id: "request".to_string(),
+            timestamp: None,
+            server_message_data: String::new(),
+            citations: vec![],
+            message: Some(api::message::Message::AgentOutput(
+                api::message::AgentOutput {
+                    text: text.to_string(),
+                },
+            )),
+        }
+    }
+
+    fn agent_output_text(message: &api::Message) -> &str {
+        let Some(api::message::Message::AgentOutput(output)) = message.message.as_ref() else {
+            panic!("expected agent output message");
+        };
+        &output.text
+    }
+
+    #[test]
+    fn local_agent_text_events_update_agent_output_text() {
+        let existing = test_agent_output_message("hel");
+        let api::response_event::Type::ClientActions(actions) =
+            append_agent_text_event("task", "message", "lo".to_string())
+                .r#type
+                .expect("append event type")
+        else {
+            panic!("expected client actions");
+        };
+        let api::client_action::Action::AppendToMessageContent(append) = actions
+            .actions
+            .into_iter()
+            .next()
+            .expect("append action")
+            .action
+            .expect("append action type")
+        else {
+            panic!("expected append action");
+        };
+        let appended = FieldMaskOperation::append(
+            &api::MESSAGE_DESCRIPTOR,
+            &existing,
+            append.message.as_ref().expect("append message"),
+            append.mask.expect("append mask"),
+        )
+        .apply()
+        .expect("append mask applies");
+        assert_eq!(agent_output_text(&appended), "hello");
+
+        let api::response_event::Type::ClientActions(actions) =
+            replace_agent_text_event("task", "request", "message", "replaced".to_string())
+                .r#type
+                .expect("replace event type")
+        else {
+            panic!("expected client actions");
+        };
+        let api::client_action::Action::UpdateTaskMessage(update) = actions
+            .actions
+            .into_iter()
+            .next()
+            .expect("update action")
+            .action
+            .expect("update action type")
+        else {
+            panic!("expected update action");
+        };
+        let replaced = FieldMaskOperation::update(
+            &api::MESSAGE_DESCRIPTOR,
+            &existing,
+            update.message.as_ref().expect("update message"),
+            update.mask.expect("update mask"),
+        )
+        .apply()
+        .expect("update mask applies");
+        assert_eq!(agent_output_text(&replaced), "replaced");
+    }
 
     #[test]
     fn ingests_codex_agent_message_jsonl_deltas() {
