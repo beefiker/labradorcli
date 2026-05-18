@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use std::process::Stdio;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use super::{LocalLLMError, LocalLLMOneShot, Provider};
@@ -41,7 +42,7 @@ impl LocalLLMOneShot for CodexOneShot {
         let mut cmd = Command::new(BINARY);
         cmd.arg("exec")
             .arg("--skip-git-repo-check")
-            .stdin(Stdio::null())
+            .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -52,9 +53,15 @@ impl LocalLLMOneShot for CodexOneShot {
             Some(sys) if !sys.is_empty() => format!("{sys}\n\n{prompt}"),
             _ => prompt.to_string(),
         };
-        cmd.arg(combined);
+        cmd.arg("-");
 
-        let output = cmd.output().await?;
+        let mut child = cmd.spawn()?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(combined.as_bytes()).await?;
+            stdin.shutdown().await?;
+        }
+
+        let output = child.wait_with_output().await?;
         if !output.status.success() {
             return Err(LocalLLMError::CliFailed {
                 binary: BINARY,

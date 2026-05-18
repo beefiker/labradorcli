@@ -34,7 +34,9 @@ use warpui::{AppContext, Element, Entity, EventContext, SingletonEntity, View, V
 /// Placeholder for the now-deleted `notebooks::editor::view::RichTextEditorView`.
 /// The comment composer UI was removed from this fork; we keep the type alive
 /// as an empty View so the surrounding rendering helpers compile.
-pub(crate) struct RichTextEditorView;
+pub(crate) struct RichTextEditorView {
+    content: String,
+}
 
 impl Entity for RichTextEditorView {
     type Event = EditorViewEvent;
@@ -44,14 +46,26 @@ impl View for RichTextEditorView {
     fn ui_name() -> &'static str {
         "RichTextEditorView"
     }
-    fn render(&self, _app: &AppContext) -> Box<dyn Element> {
-        use warpui::elements::Empty;
-        Empty::new().finish()
+    fn render(&self, app: &AppContext) -> Box<dyn Element> {
+        let appearance = Appearance::as_ref(app);
+        let theme = appearance.theme();
+        Text::new(&self.content)
+            .with_size(12.0)
+            .with_line_height(1.4)
+            .with_fill(theme.text())
+            .with_clip_config(ClipConfig {
+                line_clamp: None,
+                max_width: None,
+            })
+            .finish()
     }
 }
 
 impl RichTextEditorView {
     pub fn clear_text_selection(&mut self, _ctx: &mut ViewContext<Self>) {}
+    pub fn set_content(&mut self, content: impl Into<String>) {
+        self.content = content.into();
+    }
 }
 
 fn create_readonly_comment_markdown_editor<V: View>(
@@ -60,7 +74,9 @@ fn create_readonly_comment_markdown_editor<V: View>(
     _max_width: Option<Pixels>,
     ctx: &mut ViewContext<V>,
 ) -> ViewHandle<RichTextEditorView> {
-    ctx.add_view(|_| RichTextEditorView)
+    ctx.add_view(|_| RichTextEditorView {
+        content: _content.to_string(),
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -392,8 +408,10 @@ impl CommentViewCard {
         repo_path: Option<&Path>,
         ctx: &mut ViewContext<V>,
     ) {
-        // The underlying rich-text model is gone in this fork; nothing to reset.
-        let _ = ctx;
+        let body = new_source.body.content.clone();
+        self.comment_editor.update(ctx, |editor, _| {
+            editor.set_content(body);
+        });
         self.source = new_source;
         self.title = Self::compute_title(&self.source, repo_path);
     }
