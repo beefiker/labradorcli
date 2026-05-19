@@ -863,8 +863,6 @@ fn run_claude_streaming(
             // event per assistant turn. The parser below treats these as the source of
             // truth and suppresses the redundant whole-turn `assistant` event.
             .arg("--include-partial-messages")
-            .arg("--tools")
-            .arg("")
             .arg("--no-session-persistence");
         if let Some(model) = model.as_deref() {
             command.arg("--model").arg(model);
@@ -1119,13 +1117,15 @@ impl CodexAccumulator {
     }
 }
 
-/// Claude `--output-format stream-json --include-partial-messages` events. We care
-/// about three event types:
-///   - `stream_event` with `content_block_delta`: per-token text deltas (primary
-///     streaming source).
-///   - `assistant`: the whole-turn finalization event (used only when the CLI did
-///     NOT emit `stream_event` deltas, e.g. older Claude Code versions).
-///   - `result`: last-resort fallback if neither of the above fired.
+/// Claude `--output-format stream-json --include-partial-messages` events we
+/// consume:
+///   - `stream_event` carrying the typed `event` object below — primary source
+///     for per-token text deltas, tool_use input JSON deltas, and block lifecycle.
+///   - `assistant`: whole-turn finalization (used only when no `stream_event`
+///     deltas arrived for this turn, e.g. older Claude Code versions).
+///   - `user`: subsequent turn whose `content[]` may contain `tool_result` blocks
+///     paired to a prior `tool_use_id`. We render these inline.
+///   - `result`: last-resort fallback if nothing else ever produced text.
 #[derive(Debug, Deserialize)]
 struct ClaudeLine<'a> {
     #[serde(rename = "type", default, borrow)]
@@ -1145,18 +1145,51 @@ struct ClaudeMessage {
     content: Vec<ClaudeContent>,
 }
 
+/// Content block as it appears in whole-turn `assistant` / `user` events. Tagged
+/// by `type`; we care about text (assistant) and tool_result (user).
 #[derive(Debug, Deserialize)]
 struct ClaudeContent {
+    #[serde(rename = "type", default)]
+    kind: String,
     #[serde(default)]
     text: Option<String>,
+    /// For `tool_result` blocks. Claude Code emits this as either a plain string
+    /// or an array of `{type: "text", text: ...}` parts; we accept both via
+    /// `Value` and normalize to a string.
+    #[serde(default)]
+    content: Option<Value>,
+    #[serde(default)]
+    is_error: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ClaudeStreamEvent {
     #[serde(rename = "type", default)]
     kind: String,
+    /// Block index for `content_block_*` events. Different blocks may interleave
+    /// in principle; in practice Claude streams them sequentially, but we still
+    /// index by `index` so out-of-order or parallel deltas don't cross-contaminate.
+    #[serde(default)]
+    index: Option<usize>,
+    /// For `content_block_start` — the block we're starting.
+    #[serde(default)]
+    content_block: Option<ClaudeContentBlockStart>,
+    /// For `content_block_delta` — the incremental update.
     #[serde(default)]
     delta: Option<ClaudeStreamDelta>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeContentBlockStart {
+    #[serde(rename = "type", default)]
+    kind: String,
+    /// Present on `tool_use` blocks: the tool name (e.g. "Bash", "Read", "TodoWrite").
+    #[serde(default)]
+    name: Option<String>,
+    /// Tool call id (e.g. "toolu_..."). Used to pair `tool_result` events to their
+    /// originating `tool_use`.
+    #[serde(default)]
+    id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1165,12 +1198,28 @@ struct ClaudeStreamDelta {
     kind: String,
     #[serde(default)]
     text: Option<String>,
+    /// For `input_json_delta` events: a fragment of the tool input JSON. We
+    /// concatenate these in order and parse once at `content_block_stop`.
+    #[serde(default)]
+    partial_json: Option<String>,
+}
+
+/// Per-stream state for one Claude content block. We need to remember the block
+/// kind + (for tool_use) the tool name + accumulated input JSON so we can render
+/// a friendly inline summary when the block closes.
+#[derive(Debug, Default)]
+struct ClaudeContentBlockState {
+    kind: String,
+    tool_name: Option<String>,
+    /// Accumulated `partial_json` fragments for `tool_use` blocks.
+    tool_input_json: String,
 }
 
 /// Tracks Claude streaming state. With `--include-partial-messages` we receive
-/// per-token deltas as `content_block_delta` events; the whole-turn `assistant`
-/// event arrives afterwards with the same text concatenated, and we ignore it to
-/// avoid double-emitting.
+/// per-token text deltas, per-block tool_use lifecycle (start → input_json_delta+
+/// → stop), and (in the next user-role event) any `tool_result` content. The
+/// whole-turn `assistant` event arrives at the end with the same text
+/// concatenated; we ignore it to avoid double-emitting.
 #[derive(Default)]
 struct ClaudeAccumulator {
     has_emitted_any: bool,
@@ -1178,54 +1227,301 @@ struct ClaudeAccumulator {
     /// When true, suppress the subsequent whole-turn `assistant` event for the
     /// same content block — it would duplicate text we already emitted.
     has_streamed_partials: bool,
+    /// Per-block-index state (text/thinking/tool_use). Populated on
+    /// `content_block_start` and drained on `content_block_stop`.
+    blocks: HashMap<usize, ClaudeContentBlockState>,
 }
 
 impl ClaudeAccumulator {
+    /// Ingest one JSONL line. Returns the cleaned text delta to forward to the
+    /// user, if any. Tool usage, thinking, and tool results are rendered as
+    /// inline markdown narration so the user sees what Claude is doing without
+    /// dwarf re-executing commands Claude already ran in its own sandbox.
     fn ingest_line(&mut self, line: &str) -> Option<String> {
         let parsed: ClaudeLine = serde_json::from_str(line).ok()?;
-        let text: String = match parsed.kind {
-            "stream_event" => {
-                let event = parsed.event?;
-                if event.kind != "content_block_delta" {
-                    return None;
-                }
-                let delta = event.delta?;
-                if delta.kind != "text_delta" {
-                    return None;
-                }
-                self.has_streamed_partials = true;
-                delta.text?
+        match parsed.kind {
+            "stream_event" => self.handle_stream_event(parsed.event?),
+            // Older Claude Code CLI versions emit only whole-turn `assistant`
+            // events. Use them only if we never saw a content_block_delta.
+            "assistant" if !self.has_streamed_partials => {
+                let message = parsed.message?;
+                let text: String = message
+                    .content
+                    .into_iter()
+                    .filter_map(|c| (c.kind == "text").then_some(c.text).flatten())
+                    .collect::<Vec<_>>()
+                    .join("");
+                self.emit_text(text)
             }
-            // Older Claude Code CLI versions (or runs without partial messages enabled)
-            // emit only whole-turn `assistant` events. Use these only if we never saw
-            // a content_block_delta for this same content.
-            "assistant" if !self.has_streamed_partials => parsed
-                .message?
-                .content
-                .into_iter()
-                .filter_map(|c| c.text)
-                .collect::<Vec<_>>()
-                .join(""),
+            // User-role events carry `tool_result` content for prior tool_use blocks.
+            // Render each tool_result as a fenced code block under the originating tool.
+            "user" => {
+                let message = parsed.message?;
+                let mut out = String::new();
+                for c in message.content {
+                    if c.kind != "tool_result" {
+                        continue;
+                    }
+                    let result_text = tool_result_to_text(&c);
+                    if result_text.trim().is_empty() {
+                        continue;
+                    }
+                    let is_error = c.is_error.unwrap_or(false);
+                    let snippet = format_tool_result_snippet(&result_text, is_error);
+                    out.push_str(&snippet);
+                }
+                if out.is_empty() {
+                    None
+                } else {
+                    self.emit_inline_narration(&out)
+                }
+            }
             // Final fallback when neither stream_event nor assistant text fired.
-            "result" if !self.has_emitted_any => parsed.result?.to_string(),
-            _ => return None,
-        };
+            "result" if !self.has_emitted_any => {
+                let text = parsed.result?.to_string();
+                self.emit_text(text)
+            }
+            _ => None,
+        }
+    }
+
+    fn handle_stream_event(&mut self, event: ClaudeStreamEvent) -> Option<String> {
+        match event.kind.as_str() {
+            "content_block_start" => {
+                let idx = event.index?;
+                let block = event.content_block?;
+                let _ = block.id; // captured for forward-compat; not used yet
+                self.blocks.insert(
+                    idx,
+                    ClaudeContentBlockState {
+                        kind: block.kind,
+                        tool_name: block.name,
+                        tool_input_json: String::new(),
+                    },
+                );
+                None
+            }
+            "content_block_delta" => {
+                let idx = event.index?;
+                let delta = event.delta?;
+                let block_kind = self
+                    .blocks
+                    .get(&idx)
+                    .map(|b| b.kind.clone())
+                    .unwrap_or_default();
+                match delta.kind.as_str() {
+                    "text_delta" => {
+                        self.has_streamed_partials = true;
+                        // Thinking blocks shouldn't surface as if they were assistant text;
+                        // we render them in italic when the block closes (see _stop).
+                        if block_kind == "text" {
+                            self.emit_text(delta.text?)
+                        } else {
+                            None
+                        }
+                    }
+                    "input_json_delta" => {
+                        if let Some(state) = self.blocks.get_mut(&idx) {
+                            if let Some(fragment) = delta.partial_json {
+                                state.tool_input_json.push_str(&fragment);
+                            }
+                        }
+                        None
+                    }
+                    // thinking_delta, signature_delta, citations_delta — collected but
+                    // not surfaced as text.
+                    _ => None,
+                }
+            }
+            "content_block_stop" => {
+                let idx = event.index?;
+                let state = self.blocks.remove(&idx)?;
+                if state.kind != "tool_use" {
+                    return None;
+                }
+                let narration = narrate_tool_use(
+                    state.tool_name.as_deref().unwrap_or(""),
+                    &state.tool_input_json,
+                );
+                if narration.is_empty() {
+                    return None;
+                }
+                self.emit_inline_narration(&narration)
+            }
+            // message_start / message_delta / message_stop — no payload we render.
+            _ => None,
+        }
+    }
+
+    /// Emit a primary text delta (assistant-authored text, not narration).
+    fn emit_text(&mut self, text: String) -> Option<String> {
         if text.is_empty() {
             return None;
         }
-        // The first non-empty emission is the start of streaming text. Add a
-        // paragraph break only when we're concatenating a new turn after a prior one.
-        // For per-token deltas, the joiner stays empty because each token is part of
-        // the same content block.
         let sep = if !self.has_emitted_any || self.has_streamed_partials {
             ""
         } else {
             "\n\n"
         };
-        let delta = format!("{sep}{text}");
         self.has_emitted_any = true;
-        Some(delta)
+        Some(format!("{sep}{text}"))
     }
+
+    /// Emit inline narration (tool calls + tool results). Always separated from
+    /// surrounding text by a blank line so it renders as its own paragraph.
+    fn emit_inline_narration(&mut self, narration: &str) -> Option<String> {
+        if narration.is_empty() {
+            return None;
+        }
+        let sep = if self.has_emitted_any { "\n\n" } else { "" };
+        self.has_emitted_any = true;
+        Some(format!("{sep}{narration}"))
+    }
+}
+
+/// Render a Claude `tool_result` block's `content` field to a plain string. The
+/// field is either a bare string or an array of `{type: "text", text: ...}`
+/// (and, less commonly, other block kinds we don't render).
+fn tool_result_to_text(content: &ClaudeContent) -> String {
+    let Some(value) = &content.content else {
+        return String::new();
+    };
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Array(parts) => parts
+            .iter()
+            .filter_map(|p| {
+                let kind = p.get("type").and_then(Value::as_str).unwrap_or("text");
+                if kind != "text" {
+                    return None;
+                }
+                p.get("text").and_then(Value::as_str).map(str::to_string)
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => value.to_string(),
+    }
+}
+
+/// Format a tool_result snippet for inline display. Long outputs are truncated
+/// to keep the chat readable; the user can still see the actual content of the
+/// most relevant lines.
+fn format_tool_result_snippet(result_text: &str, is_error: bool) -> String {
+    const MAX_LINES: usize = 12;
+    const MAX_CHARS: usize = 1_200;
+    let trimmed = result_text.trim_end();
+    let truncated_by_chars = trimmed.len() > MAX_CHARS;
+    let head: String = if truncated_by_chars {
+        trimmed.chars().take(MAX_CHARS).collect()
+    } else {
+        trimmed.to_string()
+    };
+    let lines: Vec<&str> = head.lines().take(MAX_LINES).collect();
+    let truncated_by_lines = head.lines().count() > MAX_LINES;
+    let body = lines.join("\n");
+    let suffix = if truncated_by_lines || truncated_by_chars {
+        "\n…"
+    } else {
+        ""
+    };
+    let label = if is_error { "error" } else { "" };
+    format!("```{label}\n{body}{suffix}\n```")
+}
+
+/// Map a finished Claude tool_use to a single inline markdown line. Examples:
+///   Bash + `{"command": "ls -la"}`            → `*Ran* `$ ls -la``
+///   Read + `{"file_path": "src/foo.rs"}`     → `*Read* `src/foo.rs``
+///   TodoWrite + `{"todos": [...]}`            → multi-line checklist
+fn narrate_tool_use(tool_name: &str, input_json: &str) -> String {
+    let parsed: Value = serde_json::from_str(input_json).unwrap_or(Value::Null);
+    match tool_name {
+        "Bash" => {
+            let cmd = parsed
+                .get("command")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            if cmd.is_empty() {
+                String::new()
+            } else {
+                format!("*Ran* `$ {}`", one_line(cmd))
+            }
+        }
+        "Read" => narrate_path(&parsed, "Read"),
+        "Edit" | "MultiEdit" => narrate_path(&parsed, "Edited"),
+        "Write" => narrate_path(&parsed, "Wrote"),
+        "Glob" => narrate_pattern(&parsed, "Searched", "pattern"),
+        "Grep" => narrate_pattern(&parsed, "Grepped for", "pattern"),
+        "WebFetch" => parsed
+            .get("url")
+            .and_then(Value::as_str)
+            .map(|u| format!("*Fetched* `{}`", one_line(u)))
+            .unwrap_or_default(),
+        "WebSearch" => parsed
+            .get("query")
+            .and_then(Value::as_str)
+            .map(|q| format!("*Searched the web for* `{}`", one_line(q)))
+            .unwrap_or_default(),
+        "TodoWrite" => narrate_todos(&parsed),
+        "" => String::new(),
+        other => format!("*Used* `{other}`"),
+    }
+}
+
+fn narrate_path(parsed: &Value, verb: &str) -> String {
+    let path = parsed
+        .get("file_path")
+        .or_else(|| parsed.get("path"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if path.is_empty() {
+        String::new()
+    } else {
+        format!("*{verb}* `{}`", one_line(path))
+    }
+}
+
+fn narrate_pattern(parsed: &Value, verb: &str, key: &str) -> String {
+    let pattern = parsed
+        .get(key)
+        .or_else(|| parsed.get("query"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if pattern.is_empty() {
+        String::new()
+    } else {
+        format!("*{verb}* `{}`", one_line(pattern))
+    }
+}
+
+fn narrate_todos(parsed: &Value) -> String {
+    let Some(todos) = parsed.get("todos").and_then(Value::as_array) else {
+        return String::new();
+    };
+    if todos.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("**Todos**");
+    for todo in todos {
+        let content = todo.get("content").and_then(Value::as_str).unwrap_or("");
+        let status = todo.get("status").and_then(Value::as_str).unwrap_or("");
+        let marker = match status {
+            "completed" => "[x]",
+            "in_progress" => "[~]",
+            _ => "[ ]",
+        };
+        out.push_str("\n- ");
+        out.push_str(marker);
+        out.push(' ');
+        out.push_str(content);
+    }
+    out
+}
+
+/// Collapse whitespace and trim. Keeps long file paths or commands on a single
+/// line so the inline markdown stays compact.
+fn one_line(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn codex_bin() -> String {
@@ -2373,6 +2669,104 @@ mod tests {
             ],
         );
         assert_eq!(total, "hi");
+    }
+
+    #[test]
+    fn claude_accumulator_renders_bash_tool_use_inline() {
+        // Real `--include-partial-messages` shape for a Bash tool call:
+        // content_block_start (tool_use, name=Bash) → input_json_delta+ → stop.
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Listing files."}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_abc","name":"Bash","input":{}}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"command\": \"ls"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":" -la /tmp\"}"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":1}}"#,
+            ],
+        );
+        assert_eq!(total, "Listing files.\n\n*Ran* `$ ls -la /tmp`");
+    }
+
+    #[test]
+    fn claude_accumulator_renders_read_and_edit_tools_inline() {
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"Read","input":{}}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"file_path\":\"src/foo.rs\"}"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_2","name":"Edit","input":{}}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"file_path\":\"src/bar.rs\"}"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":1}}"#,
+            ],
+        );
+        assert_eq!(total, "*Read* `src/foo.rs`\n\n*Edited* `src/bar.rs`");
+    }
+
+    #[test]
+    fn claude_accumulator_renders_tool_result_user_event() {
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_abc","name":"Bash","input":{}}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"echo hi\"}"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#,
+                r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_abc","content":"hi\n","is_error":false}]}}"#,
+            ],
+        );
+        assert_eq!(total, "*Ran* `$ echo hi`\n\n```\nhi\n```");
+    }
+
+    #[test]
+    fn claude_accumulator_truncates_long_tool_results() {
+        let mut acc = ClaudeAccumulator::default();
+        let lines: Vec<String> = (0..50).map(|i| format!("line {i}")).collect();
+        let big = lines.join("\\n"); // escape for the JSON string body
+        let user_event = format!(
+            r#"{{"type":"user","message":{{"content":[{{"type":"tool_result","tool_use_id":"x","content":"{big}"}}]}}}}"#
+        );
+        let total = drive_claude(&mut acc, &[user_event.as_str()]);
+        // Truncated to MAX_LINES (12) with an ellipsis marker.
+        assert!(total.starts_with("```\nline 0\nline 1\n"));
+        assert!(total.contains("line 11"));
+        assert!(total.ends_with("…\n```"));
+        assert!(!total.contains("line 12"));
+    }
+
+    #[test]
+    fn claude_accumulator_renders_todowrite_as_checklist() {
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_t","name":"TodoWrite","input":{}}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"todos\":[{\"content\":\"Read docs\",\"status\":\"completed\"},{\"content\":\"Run tests\",\"status\":\"in_progress\"},{\"content\":\"Ship it\",\"status\":\"pending\"}]}"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#,
+            ],
+        );
+        assert_eq!(
+            total,
+            "**Todos**\n- [x] Read docs\n- [~] Run tests\n- [ ] Ship it"
+        );
+    }
+
+    #[test]
+    fn claude_accumulator_handles_tool_result_array_content() {
+        // Claude sometimes sends tool_result.content as an array of {type:"text",text:...} parts.
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"x","content":[{"type":"text","text":"part a"},{"type":"text","text":"part b"}]}]}}"#,
+            ],
+        );
+        assert_eq!(total, "```\npart a\npart b\n```");
     }
 
     #[test]
