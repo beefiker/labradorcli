@@ -1,5 +1,6 @@
 use std::{
-    collections::HashMap,
+    borrow::Cow,
+    collections::{HashMap, HashSet},
     env,
     path::{Path, PathBuf},
     process::{Command as StdCommand, Stdio},
@@ -1008,43 +1009,76 @@ fn append_stderr(buf: &mut String, line: &str) {
     buf.push_str(line);
 }
 
-/// Codex emits JSONL events; we mostly want `agent_message` items for the stream, but
-/// keep `reasoning` text + item-type counts on the side so we can surface something
-/// useful when the run finishes without ever producing an `agent_message`.
+/// Codex JSONL events we care about:
+///   - `item.started` for `command_execution` / `web_search` — fires when Codex
+///     kicks off a tool call. We narrate immediately so the user sees what
+///     Codex is doing without waiting for the result.
+///   - `item.completed` for `agent_message` (assistant text), `command_execution`
+///     (with `aggregated_output` + `exit_code`), `web_search` (final `query`),
+///     and `reasoning` (kept as fallback when no agent_message ever arrives).
+///   - Older Codex versions emitted bare `{item: {...}}` without a top-level
+///     `type` and grew text monotonically across item.started/updated/completed.
+///     The accumulator still handles that shape for backward compat.
 #[derive(Debug, Deserialize)]
 struct CodexLine<'a> {
+    /// Top-level event kind, e.g. `item.started` / `item.completed` /
+    /// `turn.completed`. Empty when the event has no `type` field.
+    #[serde(rename = "type", default, borrow)]
+    kind: Cow<'a, str>,
     #[serde(default, borrow)]
     item: Option<CodexItem<'a>>,
 }
 
+/// Fields are `Cow<'a, str>` rather than `&'a str` because serde-json cannot
+/// borrow a string slice when the JSON value contains escape sequences (a
+/// runtime-decoded `String` is needed). Shell output, assistant text, and
+/// reasoning summaries all routinely contain `\n` escapes; `Cow` borrows when
+/// safe and allocates only when escapes force it.
 #[derive(Debug, Deserialize)]
 struct CodexItem<'a> {
     #[serde(rename = "type", default, borrow)]
-    kind: &'a str,
+    kind: Cow<'a, str>,
     #[serde(default, borrow)]
-    id: &'a str,
+    id: Cow<'a, str>,
     #[serde(default, borrow)]
-    text: &'a str,
+    text: Cow<'a, str>,
     /// Codex emits reasoning items as `{type: "reasoning", summary: "..."}`. We capture
     /// `summary` so a Codex run that "thinks" but never produces an agent_message can
     /// still surface its conclusion to the user instead of failing silently.
     #[serde(default, borrow)]
-    summary: &'a str,
+    summary: Cow<'a, str>,
+    /// For `command_execution` items: the shell command Codex is running in its
+    /// own sandbox (typically prefixed with `/bin/zsh -lc` or `/bin/bash -lc`).
+    #[serde(default, borrow)]
+    command: Cow<'a, str>,
+    /// For completed `command_execution` items: the shell's combined stdout/stderr.
+    #[serde(default, borrow)]
+    aggregated_output: Cow<'a, str>,
+    /// For completed `command_execution` items: the shell exit code. `None` while
+    /// the command is still running.
+    #[serde(default)]
+    exit_code: Option<i32>,
+    /// For `web_search` items: on completion, the final search query Codex issued.
+    #[serde(default, borrow)]
+    query: Cow<'a, str>,
 }
 
-/// Tracks the latest text per Codex `item.id` and emits each line's bytes-not-
-/// previously-seen as a delta. The full accumulated text is owned by the caller
-/// (the streaming function in `generate_output`); this accumulator keeps only the
-/// minimum state needed to compute deltas — no duplicated emitted-total buffer.
-///
-/// Also records sideband state (reasoning summaries + count of non-message item
-/// types) so a run that finishes without ever producing an `agent_message` can
-/// still report something useful instead of failing silently.
+/// Tracks Codex stream state. Holds:
+///   - per-id assistant text (for the older monotonic-update shape — current
+///     Codex 0.130+ only emits item.completed for agent_message, but the
+///     continuation logic is harmless and keeps backward compat),
+///   - the set of in-flight tool call ids we've already narrated, so we don't
+///     double-narrate if `item.started` fires twice or Codex retracts a call,
+///   - sideband reasoning summaries + item-type counts for diagnostics.
 #[derive(Default)]
 struct CodexAccumulator {
     texts_by_id: HashMap<String, String>,
     last_message_id: Option<String>,
     has_emitted_any: bool,
+    /// Tool-call ids whose `item.started` narration we've already emitted. Lets
+    /// us suppress the duplicate if `item.started` fires multiple times for the
+    /// same id (defensive — Codex shouldn't, but we don't want to risk it).
+    started_tool_ids: HashSet<String>,
     /// Reasoning summaries collected from `{type: "reasoning"}` items. Surfaced as
     /// a fallback response if no `agent_message` ever arrives.
     reasoning_summaries: Vec<String>,
@@ -1057,25 +1091,114 @@ impl CodexAccumulator {
     fn ingest_line(&mut self, line: &str) -> Option<String> {
         let parsed: CodexLine = serde_json::from_str(line).ok()?;
         let item = parsed.item?;
-        if item.kind != "agent_message" || item.id.is_empty() {
-            // Track sideband content + diagnostics.
-            if !item.kind.is_empty() && item.kind != "agent_message" {
+        // `item.started` for `command_execution` is the right moment to narrate
+        // a tool kickoff. Everything else routes through the completion handler,
+        // which covers (a) the older monotonic agent_message growth across
+        // item.started / item.updated / item.completed and (b) per-kind result
+        // narration for command_execution and web_search.
+        let event_kind: &str = &parsed.kind;
+        let item_kind: &str = &item.kind;
+        if event_kind == "item.started" && item_kind == "command_execution" {
+            return self.handle_item_started(item);
+        }
+        self.handle_item_completed(item)
+    }
+
+    fn handle_item_started(&mut self, item: CodexItem) -> Option<String> {
+        let kind: &str = &item.kind;
+        match kind {
+            "command_execution" if !item.command.is_empty() => {
+                if !self.started_tool_ids.insert(item.id.to_string()) {
+                    return None;
+                }
+                let cmd = strip_shell_wrapper(&item.command);
+                let narration = format!("*Running* `$ {}`", one_line(&cmd));
+                self.emit_narration(&narration)
+            }
+            // Codex emits `item.started` for `web_search` with an empty query
+            // (the query lands on `item.completed`), so there's nothing useful
+            // to show yet — wait for the completion.
+            _ => None,
+        }
+    }
+
+    fn handle_item_completed(&mut self, item: CodexItem) -> Option<String> {
+        let kind: &str = &item.kind;
+        match kind {
+            "agent_message" if !item.id.is_empty() => self.handle_agent_message(item),
+            "command_execution" => self.handle_command_completed(item),
+            "web_search" if !item.query.is_empty() => {
+                let q = one_line(&item.query);
+                self.emit_narration(&format!("*Searched the web for* `{q}`"))
+            }
+            "reasoning" => {
+                if !item.summary.is_empty() {
+                    self.reasoning_summaries.push(item.summary.into_owned());
+                }
                 *self
                     .non_message_item_counts
-                    .entry(item.kind.to_string())
+                    .entry("reasoning".to_string())
                     .or_default() += 1;
+                None
             }
-            if item.kind == "reasoning" && !item.summary.is_empty() {
-                self.reasoning_summaries.push(item.summary.to_string());
+            kind => {
+                if !kind.is_empty() {
+                    *self
+                        .non_message_item_counts
+                        .entry(kind.to_string())
+                        .or_default() += 1;
+                }
+                None
             }
+        }
+    }
+
+    fn handle_command_completed(&mut self, item: CodexItem) -> Option<String> {
+        let output = item.aggregated_output.trim_end();
+        // Codex sometimes sends a completion without a prior started — make sure
+        // the user at least sees what ran in that case.
+        let id_str: &str = &item.id;
+        let needs_command_line = !self.started_tool_ids.contains(id_str);
+        let mut narration = String::new();
+        if needs_command_line && !item.command.is_empty() {
+            let cmd = strip_shell_wrapper(&item.command);
+            narration.push_str(&format!("*Ran* `$ {}`", one_line(&cmd)));
+        }
+        let exit = item.exit_code.unwrap_or(0);
+        let body = if output.is_empty() {
+            if exit != 0 {
+                Some(format!("```\n(exit code {exit})\n```"))
+            } else {
+                None
+            }
+        } else {
+            let snippet = format_tool_result_snippet(output, exit != 0);
+            if exit != 0 {
+                Some(format!("{snippet}\n*(exit code {exit})*"))
+            } else {
+                Some(snippet)
+            }
+        };
+        if let Some(body) = body {
+            if !narration.is_empty() {
+                narration.push_str("\n\n");
+            }
+            narration.push_str(&body);
+        }
+        if narration.is_empty() {
             return None;
         }
-        let id = item.id;
-        let new_text = item.text;
+        self.emit_narration(&narration)
+    }
+
+    /// Handle assistant text. Codex 0.130 only emits item.completed for
+    /// agent_message, but older streams emit growing item.started → updated →
+    /// completed; the continuation logic handles both safely.
+    fn handle_agent_message(&mut self, item: CodexItem) -> Option<String> {
+        let id: &str = &item.id;
+        let new_text: &str = &item.text;
 
         // Continuation of the most recently seen message: emit the suffix only.
-        // Codex's typical pattern is `item.started` → many `item.updated` → `item.completed`
-        // for the same id, with text growing monotonically.
         let is_continuation = self.last_message_id.as_deref() == Some(id);
         if is_continuation {
             let prev = self
@@ -1092,18 +1215,15 @@ impl CodexAccumulator {
                 self.has_emitted_any = true;
                 return Some(delta);
             }
-            // Non-monotonic update on the last message (Codex retracted or replaced text).
-            // Fall through to the new-message path and emit it as a fresh emission.
+            // Non-monotonic update (text replaced rather than extended) — fall
+            // through and emit the new text as a fresh paragraph.
         }
 
-        // First time seeing this message id (or a non-monotonic replace).
         let already_seen = self.texts_by_id.contains_key(id);
         self.texts_by_id.insert(id.to_string(), new_text.to_string());
         self.last_message_id = Some(id.to_string());
 
         if already_seen && !is_continuation {
-            // An older (non-last) message got updated. Don't try to splice the bytes
-            // back into the user-visible stream — the original delta is already sent.
             return None;
         }
 
@@ -1115,6 +1235,45 @@ impl CodexAccumulator {
         self.has_emitted_any = true;
         Some(delta)
     }
+
+    fn emit_narration(&mut self, narration: &str) -> Option<String> {
+        if narration.is_empty() {
+            return None;
+        }
+        let sep = if self.has_emitted_any { "\n\n" } else { "" };
+        self.has_emitted_any = true;
+        // Crossing into a tool/result narration breaks the "last_message_id"
+        // continuation invariant — any subsequent agent_message with the same id
+        // should start a fresh paragraph rather than splicing into the narration.
+        self.last_message_id = None;
+        Some(format!("{sep}{narration}"))
+    }
+}
+
+/// Strip the `/bin/zsh -lc` / `/bin/bash -lc` / `/bin/sh -c` wrapper Codex adds
+/// to every shell command in its sandbox. Leaves the user-meaningful command
+/// intact for display. Also handles the case where the inner command is wrapped
+/// in matching quotes — those are dropped so the display matches what the user
+/// would type at a prompt.
+fn strip_shell_wrapper(command: &str) -> String {
+    let trimmed = command.trim();
+    for prefix in ["/bin/zsh -lc ", "/bin/bash -lc ", "/bin/sh -c ", "zsh -lc ", "bash -lc ", "sh -c "] {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            return unwrap_outer_quotes(rest.trim()).to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
+fn unwrap_outer_quotes(value: &str) -> &str {
+    if value.len() >= 2 {
+        let first = value.chars().next().unwrap();
+        let last = value.chars().last().unwrap();
+        if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+            return &value[1..value.len() - 1];
+        }
+    }
+    value
 }
 
 /// Claude `--output-format stream-json --include-partial-messages` events we
@@ -2604,6 +2763,96 @@ mod tests {
             ],
         );
         assert_eq!(total, "first\n\nsecond");
+    }
+
+    #[test]
+    fn codex_accumulator_narrates_command_execution_lifecycle() {
+        let mut acc = CodexAccumulator::default();
+        // Real Codex 0.130 sequence: item.started fires when the sandbox shell
+        // launches; item.completed lands with the combined output + exit code.
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc pwd","aggregated_output":"","exit_code":null,"status":"in_progress"}}"#,
+                r#"{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc pwd","aggregated_output":"/tmp\n","exit_code":0,"status":"completed"}}"#,
+            ],
+        );
+        assert_eq!(total, "*Running* `$ pwd`\n\n```\n/tmp\n```");
+    }
+
+    #[test]
+    fn codex_accumulator_appends_exit_code_to_failures() {
+        let mut acc = CodexAccumulator::default();
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'false'","aggregated_output":"","exit_code":null,"status":"in_progress"}}"#,
+                r#"{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'false'","aggregated_output":"","exit_code":1,"status":"completed"}}"#,
+            ],
+        );
+        assert_eq!(total, "*Running* `$ false`\n\n```\n(exit code 1)\n```");
+    }
+
+    #[test]
+    fn codex_accumulator_interleaves_tool_calls_and_text() {
+        // Real shape: command_execution → agent_message → command_execution → agent_message.
+        let mut acc = CodexAccumulator::default();
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.started","item":{"id":"i0","type":"command_execution","command":"/bin/zsh -lc 'pwd'","aggregated_output":"","exit_code":null,"status":"in_progress"}}"#,
+                r#"{"type":"item.completed","item":{"id":"i0","type":"command_execution","command":"/bin/zsh -lc 'pwd'","aggregated_output":"/tmp","exit_code":0,"status":"completed"}}"#,
+                r#"{"type":"item.completed","item":{"id":"i1","type":"agent_message","text":"You are in /tmp."}}"#,
+                r#"{"type":"item.started","item":{"id":"i2","type":"command_execution","command":"/bin/zsh -lc 'ls'","aggregated_output":"","exit_code":null,"status":"in_progress"}}"#,
+                r#"{"type":"item.completed","item":{"id":"i2","type":"command_execution","command":"/bin/zsh -lc 'ls'","aggregated_output":"a.txt\nb.txt","exit_code":0,"status":"completed"}}"#,
+                r#"{"type":"item.completed","item":{"id":"i3","type":"agent_message","text":"Two files."}}"#,
+            ],
+        );
+        assert_eq!(
+            total,
+            "*Running* `$ pwd`\n\n```\n/tmp\n```\n\nYou are in /tmp.\n\n*Running* `$ ls`\n\n```\na.txt\nb.txt\n```\n\nTwo files."
+        );
+    }
+
+    #[test]
+    fn codex_accumulator_narrates_web_search_on_completion() {
+        let mut acc = CodexAccumulator::default();
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.started","item":{"id":"ws_0","type":"web_search","query":"","action":{"type":"other"}}}"#,
+                r#"{"type":"item.completed","item":{"id":"ws_0","type":"web_search","query":"current date Seoul","action":{"type":"search","query":"current date Seoul"}}}"#,
+                r#"{"type":"item.completed","item":{"id":"m0","type":"agent_message","text":"It's May 19."}}"#,
+            ],
+        );
+        assert_eq!(
+            total,
+            "*Searched the web for* `current date Seoul`\n\nIt's May 19."
+        );
+    }
+
+    #[test]
+    fn codex_accumulator_skips_started_when_completion_has_no_started() {
+        // Defensive: if we somehow miss the started event, the completion still
+        // shows what ran so the chat isn't a mystery.
+        let mut acc = CodexAccumulator::default();
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.completed","item":{"id":"i0","type":"command_execution","command":"/bin/zsh -lc 'pwd'","aggregated_output":"/tmp","exit_code":0,"status":"completed"}}"#,
+            ],
+        );
+        assert_eq!(total, "*Ran* `$ pwd`\n\n```\n/tmp\n```");
+    }
+
+    #[test]
+    fn strip_shell_wrapper_unwraps_zsh_lc_and_quotes() {
+        assert_eq!(strip_shell_wrapper("/bin/zsh -lc pwd"), "pwd");
+        assert_eq!(strip_shell_wrapper("/bin/zsh -lc 'ls -la'"), "ls -la");
+        assert_eq!(strip_shell_wrapper("/bin/bash -lc \"cat /etc/hosts\""), "cat /etc/hosts");
+        assert_eq!(strip_shell_wrapper("/bin/sh -c 'echo hi'"), "echo hi");
+        // No wrapper → pass through.
+        assert_eq!(strip_shell_wrapper("git status"), "git status");
     }
 
     #[test]
