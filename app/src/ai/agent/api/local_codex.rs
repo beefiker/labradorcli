@@ -338,8 +338,20 @@ pub(super) async fn generate_output(
                 cleaned_text = format!("I'll run `{}` in Dwarf.", tool_calls[0].command);
             }
         }
+        log::info!(
+            "[local-agent] post-process: full={}B cleaned={}B tool_calls={} replace_needed={}",
+            full_text.len(),
+            cleaned_text.len(),
+            tool_calls.len(),
+            cleaned_text != full_text
+        );
 
-        if cleaned_text != full_text {
+        // Always emit the replace when we extracted any tool calls. By the time post-process
+        // runs we've already streamed the raw text (with DWARF_TOOL_CALL markers) into the UI
+        // via per-token AppendToMessageContent events; without a replace, those markers stay
+        // visible as inline text even though the markers are now rendered as separate tool-call
+        // blocks. The `!=` check still gates non-tool-call cleanups (trim, cwd-override prose).
+        if cleaned_text != full_text || !tool_calls.is_empty() {
             yield Ok(replace_agent_text_event(&task_id, &message_id, cleaned_text));
         }
 
