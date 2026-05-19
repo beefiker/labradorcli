@@ -809,6 +809,10 @@ fn run_claude_streaming(
             .arg("--output-format")
             .arg("stream-json")
             .arg("--verbose")
+            // Emit per-token `content_block_delta` chunks as they arrive instead of one
+            // event per assistant turn. The parser below treats these as the source of
+            // truth and suppresses the redundant whole-turn `assistant` event.
+            .arg("--include-partial-messages")
             .arg("--tools")
             .arg("")
             .arg("--no-session-persistence");
@@ -1065,8 +1069,13 @@ impl CodexAccumulator {
     }
 }
 
-/// Claude `--output-format stream-json` events. We only care about `assistant` and
-/// `result` event types; everything else is silently dropped.
+/// Claude `--output-format stream-json --include-partial-messages` events. We care
+/// about three event types:
+///   - `stream_event` with `content_block_delta`: per-token text deltas (primary
+///     streaming source).
+///   - `assistant`: the whole-turn finalization event (used only when the CLI did
+///     NOT emit `stream_event` deltas, e.g. older Claude Code versions).
+///   - `result`: last-resort fallback if neither of the above fired.
 #[derive(Debug, Deserialize)]
 struct ClaudeLine<'a> {
     #[serde(rename = "type", default, borrow)]
@@ -1075,6 +1084,9 @@ struct ClaudeLine<'a> {
     message: Option<ClaudeMessage>,
     #[serde(default, borrow)]
     result: Option<&'a str>,
+    /// Nested event for `stream_event` items.
+    #[serde(default)]
+    event: Option<ClaudeStreamEvent>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1089,32 +1101,77 @@ struct ClaudeContent {
     text: Option<String>,
 }
 
-/// Each `assistant` event represents one full assistant turn; we append them in order
-/// joined by `"\n\n"`. The result event is used only as a fallback if no `assistant`
-/// events fired (older Claude Code CLI versions).
+#[derive(Debug, Deserialize)]
+struct ClaudeStreamEvent {
+    #[serde(rename = "type", default)]
+    kind: String,
+    #[serde(default)]
+    delta: Option<ClaudeStreamDelta>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeStreamDelta {
+    #[serde(rename = "type", default)]
+    kind: String,
+    #[serde(default)]
+    text: Option<String>,
+}
+
+/// Tracks Claude streaming state. With `--include-partial-messages` we receive
+/// per-token deltas as `content_block_delta` events; the whole-turn `assistant`
+/// event arrives afterwards with the same text concatenated, and we ignore it to
+/// avoid double-emitting.
 #[derive(Default)]
 struct ClaudeAccumulator {
     has_emitted_any: bool,
+    /// True once we've seen at least one `content_block_delta` token-level event.
+    /// When true, suppress the subsequent whole-turn `assistant` event for the
+    /// same content block — it would duplicate text we already emitted.
+    has_streamed_partials: bool,
 }
 
 impl ClaudeAccumulator {
     fn ingest_line(&mut self, line: &str) -> Option<String> {
         let parsed: ClaudeLine = serde_json::from_str(line).ok()?;
         let text: String = match parsed.kind {
-            "assistant" => parsed
+            "stream_event" => {
+                let event = parsed.event?;
+                if event.kind != "content_block_delta" {
+                    return None;
+                }
+                let delta = event.delta?;
+                if delta.kind != "text_delta" {
+                    return None;
+                }
+                self.has_streamed_partials = true;
+                delta.text?
+            }
+            // Older Claude Code CLI versions (or runs without partial messages enabled)
+            // emit only whole-turn `assistant` events. Use these only if we never saw
+            // a content_block_delta for this same content.
+            "assistant" if !self.has_streamed_partials => parsed
                 .message?
                 .content
                 .into_iter()
                 .filter_map(|c| c.text)
                 .collect::<Vec<_>>()
                 .join(""),
+            // Final fallback when neither stream_event nor assistant text fired.
             "result" if !self.has_emitted_any => parsed.result?.to_string(),
             _ => return None,
         };
         if text.is_empty() {
             return None;
         }
-        let sep = if self.has_emitted_any { "\n\n" } else { "" };
+        // The first non-empty emission is the start of streaming text. Add a
+        // paragraph break only when we're concatenating a new turn after a prior one.
+        // For per-token deltas, the joiner stays empty because each token is part of
+        // the same content block.
+        let sep = if !self.has_emitted_any || self.has_streamed_partials {
+            ""
+        } else {
+            "\n\n"
+        };
         let delta = format!("{sep}{text}");
         self.has_emitted_any = true;
         Some(delta)
@@ -2124,6 +2181,31 @@ mod tests {
             ],
         );
         assert_eq!(total, "hello\n\nworld");
+    }
+
+    #[test]
+    fn claude_accumulator_streams_per_token_via_content_block_delta() {
+        let mut acc = ClaudeAccumulator::default();
+        // Simulate the real Claude `--include-partial-messages` event sequence:
+        // message_start → content_block_start → content_block_delta* → assistant → ...
+        // The deltas are the source of truth; the trailing `assistant` event repeats
+        // the same text and must be suppressed.
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"system","subtype":"init"}"#,
+                r#"{"type":"stream_event","event":{"type":"message_start","message":{}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"One"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\nTwo\nThree"}}}"#,
+                r#"{"type":"assistant","message":{"content":[{"type":"text","text":"One\nTwo\nThree"}]}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#,
+                r#"{"type":"result","result":"One\nTwo\nThree"}"#,
+            ],
+        );
+        // Total should be the per-token concatenation, NOT doubled by the assistant or result.
+        assert_eq!(total, "One\nTwo\nThree");
+        assert!(acc.has_streamed_partials);
     }
 
     #[test]
