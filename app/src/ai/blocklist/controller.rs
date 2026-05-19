@@ -1894,26 +1894,30 @@ impl BlocklistAIController {
             &conversation_data.server_conversation_token,
         );
 
+        // Snapshot the small fields we still need after handing the data off — we move the
+        // full struct (with its `Vec<Task>` = the whole conversation history) into
+        // RequestParams::new rather than cloning it.
+        let conversation_data_id = conversation_data.id;
+        let server_conversation_token_for_identifiers =
+            conversation_data.server_conversation_token.clone();
+
         let mut request_params = api::RequestParams::new(
             Some(self.terminal_view_id),
             SessionContext::from_session(self.active_session.as_ref(ctx), ctx),
             &request_input,
-            conversation_data.clone(),
+            conversation_data,
             query_metadata,
             ctx,
         );
         request_params.parent_agent_id = parent_agent_id;
         request_params.agent_name = agent_name;
 
-        let server_conversation_token_for_identifiers =
-            conversation_data.server_conversation_token.clone();
-
         let response_stream = ctx.add_model(|ctx| {
             // Create AIIdentifiers for the response stream
             let ai_identifiers = AIIdentifiers {
                 server_output_id: None, // Will be populated by the successful response
                 server_conversation_id: server_conversation_token_for_identifiers.map(Into::into),
-                client_conversation_id: Some(conversation_data.id),
+                client_conversation_id: Some(conversation_data_id),
                 client_exchange_id: None,
                 model_id: Some(request_params.model.clone()),
             };
@@ -1950,7 +1954,7 @@ impl BlocklistAIController {
             {
                 self.maybe_populate_plans_for_ai_document_model(
                     referenced_attachments,
-                    conversation_data.id,
+                    conversation_data_id,
                     ctx,
                 );
             }
@@ -1966,7 +1970,7 @@ impl BlocklistAIController {
                 Ok(_) => {
                     history_model.update_conversation_status(
                         self.terminal_view_id,
-                        conversation_data.id,
+                        conversation_data_id,
                         ConversationStatus::InProgress,
                         ctx,
                     );
@@ -1979,7 +1983,7 @@ impl BlocklistAIController {
 
         self.in_flight_response_streams.register_new_stream(
             response_stream_id.clone(),
-            conversation_data.id,
+            conversation_data_id,
             response_stream,
             CancellationReason::FollowUpSubmitted {
                 is_for_same_conversation: true,
@@ -2009,7 +2013,7 @@ impl BlocklistAIController {
         if !is_passive_request {
             BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
                 history_model.set_active_conversation_id(
-                    conversation_data.id,
+                    conversation_data_id,
                     self.terminal_view_id,
                     ctx,
                 )
@@ -2038,14 +2042,14 @@ impl BlocklistAIController {
             // After making an AI query, default to asking a follow up.
             self.context_model.update(ctx, |context_model, ctx| {
                 context_model.set_pending_query_state_for_existing_conversation(
-                    conversation_data.id,
+                    conversation_data_id,
                     AgentViewEntryOrigin::AutoFollowUp,
                     ctx,
                 )
             });
         }
 
-        Ok((conversation_data.id, response_stream_id))
+        Ok((conversation_data_id, response_stream_id))
     }
 
     /// Cancels a pending AI request response stream, given the exchange ID, if it exists.
@@ -2695,34 +2699,35 @@ fn input_for_query(
 }
 
 /// Validates that tool call results have corresponding tool calls in the task context.
-/// Logs an error if a tool call result is found without a corresponding tool call,
-/// or if a tool call result is in a different task than the tool call use.
+/// Logs an error if a tool call result is found without a corresponding tool call.
 fn validate_tool_call_results<'a>(
     inputs: impl Iterator<Item = &'a AIAgentInput>,
     tasks: &[Task],
     server_conversation_token: &Option<ServerConversationToken>,
 ) {
-    // Create a mapping from tool call IDs to their task IDs
-    let mut tool_call_to_task_map: HashMap<String, String> = HashMap::new();
-    for task in tasks {
-        for message in &task.messages {
+    // Collect tool-call IDs as borrowed string slices — we only need to check membership,
+    // not look up the owning task, so a `HashSet<&str>` against the borrowed `tasks` slice
+    // avoids cloning every tool_call_id + task_id for the lifetime of this call.
+    let tool_call_ids: HashSet<&str> = tasks
+        .iter()
+        .flat_map(|task| task.messages.iter())
+        .filter_map(|message| {
             if let Some(message::Message::ToolCall(tool_call)) = &message.message {
-                tool_call_to_task_map
-                    .insert(tool_call.tool_call_id.clone(), message.task_id.clone());
+                Some(tool_call.tool_call_id.as_str())
+            } else {
+                None
             }
-        }
-    }
+        })
+        .collect();
 
-    // Check each input for tool call results and validate they have corresponding tool calls
     for input in inputs {
         if let AIAgentInput::ActionResult { result, .. } = input {
             let action_id_str = result.id.to_string();
-            let server_conversation_id = server_conversation_token
-                .as_ref()
-                .map(|token| token.as_str())
-                .unwrap_or("None");
-
-            if !tool_call_to_task_map.contains_key(&action_id_str) {
+            if !tool_call_ids.contains(action_id_str.as_str()) {
+                let server_conversation_id = server_conversation_token
+                    .as_ref()
+                    .map(|token| token.as_str())
+                    .unwrap_or("None");
                 log::error!(
                     "Found tool call result with ID '{action_id_str}' but no corresponding tool call in task context. Server conversation ID: '{server_conversation_id}'"
                 );
