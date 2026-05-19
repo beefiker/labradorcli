@@ -561,69 +561,70 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
         local git_head=""
         local git_branch=""
 
-        # Only fill these fields once we've finished bootstrapping, as the
-        # blocks created during the bootstrap process don't have visible
-        # prompts, and we don't want to invoke `git` before we've sourced the
-        # user's rcfiles and have a fully-populated PATH.
-        if [[ -n "$WARP_BOOTSTRAPPED" ]]; then
-          if [[ -n "$VIRTUAL_ENV" ]] && [ "$WARP_IN_MSYS2" = false ]; then
-              escaped_virtual_env=$(warp_escape_json "$VIRTUAL_ENV")
-          fi
+        # Fill environment-aware fields on every precmd. The previous
+        # `$WARP_BOOTSTRAPPED` gate hid these during the bootstrap blocks, which
+        # also meant the first 1-2 user prompts after bootstrap could miss the
+        # chip if the precmd payload was sent before WARP_BOOTSTRAPPED was set.
+        # Each detector below already wraps its tool in `command -v <tool>` so a
+        # missing PATH entry produces an empty field instead of a failure — that
+        # makes the bootstrap-block path a no-op without needing the outer gate.
+        if [[ -n "$VIRTUAL_ENV" ]] && [ "$WARP_IN_MSYS2" = false ]; then
+            escaped_virtual_env=$(warp_escape_json "$VIRTUAL_ENV")
+        fi
 
-          if [[ -n "$CONDA_DEFAULT_ENV" ]] && [ "$WARP_IN_MSYS2" = false ]; then
-              escaped_conda_env=$(warp_escape_json "$CONDA_DEFAULT_ENV")
-          fi
+        if [[ -n "$CONDA_DEFAULT_ENV" ]] && [ "$WARP_IN_MSYS2" = false ]; then
+            escaped_conda_env=$(warp_escape_json "$CONDA_DEFAULT_ENV")
+        fi
 
-          # Get Node.js version if node is available and we're in a Node.js project
-          if command -v node > /dev/null 2>&1 && [ "$WARP_IN_MSYS2" = false ]; then
-              # Check for package.json in current directory and parent directories
-              local current_dir="$PWD"
-              local found_package_json=false
-              local package_json_dir=""
-              while [[ "$current_dir" != "/" ]]; do
-                  if [[ -f "$current_dir/package.json" ]]; then
-                      found_package_json=true
-                      package_json_dir="$current_dir"
-                      break
-                  fi
-                  current_dir=$(dirname "$current_dir")
-              done
-              
-              # Only show node version if package.json is within a git repository
-              if [[ "$found_package_json" = true ]]; then
-                  local git_dir="$package_json_dir"
-                  local in_git_repo=false
-                  while [[ "$git_dir" != "/" ]]; do
-                      if [[ -d "$git_dir/.git" ]]; then
-                          in_git_repo=true
-                          break
-                      fi
-                      git_dir=$(dirname "$git_dir")
-                  done
-                  
-                  if [[ "$in_git_repo" = true ]]; then
-                      local node_version=$(node --version 2>/dev/null)
-                      if [[ -n "$node_version" ]]; then
-                          escaped_node_version=$(warp_escape_json "$node_version")
-                      fi
-                  fi
-              fi
-          fi
+        # Get Node.js version if node is available and we're in a Node.js project
+        if command -v node > /dev/null 2>&1 && [ "$WARP_IN_MSYS2" = false ]; then
+            # Check for package.json in current directory and parent directories
+            local current_dir="$PWD"
+            local found_package_json=false
+            local package_json_dir=""
+            while [[ "$current_dir" != "/" ]]; do
+                if [[ -f "$current_dir/package.json" ]]; then
+                    found_package_json=true
+                    package_json_dir="$current_dir"
+                    break
+                fi
+                current_dir=$(dirname "$current_dir")
+            done
 
-          # Note: We explicitly do _not_ use command -p here, as `git` is a command that can be
-          # installed in non-standard locations and so is not always available on the shell's
-          # default PATH. Instead, we rely on the active PATH, as if the user doesn't have git
-          # available to their session, it is unlikely they will be looking for git branch
-          # information from the prompt.
-          if command -v git >/dev/null 2>&1; then
-            git_branch=$(warp_git symbolic-ref --short HEAD 2> /dev/null)
-            # The git branch the user is on, or the git commit hash if they're not on a branch.
-            git_head="${git_branch:-$(warp_git rev-parse --short HEAD 2> /dev/null)}"
-          fi
-          if [ "$WARP_IN_MSYS2" = false ]; then
-            escaped_git_head=$(warp_escape_json "$git_head")
-            escaped_git_branch=$(warp_escape_json "$git_branch")
-          fi
+            # Only show node version if package.json is within a git repository
+            if [[ "$found_package_json" = true ]]; then
+                local git_dir="$package_json_dir"
+                local in_git_repo=false
+                while [[ "$git_dir" != "/" ]]; do
+                    if [[ -d "$git_dir/.git" ]]; then
+                        in_git_repo=true
+                        break
+                    fi
+                    git_dir=$(dirname "$git_dir")
+                done
+
+                if [[ "$in_git_repo" = true ]]; then
+                    local node_version=$(node --version 2>/dev/null)
+                    if [[ -n "$node_version" ]]; then
+                        escaped_node_version=$(warp_escape_json "$node_version")
+                    fi
+                fi
+            fi
+        fi
+
+        # Note: We explicitly do _not_ use command -p here, as `git` is a command that can be
+        # installed in non-standard locations and so is not always available on the shell's
+        # default PATH. Instead, we rely on the active PATH, as if the user doesn't have git
+        # available to their session, it is unlikely they will be looking for git branch
+        # information from the prompt.
+        if command -v git >/dev/null 2>&1; then
+          git_branch=$(warp_git symbolic-ref --short HEAD 2> /dev/null)
+          # The git branch the user is on, or the git commit hash if they're not on a branch.
+          git_head="${git_branch:-$(warp_git rev-parse --short HEAD 2> /dev/null)}"
+        fi
+        if [ "$WARP_IN_MSYS2" = false ]; then
+          escaped_git_head=$(warp_escape_json "$git_head")
+          escaped_git_branch=$(warp_escape_json "$git_branch")
         fi
 
         # At this point, escaped prompt looks something like

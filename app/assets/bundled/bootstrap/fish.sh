@@ -335,68 +335,67 @@ function warp_precmd --on-event fish_prompt --on-event fish_posterror
     set -l escaped_git_head ""
     set -l escaped_git_branch ""
 
-    # Only fill these fields once we've finished bootstrapping, as the
-    # blocks created during the bootstrap process don't have visible
-    # prompts, and we don't want to invoke `git` before we've sourced the
-    # user's rcfiles and have a fully-populated PATH.
-    if test -n "$WARP_BOOTSTRAPPED"
-      if test -n "$VIRTUAL_ENV"
-          set escaped_virtual_env (warp_escape_json "$VIRTUAL_ENV")
-      end
-      if test -n "$CONDA_DEFAULT_ENV"
-          set escaped_conda_env (warp_escape_json "$CONDA_DEFAULT_ENV")
-      end
-      
-        # Get Node.js version if node is available and we're in a Node.js project
-        if command -v node > /dev/null 2>&1
-            # Check for package.json in current directory and parent directories
-            set current_dir (pwd)
-            set found_package_json false
-            set package_json_dir ""
-            while test "$current_dir" != "/"
-                if test -f "$current_dir/package.json"
-                    set found_package_json true
-                    set package_json_dir "$current_dir"
-                    break
-                end
-                set current_dir (dirname "$current_dir")
-            end
-            
-            # Only show node version if package.json is within a git repository
-            if test "$found_package_json" = true
-                set git_dir "$package_json_dir"
-                set in_git_repo false
-                while test "$git_dir" != "/"
-                    if test -d "$git_dir/.git"
-                        set in_git_repo true
-                        break
-                    end
-                    set git_dir (dirname "$git_dir")
-                end
-                
-                if test "$in_git_repo" = true
-                    set node_version (node --version 2>/dev/null)
-                    if test -n "$node_version"
-                        set escaped_node_version (warp_escape_json "$node_version")
-                    end
-                end
-            end
-        end
+    # Fill environment-aware fields on every precmd. The old `$WARP_BOOTSTRAPPED`
+    # gate skipped this work for bootstrap blocks, but it also meant the first
+    # user prompts could miss chips if precmd ran before the flag was set.
+    # Each detector below already guards its tool with `command -v <tool>` so a
+    # missing PATH entry produces an empty field rather than an error.
+    if test -n "$VIRTUAL_ENV"
+        set escaped_virtual_env (warp_escape_json "$VIRTUAL_ENV")
+    end
+    if test -n "$CONDA_DEFAULT_ENV"
+        set escaped_conda_env (warp_escape_json "$CONDA_DEFAULT_ENV")
+    end
 
-      set -l git_branch ""
-      set -l git_head ""
-      if command -q git
-          set git_branch (warp_git symbolic-ref --short HEAD 2> /dev/null)
-          if test -z "$git_branch"
-              # Fallback to the git commit hash if we aren't on a named branch.
-              set git_head (warp_git rev-parse --short HEAD 2> /dev/null)
-          else
-              set git_head "$git_branch"
+      # Get Node.js version if node is available and we're in a Node.js project
+      if command -v node > /dev/null 2>&1
+          # Check for package.json in current directory and parent directories
+          set current_dir (pwd)
+          set found_package_json false
+          set package_json_dir ""
+          while test "$current_dir" != "/"
+              if test -f "$current_dir/package.json"
+                  set found_package_json true
+                  set package_json_dir "$current_dir"
+                  break
+              end
+              set current_dir (dirname "$current_dir")
+          end
+
+          # Only show node version if package.json is within a git repository
+          if test "$found_package_json" = true
+              set git_dir "$package_json_dir"
+              set in_git_repo false
+              while test "$git_dir" != "/"
+                  if test -d "$git_dir/.git"
+                      set in_git_repo true
+                      break
+                  end
+                  set git_dir (dirname "$git_dir")
+              end
+
+              if test "$in_git_repo" = true
+                  set node_version (node --version 2>/dev/null)
+                  if test -n "$node_version"
+                      set escaped_node_version (warp_escape_json "$node_version")
+                  end
+              end
           end
       end
-      set escaped_git_head (warp_escape_json "$git_head")
-      set escaped_git_branch (warp_escape_json "$git_branch")
+
+    set -l git_branch ""
+    set -l git_head ""
+    if command -q git
+        set git_branch (warp_git symbolic-ref --short HEAD 2> /dev/null)
+        if test -z "$git_branch"
+            # Fallback to the git commit hash if we aren't on a named branch.
+            set git_head (warp_git rev-parse --short HEAD 2> /dev/null)
+        else
+            set git_head "$git_branch"
+        end
     end
+    set escaped_git_head (warp_escape_json "$git_head")
+    set escaped_git_branch (warp_escape_json "$git_branch")
 
     warp_update_prompt_vars
     # This is used solely for prompt previews, when we're using prompt markers with combined grid.

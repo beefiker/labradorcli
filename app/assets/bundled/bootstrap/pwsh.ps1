@@ -478,77 +478,77 @@ $null = New-Module -Name Warp-Module -ScriptBlock {
             $gitBranch = ''
             $nodeVersion = ''
 
-            # Only fill these fields once we've finished bootstrapping, as the
-            # blocks created during the bootstrap process don't have visible
-            # prompts, and we don't want to invoke 'git' before we've sourced the
-            # user's rcfiles and have a fully-populated PATH.
-            if ($global:WARP_BOOTSTRAPPED -eq 1) {
-                if (Test-Path env:VIRTUAL_ENV) {
-                    $virtualEnv = $env:VIRTUAL_ENV
-                }
-                if (Test-Path env:CONDA_DEFAULT_ENV) {
-                    $condaEnv = $env:CONDA_DEFAULT_ENV
-                }
-                if (Test-Path env:KUBECONFIG) {
-                    $kubeConfig = $env:KUBECONFIG
-                }
+            # Fill environment-aware fields on every precmd. The previous
+            # `$global:WARP_BOOTSTRAPPED` gate skipped this work for bootstrap
+            # blocks, but it also meant the first user prompts could miss chips
+            # if precmd ran before the flag was set. Each detector below uses
+            # `Get-Command -CommandType Application` so a missing tool produces
+            # an empty field instead of a failure.
+            if (Test-Path env:VIRTUAL_ENV) {
+                $virtualEnv = $env:VIRTUAL_ENV
+            }
+            if (Test-Path env:CONDA_DEFAULT_ENV) {
+                $condaEnv = $env:CONDA_DEFAULT_ENV
+            }
+            if (Test-Path env:KUBECONFIG) {
+                $kubeConfig = $env:KUBECONFIG
+            }
 
-                # Compute Node.js version if node is available and we're in a Node project within a Git repo.
-                $hasNodeCommand = Get-Command -CommandType Application node 2>$null
-                if ($hasNodeCommand) {
-                    try {
-                        # Walk up from the current directory to find a package.json
-                        $dir = Get-Item -LiteralPath (Get-Location).Path
-                        $foundPackageJson = $false
-                        $packageJsonDir = $null
-                        while ($null -ne $dir) {
-                            $candidate = Join-Path $dir.FullName 'package.json'
-                            if (Test-Path -LiteralPath $candidate) {
-                                $foundPackageJson = $true
-                                $packageJsonDir = $dir.FullName
+            # Compute Node.js version if node is available and we're in a Node project within a Git repo.
+            $hasNodeCommand = Get-Command -CommandType Application node 2>$null
+            if ($hasNodeCommand) {
+                try {
+                    # Walk up from the current directory to find a package.json
+                    $dir = Get-Item -LiteralPath (Get-Location).Path
+                    $foundPackageJson = $false
+                    $packageJsonDir = $null
+                    while ($null -ne $dir) {
+                        $candidate = Join-Path $dir.FullName 'package.json'
+                        if (Test-Path -LiteralPath $candidate) {
+                            $foundPackageJson = $true
+                            $packageJsonDir = $dir.FullName
+                            break
+                        }
+                        $dir = $dir.Parent
+                    }
+
+                    if ($foundPackageJson) {
+                        # Verify package.json resides within a Git repository by walking up to find a .git directory
+                        $probe = Get-Item -LiteralPath $packageJsonDir
+                        $inGitRepo = $false
+                        while ($null -ne $probe) {
+                            if (Test-Path -LiteralPath (Join-Path $probe.FullName '.git')) {
+                                $inGitRepo = $true
                                 break
                             }
-                            $dir = $dir.Parent
+                            $probe = $probe.Parent
                         }
 
-                        if ($foundPackageJson) {
-                            # Verify package.json resides within a Git repository by walking up to find a .git directory
-                            $probe = Get-Item -LiteralPath $packageJsonDir
-                            $inGitRepo = $false
-                            while ($null -ne $probe) {
-                                if (Test-Path -LiteralPath (Join-Path $probe.FullName '.git')) {
-                                    $inGitRepo = $true
-                                    break
-                                }
-                                $probe = $probe.Parent
-                            }
-
-                            if ($inGitRepo) {
-                                $nodeVersion = Warp-TryGet-NodeVersion
-                            }
+                        if ($inGitRepo) {
+                            $nodeVersion = Warp-TryGet-NodeVersion
                         }
-                    } catch {
-                        # Log at verbose level so the catch block is not empty and diagnostics are available when needed.
-                        Write-Verbose "Failed to compute Node.js context: $($_.Exception.Message)"
                     }
+                } catch {
+                    # Log at verbose level so the catch block is not empty and diagnostics are available when needed.
+                    Write-Verbose "Failed to compute Node.js context: $($_.Exception.Message)"
                 }
+            }
 
-                # We do not inline $hasGitCommand b/c the linter does not like seeing '>'
-                # in an if statement; it thinks we are trying to do -gt incorrectly.
-                # Since this is a good warning and we do not want to turn off this lint rule,
-                # we do a little indirection here
-                $hasGitCommand = Get-Command -CommandType Application git 2>$null
-                if ($hasGitCommand) {
-                    # This is deliberately not using || b/c || only works in Powershell >=7
-                    $gitBranchTmp = Warp-Git symbolic-ref --short HEAD 2>$null
-                    if ($null -ne $gitBranchTmp) {
-                        $gitBranch = $gitBranchTmp
-                        $gitHead = $gitBranchTmp
-                    } else {
-                        $gitHeadTmp = Warp-Git rev-parse --short HEAD 2>$null
-                        if ($null -ne $gitHeadTmp) {
-                            $gitHead = $gitHeadTmp
-                        }
+            # We do not inline $hasGitCommand b/c the linter does not like seeing '>'
+            # in an if statement; it thinks we are trying to do -gt incorrectly.
+            # Since this is a good warning and we do not want to turn off this lint rule,
+            # we do a little indirection here
+            $hasGitCommand = Get-Command -CommandType Application git 2>$null
+            if ($hasGitCommand) {
+                # This is deliberately not using || b/c || only works in Powershell >=7
+                $gitBranchTmp = Warp-Git symbolic-ref --short HEAD 2>$null
+                if ($null -ne $gitBranchTmp) {
+                    $gitBranch = $gitBranchTmp
+                    $gitHead = $gitBranchTmp
+                } else {
+                    $gitHeadTmp = Warp-Git rev-parse --short HEAD 2>$null
+                    if ($null -ne $gitHeadTmp) {
+                        $gitHead = $gitHeadTmp
                     }
                 }
             }
