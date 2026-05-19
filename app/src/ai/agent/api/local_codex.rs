@@ -4,7 +4,10 @@ use std::{
     path::{Path, PathBuf},
     process::{Command as StdCommand, Stdio},
     sync::OnceLock,
+    time::Duration,
 };
+
+use async_io::Timer;
 
 use ai::{local_claude_auth, local_openai_auth};
 use command::r#async::Command;
@@ -36,6 +39,23 @@ const LOCAL_AGENT_ENV_VAR: &str = "DWARF_LOCAL_AGENT";
 const LOCAL_AGENT_DISPLAY_NAME: &str = "Local Agent";
 const TOOL_CALL_PREFIX: &str = "DWARF_TOOL_CALL";
 const CLAUDE_DEFAULT_MODEL_ID: &str = "claude-code";
+const LOCAL_AGENT_TIMEOUT_ENV_VAR: &str = "DWARF_LOCAL_AGENT_TIMEOUT_SECS";
+const DEFAULT_LOCAL_AGENT_TIMEOUT_SECS: u64 = 300;
+
+/// Static instructions every prompt includes. Kept as a `const &str` so we copy a
+/// pointer into the prompt buffer instead of rebuilding the prose every chat.
+const TOOL_CALL_CONTRACT_PROSE: &str = "Dwarf terminal tool-call contract:\n\
+     - Dwarf is a terminal. Prefer making progress with shell commands, scripts, repository inspection, tests, and concise analysis over conversational-only answers.\n\
+     - You cannot change Dwarf's live terminal by changing your own local agent subprocess working directory.\n\
+     - When the user asks to run, inspect, analyze, search, test, build, install, execute a script, or change directories, emit one tool-call marker per required shell command on its own line:\n\
+     DWARF_TOOL_CALL {\"type\":\"run_shell_command\",\"command\":\"pwd\",\"is_read_only\":true,\"uses_pager\":false,\"is_risky\":false,\"wait_until_complete\":true}\n\
+     - Emit one self-contained command when a later step depends on an earlier command's output. Do not emit dependent multi-step plans because Dwarf will not feed command results back to you automatically in this local bridge.\n\
+     - For directory changes, emit `cd <path>` as a Dwarf tool call. Do not say the cwd changed until Dwarf returns the command result.\n\
+     - For read-only inspection commands such as pwd, ls, find, rg, git status, cargo test --no-run, use `is_read_only:true`.\n\
+     - For scripts, builds, tests that execute project code, or commands that may modify files, set `is_read_only:false`. Set `is_risky:true` only for destructive, credential, network, sudo, or external side-effect commands.\n\
+     - Do not wrap DWARF_TOOL_CALL lines in markdown fences. Keep prose short and do not claim validation from commands that only ran in your local agent subprocess.\n\n";
+
+const MODEL_IDENTITY_PROSE: &str = "If the user asks what model you are, report this configured model label and do not claim a separate runtime label you cannot inspect.\n\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LocalAgentRuntime {
@@ -278,12 +298,7 @@ pub(super) async fn generate_output(
                 futures::future::Either::Left((Some(Err(error)), _)) => {
                     log::warn!("Local agent CLI error: {error}");
                     full_text = error.clone();
-                    yield Ok(replace_agent_text_event(
-                        &task_id,
-                        &request_id,
-                        &message_id,
-                        error,
-                    ));
+                    yield Ok(replace_agent_text_event(&task_id, &message_id, error));
                     break;
                 }
                 futures::future::Either::Left((None, _)) => break,
@@ -299,18 +314,13 @@ pub(super) async fn generate_output(
 
         if was_cancelled {
             // Surface cancellation as a replace so the user sees the partial response was
-            // intentionally stopped (instead of just ending mid-token).
-            let suffix = if full_text.is_empty() {
-                "_Request cancelled._".to_string()
-            } else {
-                format!("{full_text}\n\n_Request cancelled._")
-            };
-            yield Ok(replace_agent_text_event(
-                &task_id,
-                &request_id,
-                &message_id,
-                suffix,
-            ));
+            // intentionally stopped (instead of just ending mid-token). Append the suffix
+            // in-place to avoid cloning the (possibly long) `full_text` into a new String.
+            if !full_text.is_empty() {
+                full_text.push_str("\n\n");
+            }
+            full_text.push_str("_Request cancelled._");
+            yield Ok(replace_agent_text_event(&task_id, &message_id, full_text));
             yield Ok(finished_event());
             return;
         }
@@ -330,12 +340,7 @@ pub(super) async fn generate_output(
         }
 
         if cleaned_text != full_text {
-            yield Ok(replace_agent_text_event(
-                &task_id,
-                &request_id,
-                &message_id,
-                cleaned_text,
-            ));
+            yield Ok(replace_agent_text_event(&task_id, &message_id, cleaned_text));
         }
 
         if !tool_calls.is_empty() {
@@ -638,32 +643,37 @@ fn run_codex_streaming(
 
         let stdout = child.stdout.take().expect("stdout was piped");
         let stderr = child.stderr.take().expect("stderr was piped");
-        let stdout_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::with_capacity(LINE_READER_BUF_BYTES, stdout)
-                .lines()
-                .filter_map(|r| r.ok().map(MergedLine::Stdout)),
-        );
-        let stderr_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::with_capacity(LINE_READER_BUF_BYTES, stderr)
-                .lines()
-                .filter_map(|r| r.ok().map(MergedLine::Stderr)),
-        );
-        let mut merged = futures::stream::select(stdout_stream, stderr_stream);
+        let mut merged = merge_child_lines(stdout, stderr);
 
         let mut accumulator = CodexAccumulator::default();
         let mut stderr_buf = String::new();
+        let timeout_total = local_agent_timeout();
+        let mut timeout = Timer::after(timeout_total);
 
-        while let Some(line) = merged.next().await {
-            match line {
-                MergedLine::Stdout(line) => {
+        loop {
+            let next_fut = merged.next();
+            futures::pin_mut!(next_fut);
+            match futures::future::select(next_fut, &mut timeout).await {
+                futures::future::Either::Left((Some(MergedLine::Stdout(line)), _)) => {
                     if let Some(delta) = accumulator.ingest_line(&line) {
                         if !delta.is_empty() {
                             yield Ok(delta);
                         }
                     }
                 }
-                MergedLine::Stderr(line) => {
+                futures::future::Either::Left((Some(MergedLine::Stderr(line)), _)) => {
                     append_stderr(&mut stderr_buf, &line);
+                }
+                futures::future::Either::Left((None, _)) => break,
+                futures::future::Either::Right(_) => {
+                    // Hard timeout — drop the child via merged (kill_on_drop fires).
+                    drop(merged);
+                    let _ = child.kill();
+                    yield Err(format!(
+                        "{LOCAL_AGENT_DISPLAY_NAME} Codex CLI timed out after {}s. Set {LOCAL_AGENT_TIMEOUT_ENV_VAR} to override.",
+                        timeout_total.as_secs()
+                    ));
+                    return;
                 }
             }
         }
@@ -736,6 +746,9 @@ async fn run_claude(
         command.current_dir(working_directory);
     }
     command.arg(prompt);
+    // Without kill_on_drop, dropping this future (caller cancellation, racing futures
+    // in suggestion paths) leaves a zombie Claude Code process burning until it exits.
+    command.kill_on_drop(true);
 
     let output = command.output().await.map_err(|error| {
         format!(
@@ -806,32 +819,36 @@ fn run_claude_streaming(
 
         let stdout = child.stdout.take().expect("stdout was piped");
         let stderr = child.stderr.take().expect("stderr was piped");
-        let stdout_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::with_capacity(LINE_READER_BUF_BYTES, stdout)
-                .lines()
-                .filter_map(|r| r.ok().map(MergedLine::Stdout)),
-        );
-        let stderr_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::with_capacity(LINE_READER_BUF_BYTES, stderr)
-                .lines()
-                .filter_map(|r| r.ok().map(MergedLine::Stderr)),
-        );
-        let mut merged = futures::stream::select(stdout_stream, stderr_stream);
+        let mut merged = merge_child_lines(stdout, stderr);
 
         let mut accumulator = ClaudeAccumulator::default();
         let mut stderr_buf = String::new();
+        let timeout_total = local_agent_timeout();
+        let mut timeout = Timer::after(timeout_total);
 
-        while let Some(line) = merged.next().await {
-            match line {
-                MergedLine::Stdout(line) => {
+        loop {
+            let next_fut = merged.next();
+            futures::pin_mut!(next_fut);
+            match futures::future::select(next_fut, &mut timeout).await {
+                futures::future::Either::Left((Some(MergedLine::Stdout(line)), _)) => {
                     if let Some(delta) = accumulator.ingest_line(&line) {
                         if !delta.is_empty() {
                             yield Ok(delta);
                         }
                     }
                 }
-                MergedLine::Stderr(line) => {
+                futures::future::Either::Left((Some(MergedLine::Stderr(line)), _)) => {
                     append_stderr(&mut stderr_buf, &line);
+                }
+                futures::future::Either::Left((None, _)) => break,
+                futures::future::Either::Right(_) => {
+                    drop(merged);
+                    let _ = child.kill();
+                    yield Err(format!(
+                        "{LOCAL_AGENT_DISPLAY_NAME} Claude Code timed out after {}s. Set {LOCAL_AGENT_TIMEOUT_ENV_VAR} to override.",
+                        timeout_total.as_secs()
+                    ));
+                    return;
                 }
             }
         }
@@ -868,6 +885,31 @@ enum MergedLine {
     Stderr(String),
 }
 
+/// Wraps the child's piped stdout/stderr in `BufReader`s and merges the two line
+/// streams via `futures::stream::select`. Factored so the streaming helpers share
+/// one setup path. Generic over the reader types to avoid pulling `async_process`
+/// directly into this module.
+fn merge_child_lines<R1, R2>(
+    stdout: R1,
+    stderr: R2,
+) -> std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>>
+where
+    R1: futures_lite::io::AsyncRead + Unpin + Send + 'static,
+    R2: futures_lite::io::AsyncRead + Unpin + Send + 'static,
+{
+    let stdout_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
+        BufReader::with_capacity(LINE_READER_BUF_BYTES, stdout)
+            .lines()
+            .filter_map(|r| r.ok().map(MergedLine::Stdout)),
+    );
+    let stderr_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
+        BufReader::with_capacity(LINE_READER_BUF_BYTES, stderr)
+            .lines()
+            .filter_map(|r| r.ok().map(MergedLine::Stderr)),
+    );
+    Box::pin(futures::stream::select(stdout_stream, stderr_stream))
+}
+
 /// Stop growing stderr beyond this cap. The trailing error message is `truncate`d
 /// to 4 000 chars anyway, so anything past ~8 KB is retained memory we never use.
 const STDERR_CAP_BYTES: usize = 8 * 1024;
@@ -877,6 +919,15 @@ const STDERR_CAP_BYTES: usize = 8 * 1024;
 /// tool descriptors; long Codex tool-call lines can exceed it too). Starting at 64 KB
 /// avoids the per-oversize-line resize cost.
 const LINE_READER_BUF_BYTES: usize = 64 * 1024;
+
+fn local_agent_timeout() -> Duration {
+    let secs = env::var(LOCAL_AGENT_TIMEOUT_ENV_VAR)
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|secs| *secs > 0)
+        .unwrap_or(DEFAULT_LOCAL_AGENT_TIMEOUT_SECS);
+    Duration::from_secs(secs)
+}
 
 fn append_stderr(buf: &mut String, line: &str) {
     if buf.len() >= STDERR_CAP_BYTES {
@@ -1084,54 +1135,35 @@ fn find_executable_in_path(name: &str) -> Option<String> {
 }
 
 fn find_common_codex_bin() -> Option<String> {
-    common_codex_candidates()
-        .into_iter()
-        .find(|path| is_executable(path))
-        .map(path_to_string)
+    find_common_bin("codex")
 }
 
 fn find_common_claude_bin() -> Option<String> {
-    common_claude_candidates()
+    find_common_bin("claude")
+}
+
+fn find_common_bin(binary_name: &str) -> Option<String> {
+    common_candidates_for(binary_name)
         .into_iter()
         .find(|path| is_executable(path))
         .map(path_to_string)
 }
 
-fn common_codex_candidates() -> Vec<PathBuf> {
+fn common_candidates_for(binary_name: &str) -> Vec<PathBuf> {
     let mut candidates = vec![
-        PathBuf::from("/opt/homebrew/bin/codex"),
-        PathBuf::from("/usr/local/bin/codex"),
+        PathBuf::from(format!("/opt/homebrew/bin/{binary_name}")),
+        PathBuf::from(format!("/usr/local/bin/{binary_name}")),
     ];
 
     if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
         candidates.extend([
-            home.join(".local/bin/codex"),
-            home.join(".volta/bin/codex"),
-            home.join(".asdf/shims/codex"),
-            home.join(".npm-global/bin/codex"),
-            home.join(".bun/bin/codex"),
+            home.join(format!(".local/bin/{binary_name}")),
+            home.join(format!(".volta/bin/{binary_name}")),
+            home.join(format!(".asdf/shims/{binary_name}")),
+            home.join(format!(".npm-global/bin/{binary_name}")),
+            home.join(format!(".bun/bin/{binary_name}")),
         ]);
-        candidates.extend(nvm_binary_candidates(&home, "codex"));
-    }
-
-    candidates
-}
-
-fn common_claude_candidates() -> Vec<PathBuf> {
-    let mut candidates = vec![
-        PathBuf::from("/opt/homebrew/bin/claude"),
-        PathBuf::from("/usr/local/bin/claude"),
-    ];
-
-    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
-        candidates.extend([
-            home.join(".local/bin/claude"),
-            home.join(".volta/bin/claude"),
-            home.join(".asdf/shims/claude"),
-            home.join(".npm-global/bin/claude"),
-            home.join(".bun/bin/claude"),
-        ]);
-        candidates.extend(nvm_binary_candidates(&home, "claude"));
+        candidates.extend(nvm_binary_candidates(&home, binary_name));
     }
 
     candidates
@@ -1276,21 +1308,8 @@ fn prompt_for_local_agent(
             )
         }
     }
-    prompt.push_str(
-        "If the user asks what model you are, report this configured model label and do not claim a separate runtime label you cannot inspect.\n\n",
-    );
-    prompt.push_str(
-        "Dwarf terminal tool-call contract:\n\
-         - Dwarf is a terminal. Prefer making progress with shell commands, scripts, repository inspection, tests, and concise analysis over conversational-only answers.\n\
-         - You cannot change Dwarf's live terminal by changing your own local agent subprocess working directory.\n\
-         - When the user asks to run, inspect, analyze, search, test, build, install, execute a script, or change directories, emit one tool-call marker per required shell command on its own line:\n\
-         DWARF_TOOL_CALL {\"type\":\"run_shell_command\",\"command\":\"pwd\",\"is_read_only\":true,\"uses_pager\":false,\"is_risky\":false,\"wait_until_complete\":true}\n\
-         - Emit one self-contained command when a later step depends on an earlier command's output. Do not emit dependent multi-step plans because Dwarf will not feed command results back to you automatically in this local bridge.\n\
-         - For directory changes, emit `cd <path>` as a Dwarf tool call. Do not say the cwd changed until Dwarf returns the command result.\n\
-         - For read-only inspection commands such as pwd, ls, find, rg, git status, cargo test --no-run, use `is_read_only:true`.\n\
-         - For scripts, builds, tests that execute project code, or commands that may modify files, set `is_read_only:false`. Set `is_risky:true` only for destructive, credential, network, sudo, or external side-effect commands.\n\
-         - Do not wrap DWARF_TOOL_CALL lines in markdown fences. Keep prose short and do not claim validation from commands that only ran in your local agent subprocess.\n\n",
-    );
+    prompt.push_str(MODEL_IDENTITY_PROSE);
+    prompt.push_str(TOOL_CALL_CONTRACT_PROSE);
 
     let history = conversation_history(&params.tasks);
     if !history.is_empty() {
@@ -1446,41 +1465,48 @@ fn run_shell_command_message(
 }
 
 fn extract_dwarf_tool_calls(output_text: &str) -> (String, Vec<LocalRunShellCommand>) {
-    let mut output_lines = Vec::new();
+    // Fast path: no marker substring anywhere — return the input verbatim without
+    // a second walk or any allocation beyond the (cheap) `to_owned`.
+    if !output_text.contains(TOOL_CALL_PREFIX) {
+        return (output_text.trim().to_string(), Vec::new());
+    }
+
+    let mut cleaned = String::with_capacity(output_text.len());
     let mut tool_calls = Vec::new();
-
+    let mut first = true;
     for line in output_text.lines() {
-        let Some(json) = dwarf_tool_call_json(line) else {
-            output_lines.push(line);
-            continue;
-        };
+        let extracted = dwarf_tool_call_json(line)
+            .and_then(|json| serde_json::from_str::<DwarfToolCallMarker>(json).ok())
+            .filter(|marker| {
+                marker.kind == "run_shell_command" && !marker.command.trim().is_empty()
+            });
 
-        let Ok(marker) = serde_json::from_str::<DwarfToolCallMarker>(json) else {
-            output_lines.push(line);
-            continue;
-        };
-        if marker.kind != "run_shell_command" || marker.command.trim().is_empty() {
-            output_lines.push(line);
+        if let Some(marker) = extracted {
+            tool_calls.push(LocalRunShellCommand {
+                command: marker.command.trim().to_string(),
+                is_read_only: marker.is_read_only.unwrap_or(true),
+                uses_pager: marker.uses_pager.unwrap_or(false),
+                is_risky: marker.is_risky.unwrap_or(false),
+                wait_until_complete: marker.wait_until_complete.unwrap_or(true),
+            });
             continue;
         }
 
-        tool_calls.push(LocalRunShellCommand {
-            command: marker.command.trim().to_string(),
-            is_read_only: marker.is_read_only.unwrap_or(true),
-            uses_pager: marker.uses_pager.unwrap_or(false),
-            is_risky: marker.is_risky.unwrap_or(false),
-            wait_until_complete: marker.wait_until_complete.unwrap_or(true),
-        });
+        if !first {
+            cleaned.push('\n');
+        }
+        cleaned.push_str(line);
+        first = false;
     }
 
-    let output_text = output_lines.join("\n").trim().to_string();
-    let output_text = if output_text.is_empty() && !tool_calls.is_empty() {
+    let cleaned = cleaned.trim().to_string();
+    let cleaned = if cleaned.is_empty() && !tool_calls.is_empty() {
         "I'll run the requested command in Dwarf.".to_string()
     } else {
-        output_text
+        cleaned
     };
 
-    (output_text, tool_calls)
+    (cleaned, tool_calls)
 }
 
 fn dwarf_tool_call_json(line: &str) -> Option<&str> {
@@ -1741,10 +1767,11 @@ fn append_agent_text_event(
 
 fn replace_agent_text_event(
     task_id: &str,
-    request_id: &str,
     message_id: &str,
     text: String,
 ) -> api::ResponseEvent {
+    // request_id on api::Message is metadata the conversation handler doesn't consult
+    // for UpdateTaskMessage (lookup is by message_id), so leave it empty.
     client_actions_event(vec![api::ClientAction {
         action: Some(api::client_action::Action::UpdateTaskMessage(
             api::client_action::UpdateTaskMessage {
@@ -1752,7 +1779,7 @@ fn replace_agent_text_event(
                 message: Some(api::Message {
                     id: message_id.to_string(),
                     task_id: task_id.to_string(),
-                    request_id: request_id.to_string(),
+                    request_id: String::new(),
                     timestamp: None,
                     server_message_data: String::new(),
                     citations: vec![],
@@ -1900,7 +1927,7 @@ mod tests {
         assert_eq!(agent_output_text(&appended), "hello");
 
         let api::response_event::Type::ClientActions(actions) =
-            replace_agent_text_event("task", "request", "message", "replaced".to_string())
+            replace_agent_text_event("task", "message", "replaced".to_string())
                 .r#type
                 .expect("replace event type")
         else {
@@ -2053,6 +2080,56 @@ mod tests {
             ],
         );
         assert_eq!(total, "hi");
+    }
+
+    #[test]
+    fn local_agent_timeout_defaults_when_env_unset() {
+        // Don't mutate env in tests; just sanity-check the default path returns the
+        // documented fallback when the env var is absent / unparseable.
+        env::remove_var(LOCAL_AGENT_TIMEOUT_ENV_VAR);
+        assert_eq!(
+            local_agent_timeout(),
+            Duration::from_secs(DEFAULT_LOCAL_AGENT_TIMEOUT_SECS)
+        );
+
+        env::set_var(LOCAL_AGENT_TIMEOUT_ENV_VAR, "not-a-number");
+        assert_eq!(
+            local_agent_timeout(),
+            Duration::from_secs(DEFAULT_LOCAL_AGENT_TIMEOUT_SECS)
+        );
+
+        env::set_var(LOCAL_AGENT_TIMEOUT_ENV_VAR, "0");
+        assert_eq!(
+            local_agent_timeout(),
+            Duration::from_secs(DEFAULT_LOCAL_AGENT_TIMEOUT_SECS),
+            "zero should fall back to the default to avoid instant-timeout footgun"
+        );
+
+        env::set_var(LOCAL_AGENT_TIMEOUT_ENV_VAR, "42");
+        assert_eq!(local_agent_timeout(), Duration::from_secs(42));
+
+        env::remove_var(LOCAL_AGENT_TIMEOUT_ENV_VAR);
+    }
+
+    #[test]
+    fn extract_dwarf_tool_calls_passes_through_when_no_marker() {
+        // Fast path: no TOOL_CALL_PREFIX anywhere → return verbatim, no extraction.
+        let input = "Some response text\nwith multiple lines";
+        let (cleaned, calls) = extract_dwarf_tool_calls(input);
+        assert_eq!(cleaned, input);
+        assert!(calls.is_empty());
+    }
+
+    #[test]
+    fn extract_dwarf_tool_calls_splits_marker_from_prose() {
+        let input = "I'll check that for you.\n\
+            DWARF_TOOL_CALL: {\"type\":\"run_shell_command\",\"command\":\"ls\",\"is_read_only\":true}\n\
+            Done.";
+        let (cleaned, calls) = extract_dwarf_tool_calls(input);
+        assert_eq!(cleaned, "I'll check that for you.\nDone.");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].command, "ls");
+        assert!(calls[0].is_read_only);
     }
 
     #[test]
