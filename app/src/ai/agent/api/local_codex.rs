@@ -280,7 +280,11 @@ pub(super) async fn generate_output(
             )),
         }]));
 
+        // Accumulated *cleaned* text — what the user sees, with markers already stripped.
+        // Used by the post-stream cwd-override path.
         let mut full_text = String::new();
+        let mut stream_filter = StreamingToolCallFilter::default();
+        let mut streamed_tool_calls: Vec<LocalRunShellCommand> = Vec::new();
 
         let mut cancellation_rx = cancellation_rx;
         let mut was_cancelled = false;
@@ -292,8 +296,24 @@ pub(super) async fn generate_output(
                     if chunk.is_empty() {
                         continue;
                     }
-                    full_text.push_str(&chunk);
-                    yield Ok(append_agent_text_event(&task_id, &message_id, chunk));
+                    let filtered = stream_filter.ingest(&chunk);
+                    for text in filtered.text_chunks {
+                        full_text.push_str(&text);
+                        yield Ok(append_agent_text_event(&task_id, &message_id, text));
+                    }
+                    for tc in filtered.tool_calls {
+                        streamed_tool_calls.push(tc.clone());
+                        yield Ok(client_actions_event(vec![api::ClientAction {
+                            action: Some(api::client_action::Action::AddMessagesToTask(
+                                api::client_action::AddMessagesToTask {
+                                    task_id: task_id.clone(),
+                                    messages: vec![run_shell_command_message(
+                                        &task_id, &request_id, tc,
+                                    )],
+                                },
+                            )),
+                        }]));
+                    }
                 }
                 futures::future::Either::Left((Some(Err(error)), _)) => {
                     log::warn!("Local agent CLI error: {error}");
@@ -312,6 +332,24 @@ pub(super) async fn generate_output(
             }
         }
 
+        // Flush any trailing partial line — emits a final text delta or final tool call.
+        let trailing = stream_filter.flush();
+        for text in trailing.text_chunks {
+            full_text.push_str(&text);
+            yield Ok(append_agent_text_event(&task_id, &message_id, text));
+        }
+        for tc in trailing.tool_calls {
+            streamed_tool_calls.push(tc.clone());
+            yield Ok(client_actions_event(vec![api::ClientAction {
+                action: Some(api::client_action::Action::AddMessagesToTask(
+                    api::client_action::AddMessagesToTask {
+                        task_id: task_id.clone(),
+                        messages: vec![run_shell_command_message(&task_id, &request_id, tc)],
+                    },
+                )),
+            }]));
+        }
+
         if was_cancelled {
             // Surface cancellation as a replace so the user sees the partial response was
             // intentionally stopped (instead of just ending mid-token). Append the suffix
@@ -325,33 +363,33 @@ pub(super) async fn generate_output(
             return;
         }
 
-        // Post-process: pull out DWARF_TOOL_CALL markers and any cwd-change tool call.
-        let (mut cleaned_text, mut tool_calls) = extract_dwarf_tool_calls(&full_text);
+        // Post-process: cwd-change detection from the user's prompt + already-clean text.
+        // Markers were extracted live during streaming; nothing to strip from text now.
+        let mut cleaned_text = full_text.clone();
+        let mut tool_calls: Vec<LocalRunShellCommand> = Vec::new();
         if let Some(target_dir) =
             local_cwd_change_target(&inputs, &cleaned_text, working_directory.as_deref())
         {
             let command = format!("cd {}", shell_quote_path(&target_dir));
-            if !tool_calls.iter().any(|call| call.command == command) {
+            // Don't duplicate a cwd-change tool call that already streamed inline.
+            let already_streamed = streamed_tool_calls.iter().any(|c| c.command == command);
+            if !already_streamed {
                 tool_calls.push(LocalRunShellCommand::read_only(command));
             }
-            if tool_calls.len() == 1 {
+            // When the synthesized cwd-change is the only action, simplify the prose
+            // (matches behaviour of the previous post-process pass).
+            if streamed_tool_calls.is_empty() && tool_calls.len() == 1 {
                 cleaned_text = format!("I'll run `{}` in Dwarf.", tool_calls[0].command);
             }
         }
         log::info!(
-            "[local-agent] post-process: full={}B cleaned={}B tool_calls={} replace_needed={}",
+            "[local-agent] stream summary: text_bytes={} streamed_tool_calls={} cwd_followup_tool_calls={}",
             full_text.len(),
-            cleaned_text.len(),
+            streamed_tool_calls.len(),
             tool_calls.len(),
-            cleaned_text != full_text
         );
 
-        // Always emit the replace when we extracted any tool calls. By the time post-process
-        // runs we've already streamed the raw text (with DWARF_TOOL_CALL markers) into the UI
-        // via per-token AppendToMessageContent events; without a replace, those markers stay
-        // visible as inline text even though the markers are now rendered as separate tool-call
-        // blocks. The `!=` check still gates non-tool-call cleanups (trim, cwd-override prose).
-        if cleaned_text != full_text || !tool_calls.is_empty() {
+        if cleaned_text != full_text {
             yield Ok(replace_agent_text_event(&task_id, &message_id, cleaned_text));
         }
 
@@ -1576,6 +1614,97 @@ fn run_shell_command_message(
     }
 }
 
+/// Per-stream line-buffered filter that separates `DWARF_TOOL_CALL` markers from
+/// prose deltas as they arrive on the wire. Lets the streaming loop emit clean
+/// text to the UI and hoist tool calls into their own blocks *during* streaming,
+/// instead of showing raw `DWARF_TOOL_CALL {...}` JSON to the user and replacing
+/// it after the stream ends.
+#[derive(Default)]
+struct StreamingToolCallFilter {
+    /// Accumulating bytes whose containing line hasn't terminated yet — we only
+    /// know if a line is a marker once we see its trailing `\n`.
+    pending_line: String,
+}
+
+#[derive(Debug, Default)]
+struct FilteredDelta {
+    /// Prose chunks safe to emit as `AppendToMessageContent` text deltas.
+    text_chunks: Vec<String>,
+    /// Tool calls whose marker line just completed.
+    tool_calls: Vec<LocalRunShellCommand>,
+}
+
+impl StreamingToolCallFilter {
+    /// Append a chunk from the CLI stream and pull out any complete lines.
+    fn ingest(&mut self, chunk: &str) -> FilteredDelta {
+        let mut result = FilteredDelta::default();
+        self.pending_line.push_str(chunk);
+
+        // Drain complete lines from `pending_line`. A "line" here is everything up
+        // to and including the `\n`. Anything after the last `\n` stays buffered.
+        loop {
+            let Some(nl_pos) = self.pending_line.find('\n') else {
+                break;
+            };
+            let line_with_newline: String = self.pending_line.drain(..=nl_pos).collect();
+            let line_without_newline = &line_with_newline[..line_with_newline.len() - 1];
+
+            if let Some(marker) = parse_dwarf_marker_line(line_without_newline) {
+                result.tool_calls.push(marker);
+            } else {
+                result.text_chunks.push(line_with_newline);
+            }
+        }
+
+        result
+    }
+
+    /// Drain whatever's left in the buffer at end-of-stream. If the trailing
+    /// line is a complete marker, return it as a tool call; if it looks like a
+    /// partial marker (starts with the prefix but no closing brace), drop it
+    /// silently rather than show half a JSON object to the user; otherwise
+    /// return it as a final text chunk.
+    fn flush(mut self) -> FilteredDelta {
+        let mut result = FilteredDelta::default();
+        if self.pending_line.is_empty() {
+            return result;
+        }
+        if let Some(marker) = parse_dwarf_marker_line(&self.pending_line) {
+            result.tool_calls.push(marker);
+            return result;
+        }
+        if self.pending_line.contains(TOOL_CALL_PREFIX) {
+            // Partial/malformed marker — better to drop than expose JSON fragments.
+            return result;
+        }
+        result.text_chunks.push(std::mem::take(&mut self.pending_line));
+        result
+    }
+}
+
+/// Parse a single line (no trailing newline) as a DWARF_TOOL_CALL marker.
+/// Returns `Some(LocalRunShellCommand)` for a valid `run_shell_command` marker
+/// with a non-empty `command`. Anything else yields `None` so the caller knows
+/// to keep the line as prose.
+fn parse_dwarf_marker_line(line: &str) -> Option<LocalRunShellCommand> {
+    let json = dwarf_tool_call_json(line)?;
+    let marker: DwarfToolCallMarker = serde_json::from_str(json).ok()?;
+    if marker.kind != "run_shell_command" || marker.command.trim().is_empty() {
+        return None;
+    }
+    Some(LocalRunShellCommand {
+        command: marker.command.trim().to_string(),
+        is_read_only: marker.is_read_only.unwrap_or(true),
+        uses_pager: marker.uses_pager.unwrap_or(false),
+        is_risky: marker.is_risky.unwrap_or(false),
+        wait_until_complete: marker.wait_until_complete.unwrap_or(true),
+    })
+}
+
+/// Whole-string variant of the tool-call extractor — used by tests and as a
+/// reference implementation. The live streaming path now uses
+/// `StreamingToolCallFilter` directly so markers never reach the UI.
+#[allow(dead_code)]
 fn extract_dwarf_tool_calls(output_text: &str) -> (String, Vec<LocalRunShellCommand>) {
     // Fast path: no marker substring anywhere — return the input verbatim without
     // a second walk or any allocation beyond the (cheap) `to_owned`.
@@ -2273,6 +2402,66 @@ mod tests {
         assert_eq!(local_agent_timeout(), Duration::from_secs(42));
 
         env::remove_var(LOCAL_AGENT_TIMEOUT_ENV_VAR);
+    }
+
+    #[test]
+    fn streaming_filter_separates_markers_from_prose() {
+        let mut filter = StreamingToolCallFilter::default();
+        // Chunk 1: one prose line + start of a marker that crosses chunk boundary.
+        let r1 = filter.ingest("I'll inspect the repo.\nDWARF_TOOL_CALL {\"type");
+        assert_eq!(r1.text_chunks, vec!["I'll inspect the repo.\n".to_string()]);
+        assert!(r1.tool_calls.is_empty());
+
+        // Chunk 2: rest of the marker + start of another marker.
+        let r2 = filter.ingest("\":\"run_shell_command\",\"command\":\"ls -la\",\"is_read_only\":true}\nDWARF_TOOL_CALL {\"type\":\"run_shell_command\",\"command\":\"cat README.md\",\"is_read_only\":true}\n");
+        assert!(r2.text_chunks.is_empty(), "no prose between markers");
+        assert_eq!(r2.tool_calls.len(), 2);
+        assert_eq!(r2.tool_calls[0].command, "ls -la");
+        assert!(r2.tool_calls[0].is_read_only);
+        assert_eq!(r2.tool_calls[1].command, "cat README.md");
+
+        // Chunk 3: trailing prose with no markers.
+        let r3 = filter.ingest("Now I'll summarize what I found.");
+        assert!(
+            r3.text_chunks.is_empty(),
+            "no newline yet — incomplete line stays buffered"
+        );
+
+        // Flush — incomplete prose line emits as text.
+        let flushed = filter.flush();
+        assert_eq!(
+            flushed.text_chunks,
+            vec!["Now I'll summarize what I found.".to_string()]
+        );
+        assert!(flushed.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn streaming_filter_drops_partial_marker_on_flush() {
+        // The CLI exits mid-marker (network drop, kill, etc.). Don't expose a
+        // half-baked `DWARF_TOOL_CALL {"type` fragment to the user.
+        let mut filter = StreamingToolCallFilter::default();
+        filter.ingest("Some prose.\nDWARF_TOOL_CALL {\"type\":\"run_sh");
+        let flushed = filter.flush();
+        assert!(flushed.text_chunks.is_empty());
+        assert!(flushed.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn streaming_filter_handles_multiple_lines_in_one_chunk() {
+        let mut filter = StreamingToolCallFilter::default();
+        let r = filter.ingest(
+            "First line.\nSecond line.\nDWARF_TOOL_CALL {\"type\":\"run_shell_command\",\"command\":\"pwd\"}\nTrailing.",
+        );
+        assert_eq!(
+            r.text_chunks,
+            vec!["First line.\n".to_string(), "Second line.\n".to_string()]
+        );
+        assert_eq!(r.tool_calls.len(), 1);
+        assert_eq!(r.tool_calls[0].command, "pwd");
+
+        let flushed = filter.flush();
+        assert_eq!(flushed.text_chunks, vec!["Trailing.".to_string()]);
     }
 
     #[test]
