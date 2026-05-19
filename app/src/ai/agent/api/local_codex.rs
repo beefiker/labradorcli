@@ -690,10 +690,27 @@ fn run_codex_streaming(
 
         if status.success() {
             if !accumulator.has_emitted_any {
-                yield Err(format!(
-                    "{LOCAL_AGENT_DISPLAY_NAME} finished without an agent message.\n\n```text\n{}\n```",
-                    truncate(&stderr_buf, 4_000)
-                ));
+                // Codex completed cleanly but never produced an `agent_message`. Try the
+                // reasoning summaries (if any) as a fallback before failing — this is the
+                // common case for prompts that drive Codex into agent/tool mode where it
+                // thinks but never emits a user-facing message.
+                if !accumulator.reasoning_summaries.is_empty() {
+                    let summary = accumulator.reasoning_summaries.join("\n\n");
+                    yield Ok(format!(
+                        "_Codex finished without a final answer; surfacing reasoning summary instead._\n\n{summary}"
+                    ));
+                } else {
+                    log::warn!(
+                        "Codex finished without agent_message. Item types seen: {:?}. stderr: {}",
+                        accumulator.non_message_item_counts,
+                        truncate(&stderr_buf, 1_000)
+                    );
+                    yield Err(format!(
+                        "{LOCAL_AGENT_DISPLAY_NAME} finished without an agent message. Item types seen: {:?}.\n\n```text\n{}\n```",
+                        accumulator.non_message_item_counts,
+                        truncate(&stderr_buf, 4_000)
+                    ));
+                }
             }
         } else {
             yield Err(format!(
@@ -939,8 +956,9 @@ fn append_stderr(buf: &mut String, line: &str) {
     buf.push_str(line);
 }
 
-/// Codex emits JSONL events; we only care about agent_message items. Every other field
-/// is skipped by serde rather than being deserialized into a generic `Value` tree.
+/// Codex emits JSONL events; we mostly want `agent_message` items for the stream, but
+/// keep `reasoning` text + item-type counts on the side so we can surface something
+/// useful when the run finishes without ever producing an `agent_message`.
 #[derive(Debug, Deserialize)]
 struct CodexLine<'a> {
     #[serde(default, borrow)]
@@ -955,17 +973,32 @@ struct CodexItem<'a> {
     id: &'a str,
     #[serde(default, borrow)]
     text: &'a str,
+    /// Codex emits reasoning items as `{type: "reasoning", summary: "..."}`. We capture
+    /// `summary` so a Codex run that "thinks" but never produces an agent_message can
+    /// still surface its conclusion to the user instead of failing silently.
+    #[serde(default, borrow)]
+    summary: &'a str,
 }
 
 /// Tracks the latest text per Codex `item.id` and emits each line's bytes-not-
 /// previously-seen as a delta. The full accumulated text is owned by the caller
 /// (the streaming function in `generate_output`); this accumulator keeps only the
 /// minimum state needed to compute deltas — no duplicated emitted-total buffer.
+///
+/// Also records sideband state (reasoning summaries + count of non-message item
+/// types) so a run that finishes without ever producing an `agent_message` can
+/// still report something useful instead of failing silently.
 #[derive(Default)]
 struct CodexAccumulator {
     texts_by_id: HashMap<String, String>,
     last_message_id: Option<String>,
     has_emitted_any: bool,
+    /// Reasoning summaries collected from `{type: "reasoning"}` items. Surfaced as
+    /// a fallback response if no `agent_message` ever arrives.
+    reasoning_summaries: Vec<String>,
+    /// Count of item types we observed but didn't emit. Used to diagnose silent
+    /// "no agent message" failures from the log.
+    non_message_item_counts: HashMap<String, usize>,
 }
 
 impl CodexAccumulator {
@@ -973,6 +1006,16 @@ impl CodexAccumulator {
         let parsed: CodexLine = serde_json::from_str(line).ok()?;
         let item = parsed.item?;
         if item.kind != "agent_message" || item.id.is_empty() {
+            // Track sideband content + diagnostics.
+            if !item.kind.is_empty() && item.kind != "agent_message" {
+                *self
+                    .non_message_item_counts
+                    .entry(item.kind.to_string())
+                    .or_default() += 1;
+            }
+            if item.kind == "reasoning" && !item.summary.is_empty() {
+                self.reasoning_summaries.push(item.summary.to_string());
+            }
             return None;
         }
         let id = item.id;
@@ -2000,6 +2043,33 @@ mod tests {
             Some("\n\nworld".to_string())
         );
         assert!(acc.has_emitted_any);
+    }
+
+    #[test]
+    fn codex_accumulator_collects_reasoning_summaries_and_item_type_counts() {
+        let mut acc = CodexAccumulator::default();
+        // Codex emits some non-agent_message items (reasoning, tool_call, etc.) without
+        // ever producing an agent_message. We want to (a) skip them in the delta stream
+        // but (b) record them for diagnostics + fallback display.
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.completed","item":{"id":"r1","type":"reasoning","summary":"I'll check the model module."}}"#,
+                r#"{"type":"item.completed","item":{"id":"tool_0","type":"function_call","name":"read_file"}}"#,
+                r#"{"type":"item.completed","item":{"id":"r2","type":"reasoning","summary":"That file is large."}}"#,
+            ],
+        );
+        assert!(total.is_empty(), "deltas should not include sideband items");
+        assert!(!acc.has_emitted_any);
+        assert_eq!(
+            acc.reasoning_summaries,
+            vec![
+                "I'll check the model module.".to_string(),
+                "That file is large.".to_string(),
+            ]
+        );
+        assert_eq!(acc.non_message_item_counts.get("reasoning"), Some(&2));
+        assert_eq!(acc.non_message_item_counts.get("function_call"), Some(&1));
     }
 
     #[test]
