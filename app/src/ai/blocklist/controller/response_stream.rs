@@ -1,7 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
 use anyhow::anyhow;
-use chrono::{DateTime, Local, TimeDelta};
 use futures::channel::oneshot;
 use uuid::Uuid;
 use warp_multi_agent_api::response_event;
@@ -45,11 +44,7 @@ pub struct ResponseStream {
     id: ResponseStreamId,
     params: api::RequestParams,
     retry_count: usize,
-    start_time: DateTime<Local>,
-    time_to_latest_event: TimeDelta,
     cancellation_tx: Option<oneshot::Sender<()>>,
-    /// Store the original error for telemetry when retries succeed
-    original_error: Option<String>,
     /// Track whether we've received any client actions
     /// If true, we cannot retry on subsequent errors since actions may have been executed
     has_received_client_actions: bool,
@@ -86,27 +81,24 @@ impl ResponseStream {
     ) -> Self {
         let server_api = ServerApiProvider::as_ref(ctx).get();
         let (cancellation_tx, cancellation_rx) = oneshot::channel();
-        let start_time = Local::now();
 
         let request_id = Uuid::new_v4();
-        let params_clone = params.clone();
-        let _ =
-            ctx.spawn(
-                async move {
-                    generate_multi_agent_output(server_api, params_clone, cancellation_rx).await
-                },
-                move |me, stream, ctx| {
-                    me.handle_response_stream_result(request_id, stream, ctx);
-                },
-            );
+        // Clone once for the spawned request future; the owned `params` is moved into `self`
+        // below so we can rebuild a retry request without going through the caller.
+        let params_for_request = params.clone();
+        let _ = ctx.spawn(
+            async move {
+                generate_multi_agent_output(server_api, params_for_request, cancellation_rx).await
+            },
+            move |me, stream, ctx| {
+                me.handle_response_stream_result(request_id, stream, ctx);
+            },
+        );
         Self {
             id: ResponseStreamId(Uuid::new_v4().to_string()),
-            params: params.clone(),
-            start_time,
-            time_to_latest_event: TimeDelta::seconds(0),
+            params,
             cancellation_tx: Some(cancellation_tx),
             retry_count: 0,
-            original_error: None,
             has_received_client_actions: false,
             ai_identifiers,
             can_attempt_resume_on_error,
@@ -208,7 +200,6 @@ impl ResponseStream {
         if self.current_request_id.is_none_or(|id| id != request_id) {
             return;
         }
-        self.time_to_latest_event = Local::now().signed_duration_since(self.start_time);
 
         match &event {
             Ok(response_event) => {
@@ -225,29 +216,15 @@ impl ResponseStream {
                             // Mark that we've received client actions
                             self.has_received_client_actions = true;
                         }
-                        warp_multi_agent_api::response_event::Type::Finished(finished_event) => {
-                            // Emit retry success telemetry on successful completion
-                            if matches!(
-                                finished_event.reason,
-                                Some(warp_multi_agent_api::response_event::stream_finished::Reason::Done(_)) | None
-                            ) {
-                                // Emit retry success telemetry if this was a successful completion after retries
-                                if self.retry_count > 0 {
-                                    if let Some(_original_error) = &self.original_error {
-                                    }
-                                }
-                            }
+                        warp_multi_agent_api::response_event::Type::Finished(_) => {
+                            // Retry-success telemetry was emitted from here previously; the
+                            // emitter is now empty so there's nothing to dispatch on completion.
                         }
                     }
                 }
                 ctx.emit(ResponseStreamEvent::ReceivedEvent(Consumable::new(event)));
             }
             Err(e) => {
-                // Store original error if this is the first error
-                if self.retry_count == 0 {
-                    self.original_error = Some(format!("{e:?}"));
-                }
-
                 // Only retry if:
                 // 1. We haven't received any client actions yet (this is the first event or only init events)
                 // 2. The error is retryable
