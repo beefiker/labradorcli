@@ -1,7 +1,9 @@
 use std::{
+    collections::HashMap,
     env,
     path::{Path, PathBuf},
     process::{Command as StdCommand, Stdio},
+    sync::OnceLock,
 };
 
 use ai::{local_claude_auth, local_openai_auth};
@@ -149,7 +151,7 @@ fn is_defaultish_model_for_runtime(model: &str, runtime: LocalAgentRuntime) -> b
 
 pub(super) async fn generate_output(
     params: RequestParams,
-    _cancellation_rx: futures::channel::oneshot::Receiver<()>,
+    cancellation_rx: futures::channel::oneshot::Receiver<()>,
 ) -> Result<ResponseStream, ConvertToAPITypeError> {
     let runtime = runtime_for_request(&params);
     let request_id = format!("local-{}-request-{}", runtime.slug(), Uuid::new_v4());
@@ -170,7 +172,8 @@ pub(super) async fn generate_output(
         .map(str::to_string);
 
     // Fast path: when we can synthesize the tool call from the prompt alone, skip the CLI roundtrip
-    // and emit the whole exchange in one shot — there's nothing to stream.
+    // and emit the whole exchange in one shot — there's nothing to stream, so cancellation_rx is
+    // unused on this branch (drops at end of scope).
     if let Some(tool_call) = direct_terminal_tool_call(&params.input, working_directory.as_deref())
     {
         let output_text = if tool_call.command.starts_with("target=$(mdfind ") {
@@ -190,11 +193,34 @@ pub(super) async fn generate_output(
         ))));
     }
 
-    // Streaming path: emit init + (optional) CreateTask + seed AddMessagesToTask with an empty
-    // AgentOutput, then drive the CLI and forward text deltas as AppendToMessageContent events.
+    // Streaming path: compute model + prompt, build the runtime-specific delta stream once,
+    // then move everything (including the user input) into the response-event stream by value —
+    // no `params.input.clone()` just to satisfy a borrow.
     let message_id = format!("local-{}-message-{}", runtime.slug(), Uuid::new_v4());
-    let inputs = params.input.clone();
+    let (model, prompt) = match runtime {
+        LocalAgentRuntime::Codex => {
+            let m = model_for_codex(&params);
+            let p = prompt_for_local_agent(&params, runtime, m.as_deref());
+            (m, p)
+        }
+        LocalAgentRuntime::Claude => {
+            let m = model_for_claude(&params);
+            let p = prompt_for_local_agent(&params, runtime, m.as_deref());
+            (m, p)
+        }
+    };
+    let delta_stream: std::pin::Pin<Box<dyn Stream<Item = Result<String, String>> + Send>> =
+        match runtime {
+            LocalAgentRuntime::Codex => {
+                Box::pin(run_codex_streaming(prompt, working_directory.clone(), model))
+            }
+            LocalAgentRuntime::Claude => {
+                Box::pin(run_claude_streaming(prompt, working_directory.clone(), model))
+            }
+        };
+    let inputs = params.input;
     let stream = async_stream::stream! {
+        let mut delta_stream = delta_stream;
         yield Ok(init_event(conversation_id, request_id.clone()));
         if needs_create_task {
             yield Ok(client_actions_event(vec![api::ClientAction {
@@ -235,38 +261,21 @@ pub(super) async fn generate_output(
         }]));
 
         let mut full_text = String::new();
-        let mut delta_stream: std::pin::Pin<Box<dyn Stream<Item = Result<String, String>> + Send>> =
-            match runtime {
-                LocalAgentRuntime::Codex => {
-                    let model = model_for_codex(&params);
-                    let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
-                    Box::pin(run_codex_streaming(
-                        prompt,
-                        working_directory.clone(),
-                        model,
-                    ))
-                }
-                LocalAgentRuntime::Claude => {
-                    let model = model_for_claude(&params);
-                    let prompt = prompt_for_local_agent(&params, runtime, model.as_deref());
-                    Box::pin(run_claude_streaming(
-                        prompt,
-                        working_directory.clone(),
-                        model,
-                    ))
-                }
-            };
 
-        while let Some(item) = delta_stream.next().await {
-            match item {
-                Ok(chunk) => {
+        let mut cancellation_rx = cancellation_rx;
+        let mut was_cancelled = false;
+        loop {
+            let next_fut = delta_stream.next();
+            futures::pin_mut!(next_fut);
+            match futures::future::select(next_fut, &mut cancellation_rx).await {
+                futures::future::Either::Left((Some(Ok(chunk)), _)) => {
                     if chunk.is_empty() {
                         continue;
                     }
                     full_text.push_str(&chunk);
                     yield Ok(append_agent_text_event(&task_id, &message_id, chunk));
                 }
-                Err(error) => {
+                futures::future::Either::Left((Some(Err(error)), _)) => {
                     log::warn!("Local agent CLI error: {error}");
                     full_text = error.clone();
                     yield Ok(replace_agent_text_event(
@@ -277,7 +286,33 @@ pub(super) async fn generate_output(
                     ));
                     break;
                 }
+                futures::future::Either::Left((None, _)) => break,
+                futures::future::Either::Right(_) => {
+                    was_cancelled = true;
+                    // Drop the delta stream — its child was spawned with kill_on_drop, so the
+                    // CLI subprocess is signalled now instead of running to natural completion.
+                    drop(delta_stream);
+                    break;
+                }
             }
+        }
+
+        if was_cancelled {
+            // Surface cancellation as a replace so the user sees the partial response was
+            // intentionally stopped (instead of just ending mid-token).
+            let suffix = if full_text.is_empty() {
+                "_Request cancelled._".to_string()
+            } else {
+                format!("{full_text}\n\n_Request cancelled._")
+            };
+            yield Ok(replace_agent_text_event(
+                &task_id,
+                &request_id,
+                &message_id,
+                suffix,
+            ));
+            yield Ok(finished_event());
+            return;
         }
 
         // Post-process: pull out DWARF_TOOL_CALL markers and any cwd-change tool call.
@@ -604,37 +639,31 @@ fn run_codex_streaming(
         let stdout = child.stdout.take().expect("stdout was piped");
         let stderr = child.stderr.take().expect("stderr was piped");
         let stdout_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::new(stdout)
+            BufReader::with_capacity(LINE_READER_BUF_BYTES, stdout)
                 .lines()
                 .filter_map(|r| r.ok().map(MergedLine::Stdout)),
         );
         let stderr_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::new(stderr)
+            BufReader::with_capacity(LINE_READER_BUF_BYTES, stderr)
                 .lines()
                 .filter_map(|r| r.ok().map(MergedLine::Stderr)),
         );
         let mut merged = futures::stream::select(stdout_stream, stderr_stream);
 
-        let mut messages_in_order: Vec<(String, String)> = Vec::new();
-        let mut emitted_total = String::new();
+        let mut accumulator = CodexAccumulator::default();
         let mut stderr_buf = String::new();
 
         while let Some(line) = merged.next().await {
             match line {
                 MergedLine::Stdout(line) => {
-                    if let Some(delta) =
-                        ingest_codex_line(&line, &mut messages_in_order, &mut emitted_total)
-                    {
+                    if let Some(delta) = accumulator.ingest_line(&line) {
                         if !delta.is_empty() {
                             yield Ok(delta);
                         }
                     }
                 }
                 MergedLine::Stderr(line) => {
-                    if !stderr_buf.is_empty() {
-                        stderr_buf.push('\n');
-                    }
-                    stderr_buf.push_str(&line);
+                    append_stderr(&mut stderr_buf, &line);
                 }
             }
         }
@@ -650,7 +679,7 @@ fn run_codex_streaming(
         };
 
         if status.success() {
-            if emitted_total.is_empty() {
+            if !accumulator.has_emitted_any {
                 yield Err(format!(
                     "{LOCAL_AGENT_DISPLAY_NAME} finished without an agent message.\n\n```text\n{}\n```",
                     truncate(&stderr_buf, 4_000)
@@ -778,39 +807,31 @@ fn run_claude_streaming(
         let stdout = child.stdout.take().expect("stdout was piped");
         let stderr = child.stderr.take().expect("stderr was piped");
         let stdout_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::new(stdout)
+            BufReader::with_capacity(LINE_READER_BUF_BYTES, stdout)
                 .lines()
                 .filter_map(|r| r.ok().map(MergedLine::Stdout)),
         );
         let stderr_stream: std::pin::Pin<Box<dyn Stream<Item = MergedLine> + Send>> = Box::pin(
-            BufReader::new(stderr)
+            BufReader::with_capacity(LINE_READER_BUF_BYTES, stderr)
                 .lines()
                 .filter_map(|r| r.ok().map(MergedLine::Stderr)),
         );
         let mut merged = futures::stream::select(stdout_stream, stderr_stream);
 
-        let mut assistant_chunks: Vec<String> = Vec::new();
-        let mut emitted_total = String::new();
+        let mut accumulator = ClaudeAccumulator::default();
         let mut stderr_buf = String::new();
 
         while let Some(line) = merged.next().await {
             match line {
                 MergedLine::Stdout(line) => {
-                    if let Some(delta) = ingest_claude_line(
-                        &line,
-                        &mut assistant_chunks,
-                        &mut emitted_total,
-                    ) {
+                    if let Some(delta) = accumulator.ingest_line(&line) {
                         if !delta.is_empty() {
                             yield Ok(delta);
                         }
                     }
                 }
                 MergedLine::Stderr(line) => {
-                    if !stderr_buf.is_empty() {
-                        stderr_buf.push('\n');
-                    }
-                    stderr_buf.push_str(&line);
+                    append_stderr(&mut stderr_buf, &line);
                 }
             }
         }
@@ -826,7 +847,7 @@ fn run_claude_streaming(
         };
 
         if status.success() {
-            if emitted_total.is_empty() {
+            if !accumulator.has_emitted_any {
                 yield Err(format!(
                     "{LOCAL_AGENT_DISPLAY_NAME} finished without a Claude Code message.\n\n```text\n{}\n```",
                     truncate(&stderr_buf, 4_000)
@@ -847,83 +868,185 @@ enum MergedLine {
     Stderr(String),
 }
 
-fn ingest_codex_line(
-    line: &str,
-    messages_in_order: &mut Vec<(String, String)>,
-    emitted_total: &mut String,
-) -> Option<String> {
-    let value: Value = serde_json::from_str(line).ok()?;
-    let item = value.get("item")?;
-    if item.get("type")?.as_str()? != "agent_message" {
-        return None;
+/// Stop growing stderr beyond this cap. The trailing error message is `truncate`d
+/// to 4 000 chars anyway, so anything past ~8 KB is retained memory we never use.
+const STDERR_CAP_BYTES: usize = 8 * 1024;
+
+/// `BufReader` line buffer capacity. Both CLIs emit JSON lines that can exceed the
+/// default 8 KB (Claude `--verbose` emits a ~3-5 KB `system.init` line full of MCP
+/// tool descriptors; long Codex tool-call lines can exceed it too). Starting at 64 KB
+/// avoids the per-oversize-line resize cost.
+const LINE_READER_BUF_BYTES: usize = 64 * 1024;
+
+fn append_stderr(buf: &mut String, line: &str) {
+    if buf.len() >= STDERR_CAP_BYTES {
+        return;
     }
-    let id = item.get("id")?.as_str()?.to_string();
-    let text = item.get("text")?.as_str()?.to_string();
-    if let Some(entry) = messages_in_order.iter_mut().find(|(eid, _)| eid == &id) {
-        entry.1 = text;
-    } else {
-        messages_in_order.push((id, text));
+    if !buf.is_empty() {
+        buf.push('\n');
     }
-    let running = messages_in_order
-        .iter()
-        .map(|(_, t)| t.as_str())
-        .collect::<Vec<_>>()
-        .join("\n\n");
-    if running.len() > emitted_total.len() && running.starts_with(&*emitted_total) {
-        let delta = running[emitted_total.len()..].to_string();
-        *emitted_total = running;
+    buf.push_str(line);
+}
+
+/// Codex emits JSONL events; we only care about agent_message items. Every other field
+/// is skipped by serde rather than being deserialized into a generic `Value` tree.
+#[derive(Debug, Deserialize)]
+struct CodexLine<'a> {
+    #[serde(default, borrow)]
+    item: Option<CodexItem<'a>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexItem<'a> {
+    #[serde(rename = "type", default, borrow)]
+    kind: &'a str,
+    #[serde(default, borrow)]
+    id: &'a str,
+    #[serde(default, borrow)]
+    text: &'a str,
+}
+
+/// Tracks the latest text per Codex `item.id` and emits each line's bytes-not-
+/// previously-seen as a delta. The full accumulated text is owned by the caller
+/// (the streaming function in `generate_output`); this accumulator keeps only the
+/// minimum state needed to compute deltas — no duplicated emitted-total buffer.
+#[derive(Default)]
+struct CodexAccumulator {
+    texts_by_id: HashMap<String, String>,
+    last_message_id: Option<String>,
+    has_emitted_any: bool,
+}
+
+impl CodexAccumulator {
+    fn ingest_line(&mut self, line: &str) -> Option<String> {
+        let parsed: CodexLine = serde_json::from_str(line).ok()?;
+        let item = parsed.item?;
+        if item.kind != "agent_message" || item.id.is_empty() {
+            return None;
+        }
+        let id = item.id;
+        let new_text = item.text;
+
+        // Continuation of the most recently seen message: emit the suffix only.
+        // Codex's typical pattern is `item.started` → many `item.updated` → `item.completed`
+        // for the same id, with text growing monotonically.
+        let is_continuation = self.last_message_id.as_deref() == Some(id);
+        if is_continuation {
+            let prev = self
+                .texts_by_id
+                .get(id)
+                .map(String::as_str)
+                .unwrap_or_default();
+            if new_text == prev {
+                return None;
+            }
+            if new_text.starts_with(prev) {
+                let delta = new_text[prev.len()..].to_string();
+                self.texts_by_id.insert(id.to_string(), new_text.to_string());
+                self.has_emitted_any = true;
+                return Some(delta);
+            }
+            // Non-monotonic update on the last message (Codex retracted or replaced text).
+            // Fall through to the new-message path and emit it as a fresh emission.
+        }
+
+        // First time seeing this message id (or a non-monotonic replace).
+        let already_seen = self.texts_by_id.contains_key(id);
+        self.texts_by_id.insert(id.to_string(), new_text.to_string());
+        self.last_message_id = Some(id.to_string());
+
+        if already_seen && !is_continuation {
+            // An older (non-last) message got updated. Don't try to splice the bytes
+            // back into the user-visible stream — the original delta is already sent.
+            return None;
+        }
+
+        let sep = if self.has_emitted_any { "\n\n" } else { "" };
+        let delta = format!("{sep}{new_text}");
+        if delta.is_empty() {
+            return None;
+        }
+        self.has_emitted_any = true;
         Some(delta)
-    } else {
-        None
     }
 }
 
-fn ingest_claude_line(
-    line: &str,
-    assistant_chunks: &mut Vec<String>,
-    emitted_total: &mut String,
-) -> Option<String> {
-    let value: Value = serde_json::from_str(line).ok()?;
-    let event_type = value.get("type")?.as_str()?;
-    let text: String = match event_type {
-        "assistant" => {
-            let content = value.get("message")?.get("content")?.as_array()?;
-            content
-                .iter()
-                .filter_map(|c| c.get("text").and_then(Value::as_str))
+/// Claude `--output-format stream-json` events. We only care about `assistant` and
+/// `result` event types; everything else is silently dropped.
+#[derive(Debug, Deserialize)]
+struct ClaudeLine<'a> {
+    #[serde(rename = "type", default, borrow)]
+    kind: &'a str,
+    #[serde(default)]
+    message: Option<ClaudeMessage>,
+    #[serde(default, borrow)]
+    result: Option<&'a str>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeMessage {
+    #[serde(default)]
+    content: Vec<ClaudeContent>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeContent {
+    #[serde(default)]
+    text: Option<String>,
+}
+
+/// Each `assistant` event represents one full assistant turn; we append them in order
+/// joined by `"\n\n"`. The result event is used only as a fallback if no `assistant`
+/// events fired (older Claude Code CLI versions).
+#[derive(Default)]
+struct ClaudeAccumulator {
+    has_emitted_any: bool,
+}
+
+impl ClaudeAccumulator {
+    fn ingest_line(&mut self, line: &str) -> Option<String> {
+        let parsed: ClaudeLine = serde_json::from_str(line).ok()?;
+        let text: String = match parsed.kind {
+            "assistant" => parsed
+                .message?
+                .content
+                .into_iter()
+                .filter_map(|c| c.text)
                 .collect::<Vec<_>>()
-                .join("")
+                .join(""),
+            "result" if !self.has_emitted_any => parsed.result?.to_string(),
+            _ => return None,
+        };
+        if text.is_empty() {
+            return None;
         }
-        "result" if assistant_chunks.is_empty() => value
-            .get("result")
-            .and_then(Value::as_str)?
-            .to_string(),
-        _ => return None,
-    };
-    if text.is_empty() {
-        return None;
-    }
-    assistant_chunks.push(text);
-    let running = assistant_chunks.join("\n\n");
-    if running.len() > emitted_total.len() && running.starts_with(&*emitted_total) {
-        let delta = running[emitted_total.len()..].to_string();
-        *emitted_total = running;
+        let sep = if self.has_emitted_any { "\n\n" } else { "" };
+        let delta = format!("{sep}{text}");
+        self.has_emitted_any = true;
         Some(delta)
-    } else {
-        None
     }
 }
 
 fn codex_bin() -> String {
-    configured_codex_bin()
-        .or_else(find_codex_bin)
-        .unwrap_or_else(|| "codex".to_string())
+    if let Some(configured) = configured_codex_bin() {
+        // Env-var override is intentionally re-read every call so users can rebind
+        // without restart. Cheap (just an env lookup), unlike the shell resolver.
+        return configured;
+    }
+    static CACHED: OnceLock<String> = OnceLock::new();
+    CACHED
+        .get_or_init(|| find_codex_bin().unwrap_or_else(|| "codex".to_string()))
+        .clone()
 }
 
 fn claude_bin() -> String {
-    configured_claude_bin()
-        .or_else(find_claude_bin)
-        .unwrap_or_else(|| "claude".to_string())
+    if let Some(configured) = configured_claude_bin() {
+        return configured;
+    }
+    static CACHED: OnceLock<String> = OnceLock::new();
+    CACHED
+        .get_or_init(|| find_claude_bin().unwrap_or_else(|| "claude".to_string()))
+        .clone()
 }
 
 fn configured_codex_bin() -> Option<String> {
@@ -1804,74 +1927,142 @@ mod tests {
         assert_eq!(agent_output_text(&replaced), "replaced");
     }
 
+    fn drive_codex(acc: &mut CodexAccumulator, lines: &[&str]) -> String {
+        let mut total = String::new();
+        for line in lines {
+            if let Some(delta) = acc.ingest_line(line) {
+                total.push_str(&delta);
+            }
+        }
+        total
+    }
+
+    fn drive_claude(acc: &mut ClaudeAccumulator, lines: &[&str]) -> String {
+        let mut total = String::new();
+        for line in lines {
+            if let Some(delta) = acc.ingest_line(line) {
+                total.push_str(&delta);
+            }
+        }
+        total
+    }
+
     #[test]
     fn ingests_codex_agent_message_jsonl_deltas() {
-        let mut messages: Vec<(String, String)> = Vec::new();
-        let mut emitted = String::new();
+        let mut acc = CodexAccumulator::default();
         assert_eq!(
-            ingest_codex_line(
-                r#"{"type":"thread.started","thread_id":"t"}"#,
-                &mut messages,
-                &mut emitted,
-            ),
+            acc.ingest_line(r#"{"type":"thread.started","thread_id":"t"}"#),
             None
         );
         assert_eq!(
-            ingest_codex_line(
+            acc.ingest_line(
                 r#"{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"hel"}}"#,
-                &mut messages,
-                &mut emitted,
             ),
             Some("hel".to_string())
         );
         assert_eq!(
-            ingest_codex_line(
+            acc.ingest_line(
                 r#"{"type":"item.updated","item":{"id":"item_0","type":"agent_message","text":"hello"}}"#,
-                &mut messages,
-                &mut emitted,
             ),
             Some("lo".to_string())
         );
         assert_eq!(
-            ingest_codex_line(
+            acc.ingest_line(
                 r#"{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"world"}}"#,
-                &mut messages,
-                &mut emitted,
             ),
             Some("\n\nworld".to_string())
         );
-        assert_eq!(emitted, "hello\n\nworld");
+        assert!(acc.has_emitted_any);
+    }
+
+    #[test]
+    fn codex_accumulator_skips_non_agent_items() {
+        let mut acc = CodexAccumulator::default();
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.completed","item":{"id":"tool_0","type":"tool_call","name":"shell"}}"#,
+            ],
+        );
+        assert!(total.is_empty());
+        assert!(!acc.has_emitted_any);
+        assert!(acc.texts_by_id.is_empty());
+    }
+
+    #[test]
+    fn codex_accumulator_ignores_no_op_updates() {
+        let mut acc = CodexAccumulator::default();
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.started","item":{"id":"m1","type":"agent_message","text":"hello"}}"#,
+                r#"{"type":"item.completed","item":{"id":"m1","type":"agent_message","text":"hello"}}"#,
+            ],
+        );
+        assert_eq!(total, "hello");
+    }
+
+    #[test]
+    fn codex_accumulator_two_messages_in_sequence() {
+        let mut acc = CodexAccumulator::default();
+        let total = drive_codex(
+            &mut acc,
+            &[
+                r#"{"type":"item.completed","item":{"id":"m1","type":"agent_message","text":"first"}}"#,
+                r#"{"type":"item.completed","item":{"id":"m2","type":"agent_message","text":"second"}}"#,
+            ],
+        );
+        assert_eq!(total, "first\n\nsecond");
     }
 
     #[test]
     fn ingests_claude_stream_json_deltas() {
-        let mut chunks: Vec<String> = Vec::new();
-        let mut emitted = String::new();
-        assert_eq!(
-            ingest_claude_line(
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
                 r#"{"type":"system","subtype":"init"}"#,
-                &mut chunks,
-                &mut emitted,
-            ),
-            None
-        );
-        assert_eq!(
-            ingest_claude_line(
                 r#"{"type":"assistant","message":{"content":[{"type":"text","text":"hello"}]}}"#,
-                &mut chunks,
-                &mut emitted,
-            ),
-            Some("hello".to_string())
-        );
-        assert_eq!(
-            ingest_claude_line(
                 r#"{"type":"assistant","message":{"content":[{"type":"text","text":"world"}]}}"#,
-                &mut chunks,
-                &mut emitted,
-            ),
-            Some("\n\nworld".to_string())
+            ],
         );
-        assert_eq!(emitted, "hello\n\nworld");
+        assert_eq!(total, "hello\n\nworld");
+    }
+
+    #[test]
+    fn claude_accumulator_falls_back_to_result_when_no_assistant_event() {
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"system","subtype":"init"}"#,
+                r#"{"type":"result","result":"final answer"}"#,
+            ],
+        );
+        assert_eq!(total, "final answer");
+    }
+
+    #[test]
+    fn claude_accumulator_skips_result_when_assistant_already_streamed() {
+        let mut acc = ClaudeAccumulator::default();
+        let total = drive_claude(
+            &mut acc,
+            &[
+                r#"{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}"#,
+                r#"{"type":"result","result":"hi"}"#,
+            ],
+        );
+        assert_eq!(total, "hi");
+    }
+
+    #[test]
+    fn stderr_cap_is_enforced() {
+        let mut buf = String::new();
+        // Push enough lines to overrun the cap; assert we don't grow without bound.
+        for i in 0..1_000 {
+            append_stderr(&mut buf, &format!("error line {i:04}: blah blah blah"));
+        }
+        assert!(buf.len() <= STDERR_CAP_BYTES + 64); // small overshoot from final line
     }
 
     #[test]
