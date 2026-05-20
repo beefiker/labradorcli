@@ -1,4 +1,5 @@
 use super::*;
+use crate::channel::ChannelState;
 use settings_page::MatchData;
 
 // ── SettingsSection classification ──────────────────────────────────────────
@@ -164,7 +165,10 @@ fn match_data_countable_zero_is_not_truthy() {
 
 #[test]
 fn subpage_display_names_are_correct() {
-    assert_eq!(SettingsSection::WarpAgent.to_string(), "Dwarf Agent");
+    assert_eq!(
+        SettingsSection::WarpAgent.to_string(),
+        ChannelState::app_name_agent()
+    );
     assert_eq!(SettingsSection::AgentProfiles.to_string(), "Profiles");
     assert_eq!(SettingsSection::AgentMCPServers.to_string(), "MCP servers");
     assert_eq!(SettingsSection::Knowledge.to_string(), "Knowledge");
@@ -188,9 +192,9 @@ fn subpage_display_names_are_correct() {
 
 #[test]
 fn subpage_from_str_parses_display_names() {
-    // Dwarf Agent resolves to SettingsSection::WarpAgent after the local rename.
+    let agent_section_name = ChannelState::app_name_agent();
     assert_eq!(
-        SettingsSection::from_str("Dwarf Agent"),
+        SettingsSection::from_str(&agent_section_name),
         Ok(SettingsSection::WarpAgent)
     );
     assert_eq!(

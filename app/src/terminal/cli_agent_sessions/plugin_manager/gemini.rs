@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use serde_json::Value;
+use warp_core::channel::ChannelState;
 
 use super::{
     compare_versions, run_cli_command_logged, CliAgentPluginManager, PluginInstallError,
@@ -106,12 +107,18 @@ impl CliAgentPluginManager for GeminiPluginManager {
         Ok(())
     }
 
-    fn install_success_message(&self) -> &'static str {
-        "Dwarf plugin installed. Please restart Gemini CLI to activate."
+    fn install_success_message(&self) -> String {
+        format!(
+            "{} plugin installed. Please restart Gemini CLI to activate.",
+            ChannelState::app_name_display()
+        )
     }
 
-    fn update_success_message(&self) -> &'static str {
-        "Dwarf plugin updated. Please restart Gemini CLI to activate."
+    fn update_success_message(&self) -> String {
+        format!(
+            "{} plugin updated. Please restart Gemini CLI to activate.",
+            ChannelState::app_name_display()
+        )
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
@@ -124,10 +131,13 @@ impl CliAgentPluginManager for GeminiPluginManager {
 }
 
 static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
-    title: "Install Warp Plugin for Gemini CLI",
-    subtitle: "Run the following command, then restart Gemini CLI.",
+    title: format!(
+        "Install {} Plugin for Gemini CLI",
+        ChannelState::app_name_display()
+    ),
+    subtitle: "Run the following command, then restart Gemini CLI.".to_string(),
     steps: &[PluginInstructionStep {
-        description: "Install the Dwarf extension",
+        description: "Install the app extension",
         command:
             "gemini extensions install https://github.com/warpdotdev/gemini-cli-warp --consent",
         executable: true,
@@ -137,10 +147,13 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plu
 });
 
 static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
-    title: "Update Warp Plugin for Gemini CLI",
-    subtitle: "Run the following command, then restart Gemini CLI.",
+    title: format!(
+        "Update {} Plugin for Gemini CLI",
+        ChannelState::app_name_display()
+    ),
+    subtitle: "Run the following command, then restart Gemini CLI.".to_string(),
     steps: &[PluginInstructionStep {
-        description: "Update the Dwarf extension",
+        description: "Update the app extension",
         command: "gemini extensions update gemini-warp",
         executable: true,
         link: None,

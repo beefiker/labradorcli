@@ -29,7 +29,12 @@ pub async fn fetch_channel_versions(
     let channel_versions = server_api
         .fetch_channel_versions(include_changelogs, is_daily)
         .await
-        .context("Failed to retrieve channel versions from Warp server");
+        .with_context(|| {
+            format!(
+                "Failed to retrieve channel versions from {} server",
+                ChannelState::app_name_display()
+            )
+        });
     match channel_versions {
         channel_versions @ Ok(_) => channel_versions,
         Err(err) => {
@@ -39,8 +44,9 @@ pub async fn fetch_channel_versions(
                 // our Sentry logs).
                 Channel::Dev | Channel::Preview => report_error!(err),
                 _ => log::warn!(
-                    "Failed to retrieve channel versions from Warp server, falling \
-                back to GCP JSON storage."
+                    "Failed to retrieve channel versions from {} server, falling \
+                back to GCP JSON storage.",
+                    ChannelState::app_name_display()
                 ),
             }
             fetch_channel_versions_from_json_storage(server_api.http_client(), nonce).await

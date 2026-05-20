@@ -14,6 +14,7 @@ use crate::ui_components::icon_with_status::{
     render_icon_with_status, IconWithStatusSizing, IconWithStatusVariant,
 };
 use crate::workspace::view::vertical_tabs::telemetry::VerticalTabsChipEntrypoint;
+use crate::ChannelState;
 use crate::FeatureFlag;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -2888,7 +2889,7 @@ fn terminal_kind_badge_label(is_oz_agent: bool, cli_agent: Option<CLIAgent>) -> 
     if let Some(cli_agent) = cli_agent {
         cli_agent.display_name().to_string()
     } else if is_oz_agent {
-        "Dwarf".to_string()
+        ChannelState::app_name_display().to_string()
     } else {
         "Terminal".to_string()
     }
@@ -5739,4 +5740,3 @@ impl Workspace {
         render_vertical_tabs_panel(&self.vertical_tabs_panel, self, side, app)
     }
 }
-

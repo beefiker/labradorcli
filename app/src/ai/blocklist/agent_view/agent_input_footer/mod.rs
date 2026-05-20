@@ -22,7 +22,7 @@ use crate::{
     },
     features::FeatureFlag,
     network::NetworkStatus,
-        server::telemetry::PluginChipTelemetryKind,
+    server::telemetry::PluginChipTelemetryKind,
     settings::{AISettings, AISettingsChangedEvent},
     settings_view::SettingsSection,
     terminal::{
@@ -78,6 +78,7 @@ use tokio::fs;
 use voice_input::{StartListeningError, VoiceSessionResult};
 
 use warp_core::{
+    channel::ChannelState,
     report_if_error,
     ui::{
         color::{blend::Blend, contrast::MinimumAllowedContrast, ContrastingColor},
@@ -372,11 +373,12 @@ impl AgentInputFooter {
         });
 
         let install_plugin_button = ctx.add_typed_action_view(|_ctx| {
+            let app_name = ChannelState::app_name_display();
             ActionButton::new("Enable notifications", InstallPluginButtonTheme)
                 .with_icon(Icon::Download)
-                .with_tooltip(
-                    "Install the Dwarf plugin to enable rich agent notifications within Dwarf",
-                )
+                .with_tooltip(format!(
+                    "Install the {app_name} plugin to enable rich agent notifications within {app_name}",
+                ))
                 .with_size(cli_button_size)
                 .with_tooltip_alignment(TooltipAlignment::Left)
                 .with_adjoined_side(AdjoinedSide::Right)
@@ -388,7 +390,10 @@ impl AgentInputFooter {
         let plugin_instructions_button = ctx.add_typed_action_view(|_ctx| {
             ActionButton::new("Notifications setup instructions", InstallPluginButtonTheme)
                 .with_icon(Icon::Info)
-                .with_tooltip("View instructions to install the Dwarf plugin")
+                .with_tooltip(format!(
+                    "View instructions to install the {} plugin",
+                    ChannelState::app_name_display()
+                ))
                 .with_size(cli_button_size)
                 .with_tooltip_alignment(TooltipAlignment::Left)
                 .with_adjoined_side(AdjoinedSide::Right)
@@ -400,21 +405,30 @@ impl AgentInputFooter {
         });
 
         let update_plugin_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Update Dwarf plugin", InstallPluginButtonTheme)
-                .with_icon(Icon::Download)
-                .with_tooltip("A new version of the Dwarf plugin is available")
-                .with_size(cli_button_size)
-                .with_tooltip_alignment(TooltipAlignment::Left)
-                .with_adjoined_side(AdjoinedSide::Right)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AgentInputFooterAction::UpdatePlugin);
-                })
+            ActionButton::new(
+                format!("Update {} plugin", ChannelState::app_name_display()),
+                InstallPluginButtonTheme,
+            )
+            .with_icon(Icon::Download)
+            .with_tooltip(format!(
+                "A new version of the {} plugin is available",
+                ChannelState::app_name_display()
+            ))
+            .with_size(cli_button_size)
+            .with_tooltip_alignment(TooltipAlignment::Left)
+            .with_adjoined_side(AdjoinedSide::Right)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(AgentInputFooterAction::UpdatePlugin);
+            })
         });
 
         let update_instructions_button = ctx.add_typed_action_view(|_ctx| {
             ActionButton::new("Plugin update instructions", InstallPluginButtonTheme)
                 .with_icon(Icon::Info)
-                .with_tooltip("View instructions to update the Dwarf plugin")
+                .with_tooltip(format!(
+                    "View instructions to update the {} plugin",
+                    ChannelState::app_name_display()
+                ))
                 .with_size(cli_button_size)
                 .with_tooltip_alignment(TooltipAlignment::Left)
                 .with_adjoined_side(AdjoinedSide::Right)
@@ -961,9 +975,9 @@ impl AgentInputFooter {
     #[cfg(not(target_family = "wasm"))]
     fn handle_plugin_operation<F, Fut>(
         &mut self,
-        progress_toast: &str,
-        error_label: &str,
-        success_toast: &str,
+        progress_toast: String,
+        error_label: String,
+        success_toast: String,
         _operation_kind: PluginChipTelemetryKind,
         operation: F,
         ctx: &mut ViewContext<Self>,
@@ -1022,16 +1036,13 @@ impl AgentInputFooter {
 
         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
             toast_stack.add_persistent_toast(
-                DismissibleToast::default(progress_toast.to_owned())
-                    .with_object_id(toast_id.clone()),
+                DismissibleToast::default(progress_toast).with_object_id(toast_id.clone()),
                 window_id,
                 ctx,
             );
         });
 
         let toast_id_for_callback = toast_id.clone();
-        let error_label = error_label.to_owned();
-        let success_toast = success_toast.to_owned();
         ctx.spawn(
             async move {
                 let path_env_var = path_future.await;
@@ -1108,10 +1119,18 @@ impl AgentInputFooter {
             .cli_agent(ctx)
             .and_then(plugin_manager_for)
             .map(|m| m.install_success_message())
-            .unwrap_or("Dwarf plugin installed. Please restart the session to activate.");
+            .unwrap_or_else(|| {
+                format!(
+                    "{} plugin installed. Please restart the session to activate.",
+                    ChannelState::app_name_display()
+                )
+            });
         self.handle_plugin_operation(
-            "Installing Dwarf plugin...",
-            "Failed to install Dwarf plugin",
+            format!("Installing {} plugin...", ChannelState::app_name_display()),
+            format!(
+                "Failed to install {} plugin",
+                ChannelState::app_name_display()
+            ),
             success_msg,
             PluginChipTelemetryKind::Install,
             |manager| async move { manager.install().await },
@@ -1125,10 +1144,18 @@ impl AgentInputFooter {
             .cli_agent(ctx)
             .and_then(plugin_manager_for)
             .map(|m| m.update_success_message())
-            .unwrap_or("Dwarf plugin updated. Please restart the session to activate.");
+            .unwrap_or_else(|| {
+                format!(
+                    "{} plugin updated. Please restart the session to activate.",
+                    ChannelState::app_name_display()
+                )
+            });
         self.handle_plugin_operation(
-            "Updating Dwarf plugin...",
-            "Failed to update Dwarf plugin",
+            format!("Updating {} plugin...", ChannelState::app_name_display()),
+            format!(
+                "Failed to update {} plugin",
+                ChannelState::app_name_display()
+            ),
             success_msg,
             PluginChipTelemetryKind::Update,
             |manager| async move { manager.update().await },
@@ -2000,8 +2027,7 @@ impl TypedActionView for AgentInputFooter {
                 }
             }
             AgentInputFooterAction::InsertFilePath(path) => {
-                if let Some(_agent) = self.cli_agent(ctx) {
-                }
+                if let Some(_agent) = self.cli_agent(ctx) {}
                 let path_with_space = format!("{path} ");
                 if self.has_active_cli_agent_input_session(ctx) {
                     ctx.emit(AgentInputFooterEvent::InsertIntoCLIRichInput(
@@ -2045,8 +2071,7 @@ impl TypedActionView for AgentInputFooter {
             AgentInputFooterAction::InstallPlugin => {
                 #[cfg(not(target_family = "wasm"))]
                 {
-                    if let Some(_agent) = self.cli_agent(ctx) {
-                    }
+                    if let Some(_agent) = self.cli_agent(ctx) {}
                     if !self.handle_install_plugin(ctx) {
                         self.record_plugin_auto_failure_and_notify(ctx);
                     }
@@ -2055,8 +2080,7 @@ impl TypedActionView for AgentInputFooter {
             AgentInputFooterAction::UpdatePlugin => {
                 #[cfg(not(target_family = "wasm"))]
                 {
-                    if let Some(_agent) = self.cli_agent(ctx) {
-                    }
+                    if let Some(_agent) = self.cli_agent(ctx) {}
                     if !self.handle_update_plugin(ctx) {
                         self.record_plugin_auto_failure_and_notify(ctx);
                     }
@@ -2084,8 +2108,7 @@ impl TypedActionView for AgentInputFooter {
                 let chip_kind = self.plugin_chip_kind(ctx);
                 let is_update = matches!(chip_kind, Some(PluginChipKind::Update));
                 if let Some(_agent) = self.cli_agent(ctx) {
-                    if let Some(_kind) = chip_kind {
-                    }
+                    if let Some(_kind) = chip_kind {}
                 }
                 let session = CLIAgentSessionsModel::as_ref(ctx)
                     .session(self.terminal_view_id)
@@ -2253,7 +2276,7 @@ impl ActionButtonTheme for ActiveMicButtonTheme {
     }
 }
 
-/// Green-accented theme for the "Install Dwarf plugin" chip.
+/// Green-accented theme for the install-plugin chip.
 struct InstallPluginButtonTheme;
 
 impl ActionButtonTheme for InstallPluginButtonTheme {
@@ -2293,10 +2316,11 @@ async fn write_install_log(agent: CLIAgent, err: &PluginInstallError) -> Option<
     let log_path = env::temp_dir().join("warp-plugin-install.log");
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
     let contents = format!(
-        "Dwarf plugin installation — {agent:?}\n\
+        "{} plugin installation — {agent:?}\n\
          {now}\n\
          \n\
          {log}",
+        ChannelState::app_name_display(),
         log = err.log,
     );
     fs::write(&log_path, contents).await.ok()?;

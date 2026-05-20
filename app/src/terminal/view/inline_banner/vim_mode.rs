@@ -1,6 +1,6 @@
 use warpui::{elements::MouseStateHandle, Element};
 
-use crate::{appearance::Appearance, terminal::view::TerminalAction};
+use crate::{appearance::Appearance, channel::ChannelState, terminal::view::TerminalAction};
 
 use super::{
     render_inline_block_list_banner, InlineBannerButtonState, InlineBannerCloseButton,
@@ -46,7 +46,10 @@ pub fn render_vim_mode_banner(
         InlineBannerStyle::LowPriority,
         appearance,
         InlineBannerContent {
-            title: "Enable Dwarf's Vim keybindings?".to_string(),
+            title: format!(
+                "Enable {} Vim keybindings?",
+                ChannelState::app_name_possessive()
+            ),
             buttons,
             close_button: Some(close_button),
             ..Default::default()

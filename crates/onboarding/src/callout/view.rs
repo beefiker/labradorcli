@@ -29,7 +29,7 @@ use crate::{
 
 /// Options for rendering a callout.
 struct CalloutOptions {
-    title: &'static str,
+    title: String,
     /// Pre-built text with keybindings already embedded
     text: String,
     step: StepStatus,
@@ -58,7 +58,10 @@ fn get_universal_input_callout_options(
 ) -> Option<CalloutOptions> {
     match state {
         UniversalInputCalloutState::MeetInput => Some(CalloutOptions {
-            title: "Meet the Dwarf input",
+            title: format!(
+                "Meet the {} input",
+                warp_core::channel::ChannelState::app_name_display()
+            ),
             text: format!(
                 "Your terminal input accepts both terminal commands and agent prompts and automatically detects which you're using. Use {} to lock the input to Agent mode (natural language) or Terminal mode (commands).",
                 keybindings.toggle_input_mode
@@ -73,7 +76,7 @@ fn get_universal_input_callout_options(
             checkbox: None,
         }),
         UniversalInputCalloutState::TalkToAgent => Some(CalloutOptions {
-            title: "Talk to the agent",
+            title: "Talk to the agent".to_string(),
             text: "You can type in natural language to engage the agent. Submit the query below to start: What tests exist in this repo, how are they structured, and what do they cover?".to_string(),
             step: StepStatus::new(1, 2),
             left_button: if has_project {
@@ -111,16 +114,18 @@ fn get_agent_modality_callout_options(
 
     match state {
         AgentModalityCalloutState::MeetTerminalInput => {
-            let title: &'static str  = if has_project || intention == OnboardingIntention::Terminal {
+            let title: String = if has_project || intention == OnboardingIntention::Terminal {
                 "Meet your terminal input"
             } else {
                 "Meet your updated terminal input"
-            };
+            }
+            .to_string();
             Some(CalloutOptions {
                 title,
                 text: format!(
-                    "Run commands from the terminal, or use {} to start a local Dwarf agent.",
+                    "Run commands from the terminal, or use {} to start a local {} agent.",
                     keybindings.submit_to_local_agent,
+                    warp_core::channel::ChannelState::app_name_display(),
                 ),
                 step: StepStatus::new(0, total_steps),
                 left_button: None,
@@ -138,7 +143,7 @@ fn get_agent_modality_callout_options(
             if initial_natural_language_detection_enabled {
                 // NL detection was already enabled - show simpler "overrides" callout without checkbox
                 Some(CalloutOptions {
-                    title: "Natural language overrides",
+                    title: "Natural language overrides".to_string(),
                     text: format!(
                         "You can always override any auto-detection using {}.",
                         keybindings.toggle_input_mode
@@ -155,9 +160,10 @@ fn get_agent_modality_callout_options(
             } else {
                 // NL detection was disabled - show full explanation with checkbox to enable
                 Some(CalloutOptions {
-                    title: "Natural language support",
+                    title: "Natural language support".to_string(),
                     text: format!(
-                        "Natural language input is off by default. If enabled, you can type requests in plain English and Dwarf will autodetect queries for the agent. You can always override them using {}.",
+                        "Natural language input is off by default. If enabled, you can type requests in plain English and {} will autodetect queries for the agent. You can always override them using {}.",
+                        warp_core::channel::ChannelState::app_name_display(),
                         keybindings.toggle_input_mode
                     ),
                     step: StepStatus::new(1, total_steps),
@@ -175,7 +181,10 @@ fn get_agent_modality_callout_options(
             }
         }
         AgentModalityCalloutState::IntroducingAgentExperience => Some(CalloutOptions {
-            title: "Introducing Dwarf's new agent experience",
+            title: format!(
+                "Introducing {} new agent experience",
+                warp_core::channel::ChannelState::app_name_possessive()
+            ),
             text: "Agent conversations are now their own scoped view outside of your terminal. Simply hit ESC to return to the terminal at any point.".to_string(),
             step: StepStatus::new(2, total_steps),
             left_button: None,
@@ -189,7 +198,7 @@ fn get_agent_modality_callout_options(
         AgentModalityCalloutState::UpdatedAgentInput => {
             if has_project {
                 Some(CalloutOptions {
-                    title: "Updated agent input",
+                    title: "Updated agent input".to_string(),
                     text: "Your agent input will detect natural language as well as commands by default. Use ! to lock the input in bash mode to write commands.\n\nSubmit the query below to have the agent initialize this project, or ⊗ to clear the input and start your own!".to_string(),
                     step: StepStatus::new(3, total_steps),
                     left_button: Some(ButtonOptions {
@@ -206,7 +215,7 @@ fn get_agent_modality_callout_options(
                 })
             } else {
                 Some(CalloutOptions {
-                    title: "Updated agent input",
+                    title: "Updated agent input".to_string(),
                     text: "Your agent input will detect natural language as well as commands by default. Use ! to lock the input in bash mode to write commands.".to_string(),
                     step: StepStatus::new(3, total_steps),
                     left_button: Some(ButtonOptions {

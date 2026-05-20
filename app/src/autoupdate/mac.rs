@@ -730,14 +730,13 @@ fn dmg_name(channel: Channel) -> String {
     format!("{}.dmg", app_name_prefix(channel))
 }
 
-fn app_name_prefix(channel: Channel) -> &'static str {
+fn app_name_prefix(channel: Channel) -> String {
     match channel {
-        Channel::Stable => "Warp",
-        Channel::Preview => "WarpPreview",
-        Channel::Local => "warp",
-        Channel::Integration => "integration",
-        Channel::Dev => "WarpDev",
-        Channel::Oss => "Dwarf",
+        Channel::Stable | Channel::Preview | Channel::Dev | Channel::Oss => {
+            ChannelState::app_id_application_name(channel)
+        }
+        Channel::Local => ChannelState::app_name().to_owned(),
+        Channel::Integration => "integration".to_owned(),
     }
 }
 
@@ -748,7 +747,7 @@ fn executable_name(channel: Channel) -> &'static str {
         Channel::Local => "warp",
         Channel::Integration => "integration",
         Channel::Dev => "dev",
-        Channel::Oss => "dwarf",
+        Channel::Oss => ChannelState::app_name(),
     }
 }
 

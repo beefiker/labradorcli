@@ -526,7 +526,6 @@ impl CLISubagentView {
         if is_autoexecuted {
             self.enable_autoexecute_override(ctx);
         }
-
     }
 
     fn handle_reject_blocked_action(
@@ -535,7 +534,6 @@ impl CLISubagentView {
         ctx: &mut ViewContext<Self>,
     ) {
         self.reject_blocked_action(should_user_take_over, ctx);
-
     }
 
     fn take_control_of_running_command(&mut self, ctx: &mut ViewContext<Self>) {

@@ -13,6 +13,7 @@ use thiserror::Error;
 use warpui::{fonts::FontInfo, keymap::Keystroke, DisplayIdx};
 
 use crate::{
+    channel::ChannelState,
     interval_timer::IntervalTimer,
     root_view::QuakeModePinPosition,
     settings::ExtraMetaKeys,
@@ -43,7 +44,10 @@ pub enum ThemeError {
 
 #[derive(Clone, Error, Debug)]
 pub enum HotkeyError {
-    #[error("A hotkey window opens in a way Warp does not support")]
+    #[error(
+        "A hotkey window opens in a way {} does not support",
+        ChannelState::app_name_display()
+    )]
     UnsupportedWindowType,
     #[error("There are multiple hotkeys configured")]
     MultipleHotkeys,

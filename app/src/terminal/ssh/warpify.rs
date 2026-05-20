@@ -1,5 +1,6 @@
 use asset_macro::bundled_asset;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use warp_core::channel::ChannelState;
 use warp_core::ui::theme::WarpTheme;
 use warpui::assets::asset_cache::{AssetCache, AssetState};
 
@@ -67,7 +68,12 @@ impl Entity for SshWarpifyBlock {
 impl SshWarpifyBlock {
     fn render_title_ui(&self, theme: &WarpTheme, appearance: &Appearance) -> Box<dyn Element> {
         let icon = Icon::new(UiIcon::Warp.into(), theme.active_ui_detail());
-        warpify::render::header_row("Dwarfifying SSH Session...", icon, theme, appearance)
+        warpify::render::header_row(
+            format!("{} SSH Session...", ChannelState::app_name_verbifying()),
+            icon,
+            theme,
+            appearance,
+        )
     }
 }
 
@@ -79,9 +85,11 @@ pub fn warpify_description(
     let theme = appearance.theme();
 
     let description = FormattedText::new(vec![FormattedTextLine::Line(vec![
-        FormattedTextFragment::plain_text(
-            "Bring Dwarf's features to your remote session. Blocks, full text editing, auto-complete, Dwarf agents, and more. "
-        ),
+        FormattedTextFragment::plain_text(format!(
+            "Bring {} features to your remote session. Blocks, full text editing, auto-complete, {} agents, and more. ",
+            ChannelState::app_name_possessive(),
+            ChannelState::app_name_display()
+        )),
         FormattedTextFragment::hyperlink("Learn more", SSH_DOCS_URL),
     ])]);
     warpify::render::build_description_row(description, theme, appearance, hyperlink_index.clone())

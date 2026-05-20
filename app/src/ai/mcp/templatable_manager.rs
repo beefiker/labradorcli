@@ -315,7 +315,6 @@ impl TemplatableMCPServerManager {
             })
             .collect()
     }
-
 }
 
 #[derive(Debug)]

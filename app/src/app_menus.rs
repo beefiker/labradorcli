@@ -25,7 +25,7 @@ use enclose::enclose;
 use itertools::Itertools;
 use settings::manager::SettingsManager;
 use settings::Setting as _;
-use warp_core::context_flag::ContextFlag;
+use warp_core::{channel::ChannelState, context_flag::ContextFlag};
 use warp_util::path::user_friendly_path;
 use warpui::actions::StandardAction;
 use warpui::keymap::{Keystroke, Trigger};
@@ -50,13 +50,19 @@ const SHOW_BOOTSTRAP_BLOCK_MENU_ITEM_NAME: &str = "Show Initialization Block";
 const HIDE_BOOTSTRAP_BLOCK_MENU_ITEM_NAME: &str = "Hide Initialization Block";
 const SHOW_IN_BAND_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Show In-band Command Blocks";
 const HIDE_IN_BAND_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Hide In-band Command Blocks";
-const SHOW_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Show Dwarfified SSH Blocks";
-const HIDE_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME: &str = "Hide Dwarfified SSH Blocks";
 const EXPORT_DEFAULT_SETTINGS_CSV_MENU_ITEM_NAME: &str =
     "Export Default Settings as CSV to home dir";
 
 const SETTINGS_CSV_FILE_NAME: &str = "warp_default_settings.csv";
 const MAX_RECENT_REPOS_IN_MENU: usize = 10;
+
+fn show_ssh_command_blocks_menu_item_name() -> String {
+    format!("Show {} SSH Blocks", ChannelState::app_name_verbed())
+}
+
+fn hide_ssh_command_blocks_menu_item_name() -> String {
+    format!("Hide {} SSH Blocks", ChannelState::app_name_verbed())
+}
 
 /// Creates the root app menu bar
 pub fn menu_bar(ctx: &mut AppContext) -> MenuBar {
@@ -193,7 +199,10 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
     menu_items.push(MenuItem::Standard(StandardAction::ShowAllApps));
     menu_items.push(MenuItem::Separator);
     menu_items.push(MenuItem::Custom(CustomMenuItem::new(
-        "Set Dwarf as Default Terminal",
+        &format!(
+            "Set {} as Default Terminal",
+            ChannelState::app_name_display()
+        ),
         move |ctx| {
             DefaultTerminal::handle(ctx).update(ctx, |default_terminal, ctx| {
                 default_terminal.make_warp_default(ctx)
@@ -212,7 +221,7 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         None,
     )));
     menu_items.push(MenuItem::Standard(StandardAction::Quit));
-    Menu::new("Dwarf", menu_items)
+    Menu::new(ChannelState::app_name_display(), menu_items)
 }
 
 fn make_new_file_menu(ctx: &AppContext) -> Menu {
@@ -268,7 +277,7 @@ fn make_new_edit_menu(ctx: &AppContext) -> Menu {
     ];
     let group_5 = vec![
         MenuItem::Custom(CustomMenuItem::new(
-            "Use Dwarf's Prompt",
+            &format!("Use {} Prompt", ChannelState::app_name_possessive()),
             move |ctx| ctx.dispatch_global_action("app:toggle_user_ps1", &()),
             move |_props, ctx| MenuItemPropertyChanges {
                 checked: Some(
@@ -587,8 +596,9 @@ fn block_menu_debug_items() -> Vec<MenuItem> {
         None,
     )));
 
+    let ssh_command_blocks_menu_item_name = show_ssh_command_blocks_menu_item_name();
     items.push(MenuItem::Custom(CustomMenuItem::new(
-        SHOW_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME,
+        &ssh_command_blocks_menu_item_name,
         move |ctx| {
             let handle = BlockVisibilitySettings::handle(ctx);
             handle.update(ctx, |block_visibility_settings, ctx| {
@@ -605,9 +615,9 @@ fn block_menu_debug_items() -> Vec<MenuItem> {
             let name = if BlockVisibilitySettings::handle(ctx).read(ctx, |settings, _ctx| {
                 *settings.should_show_ssh_block.value()
             }) {
-                HIDE_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME.to_owned()
+                hide_ssh_command_blocks_menu_item_name()
             } else {
-                SHOW_SSH_COMMAND_BLOCKS_MENU_ITEM_NAME.to_owned()
+                show_ssh_command_blocks_menu_item_name()
             };
 
             MenuItemPropertyChanges {
@@ -814,9 +824,10 @@ fn debug_menu_items() -> Vec<MenuItem> {
     debug_menu_items
 }
 
-fn link_menu_item(title: &'static str, link: Cow<'static, str>) -> MenuItem {
+fn link_menu_item(title: impl Into<String>, link: Cow<'static, str>) -> MenuItem {
+    let title = title.into();
     MenuItem::Custom(CustomMenuItem::new(
-        title,
+        &title,
         move |ctx| {
             ctx.open_url(&link);
         },
@@ -844,9 +855,15 @@ fn make_new_help_menu() -> Menu {
         "Help",
         vec![
             feedback_menu_item(),
-            link_menu_item("Dwarf Documentation...", links::USER_DOCS_URL.into()),
+            link_menu_item(
+                format!("{} Documentation...", ChannelState::app_name_display()),
+                links::USER_DOCS_URL.into(),
+            ),
             link_menu_item("GitHub Issues...", links::GITHUB_ISSUES_URL.into()),
-            link_menu_item("Dwarf Slack Community...", links::SLACK_URL.into()),
+            link_menu_item(
+                format!("{} Slack Community...", ChannelState::app_name_display()),
+                links::SLACK_URL.into(),
+            ),
         ],
     )
 }

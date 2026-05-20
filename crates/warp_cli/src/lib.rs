@@ -39,14 +39,14 @@ pub const SERVER_ROOT_URL_OVERRIDE_ENV: &str = "WARP_SERVER_ROOT_URL";
 pub const WS_SERVER_URL_OVERRIDE_ENV: &str = "WARP_WS_SERVER_URL";
 pub const SESSION_SHARING_SERVER_URL_OVERRIDE_ENV: &str = "WARP_SESSION_SHARING_SERVER_URL";
 
-/// Options related to the parent process that spawned this Warp instance.
+/// Options related to the parent process that spawned this app instance.
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct ParentOpts {
-    /// The ID of the Warp process that spawned this one.
+    /// The ID of the app process that spawned this one.
     ///
-    /// Used by codepaths that attempt to detect when the parent Warp process
+    /// Used by codepaths that attempt to detect when the parent app process
     /// has terminated. Guaranteed to be [`None`] when this is the initial
-    /// Warp process, but may also be [`None`] for Warp child processes if the
+    /// app process, but may also be [`None`] for child processes if the
     /// child process doesn't need to keep track of its parent.
     #[arg(long = "parent-pid", hide = true)]
     pub pid: Option<u32>,
@@ -61,7 +61,7 @@ pub struct ParentOpts {
 }
 
 /// Hidden worker args used to scope remote-server proxy/daemon sockets by
-/// Warp identity without exposing credentials.
+/// App identity without exposing credentials.
 #[derive(Debug, Clone, Default, clap::Args)]
 pub struct RemoteServerIdentityArgs {
     /// Non-secret identity partition key for the remote-server daemon.
@@ -87,18 +87,12 @@ pub struct GlobalOptions {
     pub output_format: OutputFormat,
 }
 
-/// Command-line argument parser for the main Warp binary. This is used across all channels.
+/// Command-line argument parser for the main app binary. This is used across all channels.
 #[derive(Debug, Default, Parser, Clone)]
 #[command(
-    name = "dwarf",
-    display_name = "Dwarf",
-    about = r#"The local agent platform for Dwarf
-
-The Dwarf CLI is a tool for running, managing, and orchestrating coding agents locally.
-Use the CLI to:
-* Launch and inspect local agents
-* Manage MCP servers
-* Inspect local model and provider configuration"#
+    name = warp_core::channel::APP_NAME,
+    display_name = warp_core::channel::APP_NAME_DISPLAY,
+    about = warp_core::channel::APP_CLI_ABOUT
 )]
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Args {
@@ -143,11 +137,11 @@ pub struct Args {
     args: AppArgs,
 }
 
-/// Flags for the Warp application. Additional binaries, like test runners, may use this type
+/// Flags for the application. Additional binaries, like test runners, may use this type
 /// along with their own flags, or convert their flags into an `AppArgs` value.
 #[derive(Debug, Default, clap::Args, Clone)]
 pub struct AppArgs {
-    /// True if this instance of Warp was launched at the end of the auto-update process.
+    /// True if this instance was launched at the end of the auto-update process.
     #[arg(long = "finish-update", hide = true)]
     pub finish_update: bool,
 
@@ -156,11 +150,11 @@ pub struct AppArgs {
     #[arg(long = "crash-recovery-mechanism", value_enum, requires = "ParentOpts")]
     pub crash_recovery_mechanism: Option<RecoveryMechanism>,
 
-    /// Options related to the parent process that spawned this Warp instance.
+    /// Options related to the parent process that spawned this app instance.
     #[clap(flatten)]
     pub parent: ParentOpts,
 
-    /// URLs to open in Warp.
+    /// URLs to open in the app.
     #[arg(hide = true)]
     pub urls: Vec<Url>,
 }
@@ -336,6 +330,7 @@ impl Args {
         // Substitute the actual binary name into help output. Ideally clap would do this for us.
         let bin_name =
             binary_name().unwrap_or_else(|| ChannelState::channel().cli_command_name().to_string());
+        let app_name = ChannelState::app_name_display();
         command = command.after_help(color_print::cformat!(
             r#"<bold><underline>Examples:</underline></bold>
 
@@ -345,7 +340,7 @@ impl Args {
 
 <bold><underline>Learn more:</underline></bold>
 * Use <bold>{bin_name} help</bold> to learn more about each command
-* Dwarf runs locally and does not require a hosted Warp account
+* {app_name} runs locally and does not require a hosted account
 "#
         ));
 
@@ -357,12 +352,12 @@ impl Args {
         self.command.as_ref()
     }
 
-    /// Args for the main Warp application, if not running a subcommand.
+    /// Args for the main application, if not running a subcommand.
     pub fn app_args(&self) -> &AppArgs {
         &self.args
     }
 
-    /// Extract the main Warp application args.
+    /// Extract the main application args.
     pub fn into_app_args(self) -> AppArgs {
         self.args
     }
@@ -400,9 +395,9 @@ impl Args {
     }
 }
 
-/// Warp may spawn several worker processes - mostly servers that support the main application.
+/// The app may spawn several worker processes - mostly servers that support the main application.
 ///
-/// These subcommands run those worker processes, which are bundled into the Warp binary.
+/// These subcommands run those worker processes, which are bundled into the app binary.
 #[derive(Debug, Clone, Subcommand)]
 pub enum WorkerCommand {
     /// Run the terminal server.
@@ -456,11 +451,11 @@ pub enum WorkerCommand {
     },
 }
 
-/// CLI-related subcommands. The command-line interface to Warp isn't a full SDK (e.g. with language bindings),
-/// but it allows scripting some Warp functionality.
+/// CLI-related subcommands. The command-line interface is not a full SDK
+/// (e.g. with language bindings), but it allows scripting app functionality.
 #[derive(Debug, Clone, Subcommand)]
 pub enum CliCommand {
-    /// Interact with Dwarf.
+    /// Interact with agents.
     #[command(subcommand)]
     Agent(crate::agent::AgentCommand),
 
@@ -508,7 +503,7 @@ pub enum CliCommand {
     #[command(subcommand, hide = true)]
     Secret(crate::secret::SecretCommand),
 
-    /// Support commands for agent harnesses to integrate with Dwarf.
+    /// Support commands for agent harnesses.
     #[command(hide = true)]
     HarnessSupport(crate::harness_support::HarnessSupportArgs),
 
@@ -517,13 +512,13 @@ pub enum CliCommand {
     Artifact(crate::artifact::ArtifactCommand),
 }
 
-/// A subcommand of the main Warp application. This includes all [`WorkerCommand`]s as well as app-specific debugging tools.
+/// A subcommand of the main application. This includes all [`WorkerCommand`]s as well as app-specific debugging tools.
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
     #[clap(flatten)]
     Worker(WorkerCommand),
 
-    /// Commands that make up the Warp CLI.
+    /// Commands that make up the app CLI.
     #[clap(flatten)]
     CommandLine(Box<CliCommand>),
 
@@ -542,7 +537,7 @@ pub enum Command {
     /// For Powershell, add the following to $PROFILE:
     ///     path\to\warp | Out-String | Invoke-Expression
     ///
-    /// If no shell is provided, this defaults to the shell that Warp was run from.
+    /// If no shell is provided, this defaults to the shell that the app was run from.
     #[command(verbatim_doc_comment)]
     Completions {
         /// Shell to generate completions for.
@@ -652,7 +647,7 @@ pub fn dump_debug_info_flag() -> String {
     format!("--{flag}")
 }
 
-/// Returns a flag that sets the current process as the parent of a Warp subcommand to spawn.
+/// Returns a flag that sets the current process as the parent of an app subcommand to spawn.
 pub fn parent_flag() -> String {
     let command = <Args as CommandFactory>::command();
     let flag = command

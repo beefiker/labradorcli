@@ -8,7 +8,7 @@
 //!
 //! The view owns:
 //! - a child [`KeyboardNavigableButtons`] handle for the two selectable
-//!   cards ("Install Dwarf's SSH extension" / "Continue without installing"),
+//!   cards (install the SSH extension / continue without installing),
 //! - the [`SessionId`] this prompt is scoped to (used for event forwarding),
 //! - the current "Don't ask me this again" checked state (purely local to
 //!   this prompt instance; persisted to `ssh_extension_install_mode` only
@@ -17,7 +17,7 @@
 //! Dismissing the block (on click of either option, or when the session is
 //! deregistered) is the parent's responsibility.
 use settings::Setting;
-use warp_core::ui::theme::color::internal_colors;
+use warp_core::{channel::ChannelState, ui::theme::color::internal_colors};
 use warpui::{
     elements::{
         Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
@@ -73,12 +73,15 @@ impl SshRemoteServerChoiceView {
         let buttons = ctx.add_typed_action_view(|_| {
             KeyboardNavigableButtons::new(vec![
                 rich_navigation_button(
-                    "Install Dwarf's SSH extension".to_string(),
-                    Some(
-                        "Install Dwarf's extension to enable agent features like file browsing, \
-                         code review, and intelligent command completions in this session."
-                            .to_string(),
+                    format!(
+                        "Install {} SSH extension",
+                        ChannelState::app_name_possessive()
                     ),
+                    Some(format!(
+                        "Install {} extension to enable agent features like file browsing, \
+                         code review, and intelligent command completions in this session.",
+                        ChannelState::app_name_possessive()
+                    )),
                     /* recommended */ true,
                     MouseStateHandle::default(),
                     SshRemoteServerChoiceViewAction::Install,
@@ -170,11 +173,11 @@ impl SshRemoteServerChoiceView {
             .with_child(Container::new(checkbox_label).with_margin_left(4.).finish())
             .finish();
 
-        // Right: "Manage Dwarfify settings" link.
+        // Right: manage SSH integration settings link.
         let manage_settings_link = appearance
             .ui_builder()
             .link(
-                "Manage Dwarfify settings".into(),
+                format!("Manage {} settings", ChannelState::app_name_verbify()),
                 None,
                 Some(Box::new(|ctx| {
                     ctx.dispatch_typed_action(SshRemoteServerChoiceViewAction::OpenWarpifySettings);

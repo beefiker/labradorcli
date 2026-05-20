@@ -3,9 +3,9 @@ use std::sync::mpsc::SyncSender;
 
 #[cfg(feature = "local_tty")]
 use warpui::geometry::vector::Vector2F;
+use warpui::ViewContext;
 #[cfg(feature = "local_tty")]
 use warpui::{ModelHandle, SingletonEntity, ViewHandle};
-use warpui::ViewContext;
 
 #[cfg(feature = "local_tty")]
 use crate::pane_group::TerminalViewResources;

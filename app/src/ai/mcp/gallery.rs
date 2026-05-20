@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ai::mcp::templatable::{
-    GalleryData, JsonTemplate, TemplatableMCPServer,
-};
+use crate::ai::mcp::templatable::{GalleryData, JsonTemplate, TemplatableMCPServer};
 use crate::server::datetime_ext::DateTimeExt;
 use chrono::DateTime;
 use uuid::Uuid;
@@ -115,7 +113,6 @@ impl MCPGalleryManager {
     pub fn get_templatable_mcp_server(&self, gallery_uuid: Uuid) -> Option<&TemplatableMCPServer> {
         self.templatable_mcp_servers.get(&gallery_uuid)
     }
-
 }
 
 pub enum MCPGalleryManagerEvent {}

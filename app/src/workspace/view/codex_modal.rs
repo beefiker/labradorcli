@@ -4,6 +4,7 @@ use crate::view_components::action_button::{ActionButton, ActionButtonTheme};
 use asset_macro::bundled_or_fetched_asset;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
+use warp_core::channel::ChannelState;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
 use warpui::elements::{
@@ -109,7 +110,7 @@ impl CodexModal {
 
         // Title
         let title = FormattedTextElement::from_str(
-            "Use Codex models in Dwarf",
+            format!("Use Codex models in {}", ChannelState::app_name_display()),
             appearance.ui_font_family(),
             24.,
         )

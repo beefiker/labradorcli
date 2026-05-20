@@ -43,8 +43,8 @@ use crate::settings::{
 };
 use crate::settings::{
     AliasExpansionEnabled, AliasExpansionSettings, AppEditorSettings, AtContextMenuInTerminalMode,
-    AutocompleteSymbols, AutosuggestionKeybindingHint, CloudPreferencesSettings,
-    CodeSettings, CommandCorrections, CompletionsOpenWhileTyping, CopyOnSelect, CtrlTabBehavior,
+    AutocompleteSymbols, AutosuggestionKeybindingHint, CloudPreferencesSettings, CodeSettings,
+    CommandCorrections, CompletionsOpenWhileTyping, CopyOnSelect, CtrlTabBehavior,
     DefaultSessionMode, EnableSlashCommandsInTerminal, EnableSshWrapper, ErrorUnderliningEnabled,
     ExtraMetaKeys, GPUSettings, GlobalHotkeyMode, InputSettings, InputSettingsChangedEvent,
     LinuxSelectionClipboard, MiddleClickPasteEnabled, MouseScrollMultiplier,
@@ -295,8 +295,9 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ];
 
     if !FeatureFlag::SSHTmuxWrapper.is_enabled() {
+        let label = format!("{} SSH wrapper", ChannelState::app_name_display());
         toggle_binding_pairs.push(ToggleSettingActionPair::new(
-            "Dwarf SSH wrapper",
+            &label,
             builder(SettingsAction::FeaturesPageToggle(
                 #[allow(deprecated)]
                 FeaturesPageAction::ToggleSshWrapper,
@@ -547,7 +548,10 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
 
     if DefaultTerminal::can_warp_become_default() {
         app.register_fixed_bindings([FixedBinding::empty(
-            "Make Dwarf the default terminal",
+            format!(
+                "Make {} the default terminal",
+                ChannelState::app_name_display()
+            ),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::MakeDwarfDefaultTerminal,
             )),
@@ -1444,7 +1448,6 @@ impl TypedActionView for FeaturesPageView {
                 });
             }
         }
-
     }
 }
 
@@ -4037,11 +4040,14 @@ impl SettingsWidget for LoginItemWidget {
         let general_settings = GeneralSettings::as_ref(app);
         let ui_builder = appearance.ui_builder();
         #[cfg(target_os = "macos")]
-        let label = "Start Dwarf at login (requires macOS 13+)";
+        let label = format!(
+            "Start {} at login (requires macOS 13+)",
+            ChannelState::app_name_display()
+        );
         #[cfg(not(target_os = "macos"))]
-        let label = "Start Dwarf at login";
+        let label = format!("Start {} at login", ChannelState::app_name_display());
         render_body_item::<FeaturesPageAction>(
-            label.into(),
+            label,
             None,
             LocalOnlyIconState::for_setting(
                 LoginItem::storage_key(),
@@ -4269,7 +4275,13 @@ impl SettingsWidget for DefaultTerminalWidget {
         let default_terminal = DefaultTerminal::as_ref(app);
         if default_terminal.is_warp_default() {
             ui_builder
-                .wrappable_text("Dwarf is the default terminal", true)
+                .wrappable_text(
+                    format!(
+                        "{} is the default terminal",
+                        ChannelState::app_name_display()
+                    ),
+                    true,
+                )
                 .with_style(UiComponentStyles {
                     font_color: Some(appearance.theme().disabled_ui_text_color().into()),
                     margin: Some(Coords::default().bottom(16.)),
@@ -4280,7 +4292,10 @@ impl SettingsWidget for DefaultTerminalWidget {
         } else {
             ui_builder
                 .link(
-                    "Make Dwarf the default terminal".to_string(),
+                    format!(
+                        "Make {} the default terminal",
+                        ChannelState::app_name_display()
+                    ),
                     None,
                     Some(Box::new(|ctx| {
                         ctx.dispatch_typed_action(FeaturesPageAction::MakeDwarfDefaultTerminal);
@@ -4373,7 +4388,7 @@ impl SettingsWidget for SSHWrapperWidget {
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
         render_body_item::<FeaturesPageAction>(
-            "Dwarf SSH Wrapper".into(),
+            format!("{} SSH Wrapper", ChannelState::app_name_display()),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
                 on_click_action: Some(FeaturesPageAction::OpenUrl(
@@ -4434,7 +4449,10 @@ impl SettingsWidget for DesktopNotificationsWidget {
         let ui_builder = appearance.ui_builder();
         let mut column = Flex::column();
         column.add_child(render_body_item::<FeaturesPageAction>(
-            "Receive desktop notifications from Dwarf".into(),
+            format!(
+                "Receive desktop notifications from {}",
+                ChannelState::app_name_display()
+            ),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
                 on_click_action: Some(FeaturesPageAction::OpenUrl(NOTIFICATIONS_DOCS_URL.into())),
@@ -6563,7 +6581,10 @@ impl SettingsWidget for WindowSystemWidget {
                     may be blurry if your Wayland compositor is using fraction scaling (ex: 125%)."
                 .to_string();
         if view.force_x11_changed {
-            secondary_text.push_str("\n\nRestart Dwarf for changes to take effect.");
+            secondary_text.push_str(&format!(
+                "\n\nRestart {} for changes to take effect.",
+                ChannelState::app_name_display()
+            ));
         }
         let warp_theme = appearance.theme();
         children.add_child(

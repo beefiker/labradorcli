@@ -4,6 +4,7 @@ use warpui::{
 };
 
 use crate::appearance::Appearance;
+use crate::channel::ChannelState;
 use crate::terminal::alias::AliasedCommand;
 use crate::terminal::view::TerminalAction;
 
@@ -91,7 +92,10 @@ pub fn render_alias_expansion_banner(
         InlineBannerStyle::VeryLowPriority,
         appearance,
         InlineBannerContent {
-            title: "Dwarf can auto-expand aliases.".into(),
+            title: format!(
+                "{} can auto-expand aliases.",
+                ChannelState::app_name_display()
+            ),
             buttons,
             content: Some(content),
             close_button: Some(close_button),

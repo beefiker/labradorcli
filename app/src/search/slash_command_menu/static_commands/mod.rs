@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 pub mod bindings;
 pub mod commands;
 
@@ -82,7 +84,7 @@ impl Argument {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StaticCommand {
     pub name: &'static str,
-    pub description: &'static str,
+    pub description: Cow<'static, str>,
     pub icon_path: &'static str,
     /// Specifies the requirements for this command to be available. See [`Availability`].
     pub availability: Availability,

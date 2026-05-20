@@ -34,6 +34,7 @@ use crate::ui_components::dwarf_icon::render_dwarf_icon;
 use crate::ui_components::icons;
 use crate::workspace::tab_settings::TabSettings;
 use settings::Setting as _;
+use warp_core::channel::ChannelState;
 use warp_core::context_flag::ContextFlag;
 use warpui::elements::{
     ChildAnchor, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
@@ -826,7 +827,7 @@ impl TerminalView {
                 let mut stack = Stack::new().with_child(render_dwarf_icon(font_size * 1.5, 4.));
                 if state.is_hovered() {
                     let tooltip = ui_builder
-                        .tool_tip("Dwarf agent run".to_string())
+                        .tool_tip(format!("{} agent run", ChannelState::app_name_display()))
                         .build()
                         .finish();
                     stack.add_positioned_overlay_child(
@@ -1001,7 +1002,7 @@ impl TerminalView {
 
 fn default_agent_conversation_title(is_ambient_agent: bool) -> String {
     if is_ambient_agent {
-        "New Dwarf agent".to_owned()
+        format!("New {} agent", ChannelState::app_name_display())
     } else {
         "New agent conversation".to_owned()
     }

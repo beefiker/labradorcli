@@ -11,7 +11,7 @@ use crate::{
         },
         BackingView, Direction, PaneDragDropLocation, PaneId, TabBarHoverIndex,
     },
-        server::telemetry::SharingDialogSource,
+    server::telemetry::SharingDialogSource,
     settings::CodeSettings,
     tab::tab_position_id,
     terminal::view::TerminalAction,
@@ -900,8 +900,7 @@ impl<P: BackingView> TypedActionView for PaneHeader<P> {
             PaneHeaderAction::ShareContents => {
                 self.share_pane_contents(SharingDialogSource::PaneHeader, ctx)
             }
-            PaneHeaderAction::PaneHeaderDragStarted => {
-            }
+            PaneHeaderAction::PaneHeaderDragStarted => {}
             PaneHeaderAction::PaneHeaderDragged {
                 origin,
                 drag_location,
@@ -953,20 +952,16 @@ impl<P: BackingView> TypedActionView for PaneHeader<P> {
             PaneHeaderAction::PaneHeaderDropped {
                 origin,
                 drop_location,
-            } => {
-                match drop_location {
-                    PaneDragDropLocation::TabBar(_) => {
-                        self.is_visible_in_pane_group = true;
-                        ctx.emit(Event::DroppedOnTabBar { origin: *origin })
-                    }
-                    PaneDragDropLocation::PaneGroup(_) => {
-                        ctx.emit(Event::PaneDroppedWithinPaneGroup)
-                    }
-                    PaneDragDropLocation::Other => {
-                        ctx.emit(Event::PaneDroppedOutsideofTabBarOrPaneGroup)
-                    }
+            } => match drop_location {
+                PaneDragDropLocation::TabBar(_) => {
+                    self.is_visible_in_pane_group = true;
+                    ctx.emit(Event::DroppedOnTabBar { origin: *origin })
                 }
-            }
+                PaneDragDropLocation::PaneGroup(_) => ctx.emit(Event::PaneDroppedWithinPaneGroup),
+                PaneDragDropLocation::Other => {
+                    ctx.emit(Event::PaneDroppedOutsideofTabBarOrPaneGroup)
+                }
+            },
             PaneHeaderAction::PaneHeaderClicked => ctx.emit(Event::PaneHeaderClicked),
         }
     }
@@ -1194,4 +1189,3 @@ fn render_draggable_placeholder_element(
     .with_background_color(appearance.theme().dark_overlay().into())
     .finish()
 }
-

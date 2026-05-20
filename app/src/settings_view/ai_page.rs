@@ -20,12 +20,11 @@ use crate::settings::{
     AIAutoDetectionEnabled, AICommandDenylist, AISettingsChangedEvent,
     AgentModeCodingPermissionsType, AgentModeCommandExecutionDenylist,
     AgentModeCommandExecutionPredicate, AgentModeQuerySuggestionsEnabled,
-    CanUseWarpCreditsWithByok, CodeSettings, CodebaseContextEnabled,
-    FileBasedMcpEnabled, GitOperationsAutogenEnabled, IncludeAgentCommandsInHistory,
-    IntelligentAutosuggestionsEnabled, MemoryEnabled, NLDInTerminalEnabled,
-    NaturalLanguageAutosuggestionsEnabled, OrchestrationEnabled, RuleSuggestionsEnabled,
-    SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
-    ShouldRenderUseAgentToolbarForUserCommands, ShowAgentTips,
+    CanUseWarpCreditsWithByok, CodeSettings, CodebaseContextEnabled, FileBasedMcpEnabled,
+    GitOperationsAutogenEnabled, IncludeAgentCommandsInHistory, IntelligentAutosuggestionsEnabled,
+    MemoryEnabled, NLDInTerminalEnabled, NaturalLanguageAutosuggestionsEnabled,
+    OrchestrationEnabled, RuleSuggestionsEnabled, SharedBlockTitleGenerationEnabled,
+    ShouldRenderCLIAgentToolbar, ShouldRenderUseAgentToolbarForUserCommands, ShowAgentTips,
     ShowConversationHistory, ShowHintText, ThinkingDisplayMode, VoiceInputEnabled,
     WarpDriveContextEnabled,
 };
@@ -47,8 +46,8 @@ use warp_core::context_flag::ContextFlag;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
-    ChildView, ConstrainedBox, CornerRadius, CrossAxisAlignment, Dismiss, Fill,
-    HyperlinkLens, MainAxisAlignment, MainAxisSize, MouseStateHandle, Radius, Shrinkable, Text,
+    ChildView, ConstrainedBox, CornerRadius, CrossAxisAlignment, Dismiss, Fill, HyperlinkLens,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, Radius, Shrinkable, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::id;
@@ -111,6 +110,7 @@ use crate::menu::{MenuItem, MenuItemFields};
 use crate::ui_components::icons::Icon;
 use crate::view_components::dropdown::DropdownAction;
 use crate::workspaces::workspace::{AdminEnablementSetting, CustomerType};
+use crate::UserWorkspaces;
 use crate::{
     appearance::Appearance,
     editor::Event as EditorEvent,
@@ -121,7 +121,6 @@ use crate::{
     view_components::{Dropdown, DropdownItem},
 };
 use crate::{report_error, report_if_error};
-use crate::{UserWorkspaces};
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -2229,7 +2228,7 @@ impl TypedActionView for AISettingsPageView {
                 match AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     settings.is_any_ai_enabled.toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Global AI setting: {e:?}");
                     }
@@ -2242,7 +2241,7 @@ impl TypedActionView for AISettingsPageView {
                         .is_active_ai_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Active AI setting: {e:?}");
                     }
@@ -2255,7 +2254,7 @@ impl TypedActionView for AISettingsPageView {
                         .intelligent_autosuggestions_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Next Command setting: {e:?}");
                     }
@@ -2271,7 +2270,7 @@ impl TypedActionView for AISettingsPageView {
                         .prompt_suggestions_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Prompt Suggestions setting: {e:?}");
                     }
@@ -2284,7 +2283,7 @@ impl TypedActionView for AISettingsPageView {
                         .code_suggestions_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Code Suggestions setting: {e:?}");
                     }
@@ -2297,7 +2296,7 @@ impl TypedActionView for AISettingsPageView {
                         .natural_language_autosuggestions_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!(
                             "Failed to set value for Natural Language Autosuggestions setting: {e:?}"
@@ -2312,8 +2311,7 @@ impl TypedActionView for AISettingsPageView {
                         .shared_block_title_generation_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {
-                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!(
                             "Failed to set value for Shared Block Title Generation setting: {e:?}"
@@ -2328,7 +2326,7 @@ impl TypedActionView for AISettingsPageView {
                         .git_operations_autogen_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Git Operations Autogen setting: {e:?}");
                     }
@@ -2341,7 +2339,7 @@ impl TypedActionView for AISettingsPageView {
                         .ai_autodetection_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Input Auto-detection: {e:?}");
                     }
@@ -2367,7 +2365,7 @@ impl TypedActionView for AISettingsPageView {
                         .should_render_cli_agent_footer
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for CLI Agent Footer setting: {e:?}");
                     }
@@ -2402,7 +2400,7 @@ impl TypedActionView for AISettingsPageView {
                         .should_render_use_agent_footer_for_user_commands
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Use Agent Footer setting: {e:?}");
                     }
@@ -2413,7 +2411,7 @@ impl TypedActionView for AISettingsPageView {
                 match CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
                     settings.codebase_context_enabled.toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Codebase Context: {e:?}");
                     }
@@ -2426,7 +2424,7 @@ impl TypedActionView for AISettingsPageView {
                         .voice_input_enabled_internal
                         .toggle_and_save_value(ctx)
                 }) {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Voice Input: {e:?}");
                     }
@@ -2455,7 +2453,7 @@ impl TypedActionView for AISettingsPageView {
                     .show_agent_tips
                     .toggle_and_save_value(ctx)
                 {
-                    Ok(_new_value) => {                    }
+                    Ok(_new_value) => {}
                     Err(e) => {
                         log::warn!("Failed to set value for Show Agent Tips setting: {e:?}");
                     }
@@ -2560,8 +2558,7 @@ impl TypedActionView for AISettingsPageView {
                         readonly_cmd_execution_enabled,
                         ctx,
                     ) {
-                        Ok(_) => {
-                        }
+                        Ok(_) => {}
                         Err(e) => report_error!(e),
                     }
                 });
@@ -2569,8 +2566,7 @@ impl TypedActionView for AISettingsPageView {
             AISettingsPageAction::SetCodingPermission(p) => {
                 BlocklistAIPermissions::handle(ctx).update(ctx, |model, ctx| {
                     match model.set_coding_permissions(*p, ctx) {
-                        Ok(_) => {
-                        }
+                        Ok(_) => {}
                         Err(e) => report_error!(e),
                     }
                 });
@@ -2972,7 +2968,7 @@ fn render_ai_feature_switch(
 
 fn render_ai_list(
     header: &str,
-    description: &str,
+    description: impl Into<Cow<'static, str>>,
     input_list: Box<dyn Element>,
     view: &AISettingsPageView,
     ai_settings: &AISettings,
@@ -2985,11 +2981,8 @@ fn render_ai_list(
         app,
     );
 
-    let description = render_ai_setting_description(
-        description.to_string(),
-        ai_settings.is_any_ai_enabled(app),
-        app,
-    );
+    let description =
+        render_ai_setting_description(description, ai_settings.is_any_ai_enabled(app), app);
 
     Flex::column()
         .with_child(setting_header)
@@ -3027,7 +3020,7 @@ impl SettingsWidget for GlobalAIWidget {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
                 Text::new_inline(
-                    "Dwarf Agent",
+                    ChannelState::app_name_agent(),
                     appearance.ui_font_family(),
                     PRIMARY_HEADER_FONT_SIZE,
                 )
@@ -3093,15 +3086,20 @@ impl SettingsWidget for UsageWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         let usage_header = Container::new(
-            build_sub_header(appearance, "Usage", Some(styles::header_font_color(true, app)))
-                .finish(),
+            build_sub_header(
+                appearance,
+                "Usage",
+                Some(styles::header_font_color(true, app)),
+            )
+            .finish(),
         )
         .with_padding_bottom(HEADER_PADDING)
         .finish();
 
-        let upgrade_cta_text_fragments = vec![FormattedTextFragment::plain_text(
-            "Dwarf local agent mode uses your local provider credentials.",
-        )];
+        let upgrade_cta_text_fragments = vec![FormattedTextFragment::plain_text(format!(
+            "{} local agent mode uses your local provider credentials.",
+            ChannelState::app_name_display(),
+        ))];
 
         let mut upgrade_cta = FormattedTextElement::new(
             FormattedText::new([FormattedTextLine::Line(upgrade_cta_text_fragments)]),
@@ -3985,7 +3983,10 @@ impl AgentsWidget {
         );
         render_ai_list(
             "Command denylist",
-            "Regular expressions to match commands that the Dwarf Agent should always ask permission to execute.",
+            format!(
+                "Regular expressions to match commands that the {} should always ask permission to execute.",
+                ChannelState::app_name_agent(),
+            ),
             list,
             view,
             ai_settings,
@@ -4018,7 +4019,10 @@ impl AgentsWidget {
 
         render_ai_list(
             "Command allowlist",
-            "Regular expressions to match commands that can be automatically executed by the Dwarf Agent.",
+            format!(
+                "Regular expressions to match commands that can be automatically executed by the {}.",
+                ChannelState::app_name_agent(),
+            ),
             list,
             view,
             ai_settings,
@@ -4114,12 +4118,16 @@ impl AgentsWidget {
             .finish()
         };
 
+        let base_model_description = format!(
+            "This model serves as the primary engine behind the {}. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. {} may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
+            ChannelState::app_name_agent(),
+            ChannelState::app_name_display(),
+        );
+
         render_dropdown_item(
             appearance,
             "Base model",
-            Some(
-                "This model serves as the primary engine behind the Dwarf Agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Dwarf may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
-            ),
+            Some(&base_model_description),
             Some(show_in_prompt_checkbox),
             LocalOnlyIconState::Hidden,
             (!ai_settings.is_any_ai_enabled(app))
@@ -4149,7 +4157,10 @@ impl AgentsWidget {
 
         let codebase_context_description = vec![
             FormattedTextFragment::plain_text(
-                "Allow the Dwarf Agent to generate an outline of your codebase that can be used for context. No code is ever stored on our servers. ",
+                format!(
+                    "Allow the {} to generate an outline of your codebase that can be used for context. No code is ever stored on our servers. ",
+                    ChannelState::app_name_agent(),
+                ),
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
@@ -4222,7 +4233,10 @@ impl AgentsWidget {
         let subtext = {
             let subtext_fragments = vec![
                 FormattedTextFragment::plain_text(
-                    "You haven't added any MCP servers yet. Once you do, you'll be able to control how much autonomy the Dwarf Agent has when interacting with them. ",
+                    format!(
+                        "You haven't added any MCP servers yet. Once you do, you'll be able to control how much autonomy the {} has when interacting with them. ",
+                        ChannelState::app_name_agent(),
+                    ),
                 ),
                 FormattedTextFragment::hyperlink_action(
                     "Add a server",
@@ -4303,7 +4317,10 @@ impl AgentsWidget {
         {
             let allowlist = self.render_mcp_list(
                 "MCP allowlist",
-                "Allow the Dwarf Agent to call these MCP servers.",
+                format!(
+                    "Allow the {} to call these MCP servers.",
+                    ChannelState::app_name_agent(),
+                ),
                 &view.mcp_allowlist_dropdown,
                 BlocklistAIPermissions::as_ref(app).get_mcp_allowlist(app, None),
                 view.mcp_allowlist_mouse_state_handles.clone(),
@@ -4320,7 +4337,10 @@ impl AgentsWidget {
         {
             let denylist = self.render_mcp_list(
                 "MCP denylist",
-                "The Dwarf Agent will always ask for permission before calling any MCP servers on this list.",
+                format!(
+                    "The {} will always ask for permission before calling any MCP servers on this list.",
+                    ChannelState::app_name_agent(),
+                ),
                 &view.mcp_denylist_dropdown,
                 BlocklistAIPermissions::as_ref(app).get_mcp_denylist(app, None),
                 view.mcp_denylist_mouse_state_handles.clone(),
@@ -4340,7 +4360,7 @@ impl AgentsWidget {
     fn render_mcp_list(
         &self,
         title: &str,
-        description: &str,
+        description: impl Into<String>,
         dropdown: &ViewHandle<FilterableDropdown<AISettingsPageAction>>,
         items: Vec<uuid::Uuid>,
         mouse_state_handles: Vec<MouseStateHandle>,
@@ -4349,6 +4369,7 @@ impl AgentsWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
+        let description = description.into();
         let selector = Container::new(
             Flex::row()
                 .with_main_axis_size(MainAxisSize::Max)
@@ -4358,7 +4379,7 @@ impl AgentsWidget {
                         1.0,
                         Container::new(render_dropdown_item_label(
                             title.to_string(),
-                            Some(description.to_string()),
+                            Some(description),
                             LocalOnlyIconState::Hidden,
                             (!ai_settings.is_any_ai_enabled(app))
                                 .then(|| appearance.theme().disabled_ui_text_color()),
@@ -4689,10 +4710,11 @@ impl SettingsWidget for MCPServersWidget {
         .finish();
 
         let mcp_description = vec![
-            FormattedTextFragment::plain_text(
-                "Add MCP servers to extend the Dwarf Agent's capabilities. \
+            FormattedTextFragment::plain_text(format!(
+                "Add MCP servers to extend {}'s capabilities. \
             MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. ",
-            ),
+                ChannelState::app_name_agent()
+            )),
             FormattedTextFragment::hyperlink(
                 "Learn more",
                 "https://docs.warp.dev/agent-platform/capabilities/mcp",
@@ -4822,7 +4844,10 @@ impl AIFactWidget {
 
         let rules_description = vec![
             FormattedTextFragment::plain_text(
-                "Rules help the Dwarf Agent follow your conventions, whether for codebases or specific workflows. ",
+                format!(
+                    "Rules help the {} follow your conventions, whether for codebases or specific workflows. ",
+                    ChannelState::app_name_agent(),
+                ),
             ),
             FormattedTextFragment::hyperlink(
                 "Learn more",
@@ -4890,7 +4915,7 @@ impl AIFactWidget {
         app: &warpui::AppContext,
     ) -> Box<dyn Element> {
         let toggle = render_ai_setting_toggle::<WarpDriveContextEnabled>(
-            "Dwarf Drive as agent context",
+            format!("{} as agent context", ChannelState::app_name_drive()),
             AISettingsPageAction::ToggleWarpDriveContext,
             *ai_settings.warp_drive_context_enabled,
             ai_settings.is_any_ai_enabled(app),
@@ -4900,7 +4925,11 @@ impl AIFactWidget {
         );
 
         let description = render_ai_setting_description(
-            "The Dwarf Agent can leverage your Dwarf Drive Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
+            format!(
+                "The {} can leverage your {} Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
+                ChannelState::app_name_agent(),
+                ChannelState::app_name_drive(),
+            ),
             ai_settings.is_any_ai_enabled(app),
             app,
         );
@@ -4990,7 +5019,10 @@ impl VoiceWidget {
 
         let voice_input_description_text_fragments = vec![
             FormattedTextFragment::plain_text(
-                "Voice input allows you to control Dwarf by speaking directly to your terminal (powered by ",
+                format!(
+                    "Voice input allows you to control {} by speaking directly to your terminal (powered by ",
+                    ChannelState::app_name_display(),
+                ),
             ),
             FormattedTextFragment::hyperlink("Wispr Flow", WISPR_FLOW_URL),
             FormattedTextFragment::plain_text(")."),
@@ -5044,7 +5076,7 @@ impl SettingsWidget for VoiceWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "voice agent dwarf ai a.i. speech input natural language talk english"
+        "voice agent ai a.i. speech input natural language talk english"
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
@@ -5312,9 +5344,10 @@ impl SettingsWidget for CLIAgentWidget {
                         mouse_state: self.auto_toggle_rich_input_info_tooltip.clone(),
                         on_click_action: None,
                         secondary_text: None,
-                        tooltip_override_text: Some(
-                            "Requires the Dwarf plugin for your coding agent".to_owned(),
-                        ),
+                        tooltip_override_text: Some(format!(
+                            "Requires the {} plugin for your coding agent",
+                            ChannelState::app_name_display(),
+                        )),
                     }),
                     LocalOnlyIconState::for_setting(
                         AutoToggleRichInput::storage_key(),
@@ -5612,7 +5645,10 @@ impl SettingsWidget for AgentAttributionWidget {
             )
             .with_child(toggle_row)
             .with_child(render_ai_setting_description(
-                "Dwarf can add attribution to commit messages and pull requests it creates",
+                format!(
+                    "{} can add attribution to commit messages and pull requests it creates",
+                    ChannelState::app_name_display(),
+                ),
                 !state.is_disabled,
                 app,
             ))
@@ -5634,7 +5670,7 @@ impl SettingsWidget for CloudAgentComputerUseWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "dwarf local agent computer use orchestration multi-agent"
+        "local agent computer use orchestration multi-agent"
     }
 
     fn render(
@@ -5716,7 +5752,10 @@ impl SettingsWidget for CloudAgentComputerUseWidget {
             )
             .with_child(toggle_row)
             .with_child(render_ai_setting_description(
-                "Enable computer use in agent conversations started from the Dwarf app.",
+                format!(
+                    "Enable computer use in agent conversations started from the {} app.",
+                    ChannelState::app_name_display(),
+                ),
                 !is_disabled,
                 app,
             ));
@@ -5874,7 +5913,10 @@ impl ApiKeysWidget {
             .with_child(
                 Container::new(
                     render_ai_setting_description(
-                        "Use your own API keys from model providers for the Dwarf Agent to use. API keys are stored locally and never synced to the cloud.",
+                        format!(
+                            "Use your own API keys from model providers for the {} to use. API keys are stored locally and never synced to the cloud.",
+                            ChannelState::app_name_agent(),
+                        ),
                         is_enabled,
                         app,
                     ))
@@ -5954,7 +5996,7 @@ impl ApiKeysWidget {
         let ai_settings = AISettings::as_ref(app);
 
         let toggle = render_ai_setting_toggle::<CanUseWarpCreditsWithByok>(
-            "Dwarf model fallback",
+            format!("{} model fallback", ChannelState::app_name_display()),
             AISettingsPageAction::ToggleCanUseWarpCreditsWithByok,
             *ai_settings.can_use_warp_credits_with_byok,
             ai_settings.is_any_ai_enabled(app),
@@ -5964,7 +6006,11 @@ impl ApiKeysWidget {
         );
 
         let description = render_ai_setting_description(
-            "When enabled, agent requests may be routed to one of Dwarf's provided models in the event of an error. Dwarf will prioritize using your local provider credentials.",
+            format!(
+                "When enabled, agent requests may be routed to one of {} provided models in the event of an error. {} will prioritize using your local provider credentials.",
+                ChannelState::app_name_possessive(),
+                ChannelState::app_name_display(),
+            ),
             ai_settings.is_any_ai_enabled(app),
             app,
         );
@@ -6019,7 +6065,6 @@ impl SettingsWidget for ApiKeysWidget {
             .finish()
     }
 }
-
 
 mod styles {
     use warp_core::ui::{appearance::Appearance, theme::Fill};

@@ -14,7 +14,8 @@ use crate::{
         EnablementState, LspRepoStatus, PersistedWorkspace, PersistedWorkspaceEvent,
     },
     appearance::Appearance,
-        settings::{AISettings, CodeSettings},
+    channel::ChannelState,
+    settings::{AISettings, CodeSettings},
     terminal::general_settings::GeneralSettings,
     ui_components::{
         avatar::{Avatar, AvatarContent, StatusElementTypes},
@@ -79,10 +80,21 @@ const LSP_STATUS_INDICATOR_SIZE: f32 = 8.;
 const CODE_FEATURE_NAME: &str = "Code";
 const INITIALIZATION_SETTINGS_HEADER: &str = "Initialization Settings";
 const CODEBASE_INDEXING_LABEL: &str = "Codebase indexing";
-const CODEBASE_INDEX_DESCRIPTION: &str = "Dwarf can automatically index code repositories as you navigate them, helping agents quickly understand context and provide solutions. Code is never stored on the server. If a codebase is unable to be indexed, Dwarf can still navigate your codebase and gain insights via grep and find tool calling.";
-const WARP_INDEXING_IGNORE_DESCRIPTION: &str = "To exclude specific files or directories from indexing, add them to the .warpindexingignore file in your repository directory. These files will still be accessible to AI features, but they won't be included in codebase embeddings.";
+fn codebase_index_description() -> String {
+    format!(
+        "{} can automatically index code repositories as you navigate them, helping agents quickly understand context and provide solutions. Code is never stored on the server. If a codebase is unable to be indexed, {} can still navigate your codebase and gain insights via grep and find tool calling.",
+        ChannelState::app_name_display(),
+        ChannelState::app_name_display()
+    )
+}
+const WARP_INDEXING_IGNORE_DESCRIPTION: &str = "To exclude specific files or directories from indexing, add them to the .labradorindexingignore file in your repository directory. These files will still be accessible to AI features, but they won't be included in codebase embeddings.";
 const AUTO_INDEX_FEATURE_NAME: &str = "Index new folders by default";
-const AUTO_INDEX_DESCRIPTION: &str = "When set to true, Dwarf will automatically index code repositories as you navigate them - helping agents quickly understand context and provide targeted solutions.";
+fn auto_index_description() -> String {
+    format!(
+        "When set to true, {} will automatically index code repositories as you navigate them - helping agents quickly understand context and provide targeted solutions.",
+        ChannelState::app_name_display()
+    )
+}
 const INDEXING_DISABLED_ADMIN_TEXT: &str = "Team admins have disabled codebase indexing.";
 const INDEXING_WORKSPACE_ENABLED_ADMIN_TEXT: &str = "Team admins have enabled codebase indexing.";
 const INDEXING_DISABLED_GLOBAL_AI_TEXT: &str =
@@ -573,8 +585,7 @@ impl TypedActionView for CodeSettingsPageView {
 
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
                     match settings.codebase_context_enabled.toggle_and_save_value(ctx) {
-                        Ok(_new_value) => {
-                        }
+                        Ok(_new_value) => {}
                         Err(e) => {
                             log::warn!("Failed to set value for Codebase Context: {e:?}");
                         }
@@ -586,8 +597,7 @@ impl TypedActionView for CodeSettingsPageView {
             CodeSettingsPageAction::ToggleAutoIndexing => {
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
                     match settings.auto_indexing_enabled.toggle_and_save_value(ctx) {
-                        Ok(_new_value) => {
-                        }
+                        Ok(_new_value) => {}
                         Err(e) => {
                             log::warn!("Failed to set value for auto indexing: {e:?}");
                         }
@@ -804,7 +814,7 @@ impl SettingsWidget for CodePageWidget {
         ));
         content.add_child(self.render_settings_subtext(
             global_ai_enabled,
-            CODEBASE_INDEX_DESCRIPTION,
+            codebase_index_description(),
             appearance,
         ));
         content.add_child(self.render_settings_subtext(
@@ -855,7 +865,7 @@ impl CodePageWidget {
             // Use subtext styling for description (gray color per Figma)
             self.render_settings_subtext(
                 codebase_indexing_enabled,
-                AUTO_INDEX_DESCRIPTION,
+                auto_index_description(),
                 appearance,
             ),
         ];
@@ -927,7 +937,7 @@ impl CodePageWidget {
     fn render_settings_subtext(
         &self,
         _active: bool,
-        description: &'static str,
+        description: impl Into<std::borrow::Cow<'static, str>>,
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
@@ -2064,7 +2074,7 @@ impl SettingsWidget for CodebaseIndexingCategorizedWidget {
             ToggleState::Enabled,
             appearance,
             toggle_element,
-            Some(CODEBASE_INDEX_DESCRIPTION.into()),
+            Some(codebase_index_description()),
         ));
 
         // Auto-indexing toggle (only shown when codebase indexing is enabled)
@@ -2085,7 +2095,7 @@ impl SettingsWidget for CodebaseIndexingCategorizedWidget {
                         ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleAutoIndexing);
                     })
                     .finish(),
-                Some(AUTO_INDEX_DESCRIPTION.into()),
+                Some(auto_index_description()),
             ));
 
             if !CodebaseIndexManager::as_ref(app).can_create_new_indices() {

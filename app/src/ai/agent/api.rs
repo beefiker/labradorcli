@@ -232,10 +232,8 @@ impl RequestParams {
         let should_redact_secrets = get_secret_obfuscation_mode(app).should_redact_secret();
 
         let user_workspaces = UserWorkspaces::as_ref(app);
-        let api_keys = ApiKeyManager::as_ref(app).api_keys_for_request(
-            user_workspaces.is_byo_api_key_enabled(),
-            false,
-        );
+        let api_keys = ApiKeyManager::as_ref(app)
+            .api_keys_for_request(user_workspaces.is_byo_api_key_enabled(), false);
         let allow_use_of_warp_credits_with_byok = *AISettings::as_ref(app)
             .can_use_warp_credits_with_byok
             && !ai::local_openai_auth::has_access_token()

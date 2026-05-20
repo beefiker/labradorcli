@@ -2,6 +2,7 @@ use itertools::Itertools as _;
 use markdown_parser::{parse_markdown, FormattedText, FormattedTextFragment, FormattedTextLine};
 use parking_lot::FairMutex;
 use std::{borrow::Cow, cmp::Reverse, path::Path, sync::Arc};
+use warp_core::channel::ChannelState;
 use warpui::{
     assets::asset_cache::AssetSource,
     elements::{
@@ -299,7 +300,11 @@ impl View for AgentViewZeroStateBlock {
 
         let header_props = if self.origin.is_cloud_agent() {
             HeaderProps {
-                title: "New Dwarf agent conversation".into(),
+                title: format!(
+                    "New {} agent conversation",
+                    ChannelState::app_name_display()
+                )
+                .into(),
                 description: AgentViewDescription::CloudModeWithDocsLink,
             }
         } else {
@@ -314,7 +319,11 @@ impl View for AgentViewZeroStateBlock {
             }
 
             HeaderProps {
-                title: "New Dwarf agent conversation".into(),
+                title: format!(
+                    "New {} agent conversation",
+                    ChannelState::app_name_display()
+                )
+                .into(),
                 description: AgentViewDescription::PlainText(vec![local_description.into()]),
             }
         };
@@ -523,9 +532,10 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
 
             // Second line: text with "Visit docs" hyperlink.
             let description_with_link = FormattedText::new([FormattedTextLine::Line(vec![
-                FormattedTextFragment::plain_text(
-                    "Use Dwarf agents to run commands, analyze code, and manage local development work. ",
-                ),
+                FormattedTextFragment::plain_text(format!(
+                    "Use {} agents to run commands, analyze code, and manage local development work. ",
+                    ChannelState::app_name_display()
+                )),
                 FormattedTextFragment::hyperlink("Visit docs", CLOUD_AGENT_DOCS_URL),
             ])]);
 

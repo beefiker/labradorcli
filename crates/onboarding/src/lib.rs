@@ -28,20 +28,30 @@ pub use callout::{OnboardingCalloutView, OnboardingKeybindings};
 /// User-facing names of the AI features enabled when the agent intention is selected.
 /// Shared by the intention slide's agent card checklist and the login slide's
 /// skip-login confirmation dialog so the two always stay in sync.
-pub const AI_FEATURES: &[&str] = &[
-    "Dwarf local agent",
-    "Local Codex or Claude Code auth",
-    "Command and script execution",
-    "Codebase context",
-    "Prompt suggestions",
-    "Third-party CLI agent support",
-];
+pub fn ai_features() -> Vec<String> {
+    vec![
+        format!(
+            "{} local agent",
+            warp_core::channel::ChannelState::app_name_display()
+        ),
+        "Local Codex or Claude Code auth".to_string(),
+        "Command and script execution".to_string(),
+        "Codebase context".to_string(),
+        "Prompt suggestions".to_string(),
+        "Third-party CLI agent support".to_string(),
+    ]
+}
 
 /// User-facing names of the Dwarf Drive features enabled when the terminal
 /// intention is selected with Dwarf Drive turned on. Shared by the login slide's
 /// skip-login confirmation dialog so the list stays in sync with any future
 /// surfaces that need it.
-pub const WARP_DRIVE_FEATURES: &[&str] = &["Dwarf Drive", "Session Sharing"];
+pub fn warp_drive_features() -> Vec<String> {
+    vec![
+        warp_core::channel::ChannelState::app_name_with_suffix("Drive"),
+        "Session Sharing".to_string(),
+    ]
+}
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "bin")] {

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use settings::{Setting, ToggleableSetting};
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 use warpui::{
     elements::{Flex, MouseStateHandle, ParentElement},
     ui_components::{components::UiComponent, switch::SwitchStateHandle},
@@ -153,7 +153,10 @@ impl ExternalEditorView {
 
         let mut items = vec![default_app];
 
-        items.push(DropdownItem::new("Dwarf", make_action(EditorChoice::Warp)));
+        items.push(DropdownItem::new(
+            ChannelState::app_name_display(),
+            make_action(EditorChoice::Warp),
+        ));
         if FeatureFlag::AllowOpeningFileLinksUsingEditorEnv.is_enabled() {
             items.push(DropdownItem::new(
                 "$EDITOR",
@@ -175,7 +178,9 @@ impl ExternalEditorView {
             EditorChoice::ExternalEditor(editor) => {
                 dropdown.set_selected_by_name(format!("{editor}"), ctx)
             }
-            EditorChoice::Warp => dropdown.set_selected_by_name("Dwarf", ctx),
+            EditorChoice::Warp => {
+                dropdown.set_selected_by_name(ChannelState::app_name_display(), ctx)
+            }
             EditorChoice::EnvEditor => dropdown.set_selected_by_name("$EDITOR", ctx),
             EditorChoice::SystemDefault => dropdown.set_selected_by_name(default_option_text, ctx),
         };
@@ -186,7 +191,6 @@ impl ExternalEditorView {
         EditorSettings::handle(ctx).update(ctx, |settings, ctx| {
             report_if_error!(settings.open_file_editor.set_value(*editor, ctx));
         });
-
     }
 
     fn set_code_panels_editor(&mut self, editor: &EditorChoice, ctx: &mut ViewContext<Self>) {
@@ -195,7 +199,6 @@ impl ExternalEditorView {
                 .open_code_panels_file_editor
                 .set_value(*editor, ctx));
         });
-
     }
 
     // Handles [`ExternalEditorAction::SetLayout`] by updating the external editor layout settings.
@@ -203,7 +206,6 @@ impl ExternalEditorView {
         EditorSettings::handle(ctx).update(ctx, |settings, ctx| {
             report_if_error!(settings.open_file_layout.set_value(*layout, ctx));
         });
-
     }
 
     /// Handles [`ExternalEditorAction::TogglePreferMarkdownViewer`]
@@ -214,7 +216,6 @@ impl ExternalEditorView {
             report_if_error!(new_value);
             new_value.unwrap_or(PreferMarkdownViewer::default_value())
         });
-
     }
 
     /// Handles [`ExternalEditorAction::TogglePreferTabbedEditorView`] by updating the tabbed file viewer preference.
@@ -226,7 +227,6 @@ impl ExternalEditorView {
             report_if_error!(new_value);
             new_value.unwrap_or(PreferTabbedEditorView::default_value())
         });
-
     }
 }
 
@@ -272,9 +272,13 @@ impl View for ExternalEditorView {
             &self.code_panels_editor_dropdown,
         );
 
+        let default_layout_label = format!(
+            "Choose a layout to open files in {}",
+            ChannelState::app_name_display()
+        );
         let default_layout = render_dropdown_item(
             appearance,
-            "Choose a layout to open files in Dwarf",
+            &default_layout_label,
             None,
             None,
             LocalOnlyIconState::for_setting(
@@ -322,7 +326,10 @@ impl View for ExternalEditorView {
         }
 
         column.add_child(render_body_item::<ExternalEditorAction>(
-            "Open Markdown files in Dwarf's Markdown Viewer by default".to_string(),
+            format!(
+                "Open Markdown files in {} Markdown Viewer by default",
+                ChannelState::app_name_possessive()
+            ),
             Some(AdditionalInfo {
                 mouse_state: self.markdown_viewer_mouse_state.clone(),
                 on_click_action: Some(ExternalEditorAction::OpenUrl(

@@ -24,10 +24,7 @@ use warpui::{
 use warpui::{BlurContext, FocusContext};
 
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{
-    appearance::Appearance,
-    ui_components::blended_colors,
-};
+use crate::{appearance::Appearance, ui_components::blended_colors};
 
 use super::panel::HEADER_HEIGHT;
 use super::{
@@ -63,8 +60,12 @@ const SHOW_EXAMPLES_PROMPT: &str = "Show examples.";
 const WHAT_TO_DO_NEXT_PROMPT: &str = "What should I do next?";
 const IN_FLIGHT_REQUEST_TEXT: &str = "Generating answer...";
 const ACCURACY_NOTICE_TEXT: &str = "AI responses can be inaccurate.";
-const MISSING_CONTEXT_NOTICE_TEXT: &str =
-    "Dwarf AI might forget earlier answers as conversations get long.";
+fn missing_context_notice_text() -> String {
+    format!(
+        "{} might forget earlier answers as conversations get long.",
+        crate::ai_assistant::ai_assistant_feature_name()
+    )
+}
 
 lazy_static::lazy_static! {
     static ref SCROLL_BUFFER_OFFSET_PX: Pixels = (10.).into_pixels();
@@ -201,7 +202,6 @@ impl Transcript {
         if let Some(code) = self.code_for_index(code_block_index, ctx) {
             ctx.clipboard().write(ClipboardContent::plain_text(code));
         }
-
     }
 
     fn paste_in_terminal_input(
@@ -220,7 +220,6 @@ impl Transcript {
         if let Some(code) = self.code_for_index(code_block_index, ctx) {
             ctx.emit(TranscriptEvent::OpenWorkflowModalWithCommand(code));
         }
-
     }
 
     fn handle_keydown(&mut self, keystroke: &Keystroke, ctx: &mut ViewContext<Self>) {
@@ -877,10 +876,9 @@ impl View for Transcript {
 
             if current_transcript_summarized {
                 blocks.add_child(
-                    Container::new(self.render_warning_message(
-                        MISSING_CONTEXT_NOTICE_TEXT.to_string(),
-                        appearance,
-                    ))
+                    Container::new(
+                        self.render_warning_message(missing_context_notice_text(), appearance),
+                    )
                     .with_margin_bottom(DETAILS_BOTTOM_MARGIN)
                     .finish(),
                 );

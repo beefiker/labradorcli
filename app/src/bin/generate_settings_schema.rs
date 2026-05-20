@@ -12,6 +12,7 @@ use schemars::SchemaGenerator;
 use serde_json::{Map, Value};
 
 use settings::schema::SettingSchemaEntry;
+use warp_core::channel::ChannelState;
 use warp_core::features::{FeatureFlag, DEBUG_FLAGS, DOGFOOD_FLAGS, PREVIEW_FLAGS, RELEASE_FLAGS};
 
 /// Ensures all `inventory::submit!` registrations from the app crate's
@@ -199,12 +200,10 @@ fn main() {
         }
 
         // Always overwrite description with the macro-provided one
-        if !entry.description.is_empty() {
+        let description = (entry.description_fn)();
+        if !description.is_empty() {
             if let Some(obj) = schema_value.as_object_mut() {
-                obj.insert(
-                    "description".to_string(),
-                    Value::String(entry.description.to_string()),
-                );
+                obj.insert("description".to_string(), Value::String(description));
             }
         }
 
@@ -230,12 +229,13 @@ fn main() {
     );
     root.insert(
         "title".to_string(),
-        Value::String("Dwarf Settings".to_string()),
+        Value::String(format!("{} Settings", ChannelState::app_name_display())),
     );
     root.insert(
         "description".to_string(),
         Value::String(format!(
-            "JSON Schema for Dwarf settings ({channel} channel, {entry_count} settings)"
+            "JSON Schema for {} settings ({channel} channel, {entry_count} settings)",
+            ChannelState::app_name_display(),
         )),
     );
     root.insert("type".to_string(), Value::String("object".to_string()));

@@ -98,7 +98,7 @@ const SIDEBAR_WIDTH_DEFAULT: f32 = 200.;
 /// Wider sidebar used when the settings-file footer is enabled. Sized to
 /// match Figma's settings nav rail (223px alert + 12px horizontal padding
 /// on each side + 1px right border), giving the error-alert footer enough
-/// room to render its "Open file" and "Fix with Dwarf" buttons side-by-side
+/// room to render its "Open file" and AI fix buttons side-by-side
 /// with the designed 24px indent and 8px internal padding.
 const SIDEBAR_WIDTH_WITH_FOOTER: f32 = 248.;
 
@@ -194,7 +194,7 @@ impl Display for SettingsSection {
         match self {
             SettingsSection::Keybindings => write!(f, "Keyboard shortcuts"),
             SettingsSection::MCPServers => write!(f, "MCP Servers"),
-            SettingsSection::WarpAgent => write!(f, "Dwarf Agent"),
+            SettingsSection::WarpAgent => write!(f, "{}", ChannelState::app_name_agent()),
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
             SettingsSection::Knowledge => write!(f, "Knowledge"),
@@ -202,7 +202,7 @@ impl Display for SettingsSection {
             SettingsSection::CodeIndexing => write!(f, "Indexing and projects"),
             SettingsSection::EditorAndCodeReview => write!(f, "Editor and Code Review"),
             SettingsSection::CloudEnvironments => write!(f, "Environments"),
-            SettingsSection::Warpify => write!(f, "Dwarfify"),
+            SettingsSection::Warpify => write!(f, "{}", ChannelState::app_name_verbify()),
             _ => write!(f, "{self:?}"),
         }
     }
@@ -291,8 +291,12 @@ impl FromStr for SettingsSection {
             "Features" => Ok(Self::Features),
             "Keyboard shortcuts" => Ok(Self::Keybindings),
             "Privacy" => Ok(Self::Privacy),
-            "Warpify" | "Dwarfify" => Ok(Self::Warpify),
-            "Warp Agent" | "Dwarf Agent" => Ok(Self::WarpAgent),
+            other if other == "Warpify" || other == ChannelState::app_name_verbify() => {
+                Ok(Self::Warpify)
+            }
+            other if other == "Warp Agent" || other == ChannelState::app_name_agent() => {
+                Ok(Self::WarpAgent)
+            }
             "Profiles" | "AgentProfiles" => Ok(Self::AgentProfiles),
             "MCP servers" | "AgentMCPServers" => Ok(Self::AgentMCPServers),
             "Knowledge" => Ok(Self::Knowledge),
@@ -1648,8 +1652,7 @@ impl SettingsView {
             self.clear_search_query(ctx);
         }
         self.current_settings_page = section;
-        if previous_section != section && section == SettingsSection::CloudEnvironments {
-        }
+        if previous_section != section && section == SettingsSection::CloudEnvironments {}
 
         // When navigating to a subpage, update the backing page's active subpage mode
         // and auto-expand the umbrella containing it.
@@ -2227,8 +2230,7 @@ impl TypedActionView for SettingsView {
             SettingsAction::SelectAndRefresh(section) => {
                 self.set_and_refresh_current_page_internal(*section, false, true, ctx);
 
-                if *section == SettingsSection::MCPServers {
-                }
+                if *section == SettingsSection::MCPServers {}
             }
             SettingsAction::ToggleUmbrella(nav_index) => {
                 if let Some(SettingsNavItem::Umbrella(umbrella)) =

@@ -55,7 +55,10 @@ impl OneTimeModalModel {
                         .did_check_to_trigger_oz_launch_modal
                         .set_value(true, ctx)
                     {
-                        log::warn!("Failed to mark Dwarf launch modal as dismissed: {e}");
+                        log::warn!(
+                            "Failed to mark {} launch modal as dismissed: {e}",
+                            ChannelState::app_name_display()
+                        );
                     }
                 });
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -202,7 +205,10 @@ impl OneTimeModalModel {
                 .did_check_to_trigger_oz_launch_modal
                 .set_value(true, ctx)
             {
-                log::warn!("Failed to mark Dwarf launch modal as dismissed: {e}");
+                log::warn!(
+                    "Failed to mark {} launch modal as dismissed: {e}",
+                    ChannelState::app_name_display()
+                );
             }
         });
 

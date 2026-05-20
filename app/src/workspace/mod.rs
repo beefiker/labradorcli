@@ -186,13 +186,19 @@ pub fn init(app: &mut AppContext) {
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:install_opencode_warp_plugin",
-                    "[Debug] Install OpenCode Dwarf plugin",
+                    format!(
+                        "[Debug] Install OpenCode {} plugin",
+                        ChannelState::app_name_display()
+                    ),
                     WorkspaceAction::InstallOpenCodeWarpPlugin,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:use_local_opencode_warp_plugin",
-                    "[Debug] Use local OpenCode Dwarf plugin (testing only)",
+                    format!(
+                        "[Debug] Use local OpenCode {} plugin (testing only)",
+                        ChannelState::app_name_display()
+                    ),
                     WorkspaceAction::UseLocalOpenCodeWarpPlugin,
                 )
                 .with_context_predicate(id!("Workspace")),
@@ -783,7 +789,7 @@ pub fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "workspace:terminate_app",
-            "Quit Dwarf",
+            format!("Quit {}", ChannelState::app_name_display()),
             WorkspaceAction::TerminateApp,
         )
         .with_context_predicate(id!("Workspace"))
@@ -888,7 +894,7 @@ pub fn init(app: &mut AppContext) {
         EditableBinding::new(
             // If you rename this name, please update the name in command_palette/action/data_source.rs
             "workspace:search_drive",
-            "Search Dwarf Drive",
+            format!("Search {}", ChannelState::app_name_drive()),
             WorkspaceAction::OpenPalette {
                 mode: PaletteMode::WarpDrive,
                 source: PaletteSource::Keybinding,
@@ -938,14 +944,14 @@ pub fn init(app: &mut AppContext) {
         app.register_editable_bindings([
             EditableBinding::new(
                 "workspace:install_cli",
-                "Install Dwarf CLI command",
+                format!("Install {} command", ChannelState::app_name_cli()),
                 WorkspaceAction::InstallCLI,
             )
             .with_group(bindings::BindingGroup::Settings.as_str())
             .with_context_predicate(id!("Workspace")),
             EditableBinding::new(
                 "workspace:uninstall_cli",
-                "Uninstall Dwarf CLI command",
+                format!("Uninstall {} command", ChannelState::app_name_cli()),
                 WorkspaceAction::UninstallCLI,
             )
             .with_group(bindings::BindingGroup::Settings.as_str())
@@ -970,7 +976,7 @@ pub fn init(app: &mut AppContext) {
         .with_custom_action(CustomAction::NewAgentModePane),
         EditableBinding::new(
             "workspace:toggle_ai_assistant",
-            "Toggle Dwarf AI",
+            format!("Toggle {}", ChannelState::app_name_ai()),
             WorkspaceAction::ToggleAIAssistant,
         )
         .with_enabled(|| !FeatureFlag::AgentMode.is_enabled())
@@ -1155,7 +1161,10 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
         EditableBinding::new(
             "workspace:show_settings_about_page",
             BindingDescription::new("Open Settings: About")
-                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "About Dwarf"),
+                .with_custom_description(
+                    bindings::MAC_MENUS_CONTEXT,
+                    format!("About {}", ChannelState::app_name_display()),
+                ),
             WorkspaceAction::ShowSettingsPage(SettingsSection::About),
         )
         .with_group(bindings::BindingGroup::Settings.as_str())
@@ -1170,8 +1179,14 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
         .with_context_predicate(id!("Workspace")),
         EditableBinding::new(
             "workspace:show_settings_warpify_page",
-            BindingDescription::new("Open Settings: Dwarfify")
-                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Configure Dwarfify..."),
+            BindingDescription::new(format!(
+                "Open Settings: {}",
+                ChannelState::app_name_verbify()
+            ))
+            .with_custom_description(
+                bindings::MAC_MENUS_CONTEXT,
+                format!("Configure {}...", ChannelState::app_name_verbify()),
+            ),
             WorkspaceAction::ShowSettingsPage(SettingsSection::Warpify),
         )
         .with_group(bindings::BindingGroup::Settings.as_str())
@@ -1245,7 +1260,11 @@ fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
         EditableBinding::new(
             "workspace:send_feedback",
             BindingDescription::new("Send feedback (opens external link)").with_dynamic_override(
-                |ctx| is_feedback_skill_available(ctx).then(|| "Send feedback with Dwarf".into()),
+                |ctx| {
+                    is_feedback_skill_available(ctx).then(|| {
+                        format!("Send feedback with {}", ChannelState::app_name_display()).into()
+                    })
+                },
             ),
             WorkspaceAction::SendFeedback,
         )
@@ -1253,7 +1272,7 @@ fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
         #[cfg(not(target_family = "wasm"))]
         EditableBinding::new(
             "workspace:view_logs",
-            "View Dwarf logs",
+            format!("View {} logs", ChannelState::app_name_display()),
             WorkspaceAction::ViewLogs,
         )
         .with_context_predicate(id!("Workspace")),

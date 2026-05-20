@@ -497,8 +497,7 @@ impl OnboardingStateModel {
         path: Option<String>,
         ctx: &mut ModelContext<Self>,
     ) {
-        if path.is_some() {
-        }
+        if path.is_some() {}
         self.project_settings = ProjectOnboardingSettings::from_path(path);
         ctx.notify();
     }
@@ -532,7 +531,6 @@ impl OnboardingStateModel {
             self.project_settings,
             ProjectOnboardingSettings::Project { .. }
         );
-
     }
 
     pub(crate) fn complete(&mut self, ctx: &mut ModelContext<Self>) {
@@ -584,8 +582,7 @@ impl OnboardingStateModel {
         } else {
             matches!(self.step, OnboardingStep::Project)
         };
-        if !is_last_step {
-        }
+        if !is_last_step {}
 
         if theme_picker_last {
             match self.step {
@@ -623,20 +620,13 @@ impl OnboardingStateModel {
         self.step = step;
 
         match step {
-            OnboardingStep::Intro => {
-            }
-            OnboardingStep::ThemePicker => {
-            }
-            OnboardingStep::Intention => {
-            }
-            OnboardingStep::Customize => {
-            }
-            OnboardingStep::Agent => {
-            }
-            OnboardingStep::ThirdParty => {
-            }
-            OnboardingStep::Project => {
-            }
+            OnboardingStep::Intro => {}
+            OnboardingStep::ThemePicker => {}
+            OnboardingStep::Intention => {}
+            OnboardingStep::Customize => {}
+            OnboardingStep::Agent => {}
+            OnboardingStep::ThirdParty => {}
+            OnboardingStep::Project => {}
         }
 
         ctx.emit(OnboardingStateEvent::SelectedSlideChanged);

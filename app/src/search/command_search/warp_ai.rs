@@ -1,7 +1,7 @@
 use crate::{
     ai_assistant::{
-        execution_context::WarpAiExecutionContext, GenerateCommandsFromNaturalLanguageError,
-        AI_ASSISTANT_LOGO_COLOR,
+        ai_assistant_feature_name, execution_context::WarpAiExecutionContext,
+        GenerateCommandsFromNaturalLanguageError, AI_ASSISTANT_LOGO_COLOR,
     },
     appearance::Appearance,
     features::FeatureFlag,
@@ -31,9 +31,6 @@ use warpui::{
     AppContext, Element, SingletonEntity,
 };
 
-const OPEN_WARP_AI_ITEM_BODY_TEXT: &str = "Ask Dwarf AI for command suggestions";
-const TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT: &str = "Translate into shell command using Dwarf AI";
-
 #[derive(Clone, Debug)]
 pub enum WarpAISearchItem {
     /// Translates the query within command search.
@@ -44,10 +41,14 @@ pub enum WarpAISearchItem {
 }
 
 impl WarpAISearchItem {
-    fn item_body_text(&self) -> &'static str {
+    fn item_body_text(&self) -> String {
         match self {
-            WarpAISearchItem::Translate => TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT,
-            WarpAISearchItem::Open => OPEN_WARP_AI_ITEM_BODY_TEXT,
+            WarpAISearchItem::Translate => {
+                format!("Translate into shell command using {}", ai_assistant_feature_name())
+            }
+            WarpAISearchItem::Open => {
+                format!("Ask {} for command suggestions", ai_assistant_feature_name())
+            }
         }
     }
 }
@@ -135,7 +136,7 @@ impl SearchItem for WarpAISearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Dwarf AI: {}", self.item_body_text())
+        format!("{}: {}", ai_assistant_feature_name(), self.item_body_text())
     }
 }
 

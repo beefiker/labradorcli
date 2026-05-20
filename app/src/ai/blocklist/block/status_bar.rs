@@ -4,9 +4,9 @@ use super::{
     cli_controller::{CLISubagentController, CLISubagentEvent, UserTakeOverReason},
     model::{AIBlockModel, AIBlockModelImpl, AIBlockOutputStatus},
     view_impl::common::{
-        render_switch_control_to_user_button, render_warping_indicator,
+        load_output_message, render_switch_control_to_user_button, render_warping_indicator,
         render_warping_indicator_base, ButtonProps, ForceRefreshButtonProps, MaybeShimmeringText,
-        WarpingIndicatorProps, WarpingProps, LOAD_OUTPUT_MESSAGE, WAITING_FOR_USER_INPUT_MESSAGE,
+        WarpingIndicatorProps, WarpingProps, WAITING_FOR_USER_INPUT_MESSAGE,
     },
 };
 use crate::{ai::agent_tips::AITipModel, terminal::input::buffer_model::InputBufferUpdateEvent};
@@ -16,13 +16,12 @@ use crate::{
         AgentViewController, EphemeralMessageModel,
     },
     terminal::input::{
-        buffer_model::InputBufferModel,
-        message_bar::common::render_standard_message_bar,
-        message_bar::Message,
-        slash_command_model::SlashCommandModel,
+        buffer_model::InputBufferModel, message_bar::common::render_standard_message_bar,
+        message_bar::Message, slash_command_model::SlashCommandModel,
         suggestions_mode_model::InputSuggestionsModeModel,
     },
 };
+use warp_core::channel::ChannelState;
 use warp_multi_agent_api as api;
 
 use crate::{
@@ -698,8 +697,7 @@ impl BlocklistAIStatusBar {
             // Get the current tip from the model
             self.current_tip = tip_model.as_ref(ctx).current_tip().cloned();
 
-            if let Some(_tip) = self.current_tip.as_ref() {
-            }
+            if let Some(_tip) = self.current_tip.as_ref() {}
         } else {
             self.current_tip = None;
         }
@@ -776,11 +774,9 @@ impl BlocklistAIStatusBar {
             model.as_ref(),
             app,
         );
-        let default_warping_text = fallback_warping_text
-            .as_deref()
-            .unwrap_or(LOAD_OUTPUT_MESSAGE)
-            .to_owned();
-        let secondary_element = if fallback_warping_text.is_some() {
+        let has_fallback_warping_text = fallback_warping_text.is_some();
+        let default_warping_text = fallback_warping_text.unwrap_or_else(load_output_message);
+        let secondary_element = if has_fallback_warping_text {
             Some(render_fallback_explanation(model.as_ref(), app))
         } else {
             self.render_tip(app)
@@ -953,10 +949,10 @@ fn render_fallback_explanation<V: View>(
 }
 
 /// If the current exchange is using a fallback model, returns the warping message to display
-/// (e.g. "Dwarfing with Claude 3.5 Haiku."). When the current exchange's output doesn't have
+/// (e.g. loading with a model name). When the current exchange's output doesn't have
 /// model info yet (the ModelUsed message hasn't arrived), we check the most recent previous
 /// exchange as a best guess — if the conversation already fell back, the next exchange likely
-/// will too. This avoids a flicker from "Dwarfing..." to "Dwarfing with {name}." on follow-ups.
+/// will too. This avoids a flicker from generic loading text to model-specific loading text on follow-ups.
 ///
 /// We skip the lookback for new user queries because the underlying model may have recovered
 /// since the previous exchange. For agent-initiated follow-up exchanges (action results, etc.)
@@ -991,8 +987,11 @@ fn resolve_fallback_warping_message<V: View>(
         return None;
     }
     Some(match display_name.as_deref() {
-        Some(name) => format!("Dwarfing with {name}."),
-        None => "Dwarfing with another model.".to_owned(),
+        Some(name) => format!("{}ing with {name}.", ChannelState::app_name_display()),
+        None => format!(
+            "{}ing with another model.",
+            ChannelState::app_name_display()
+        ),
     })
 }
 

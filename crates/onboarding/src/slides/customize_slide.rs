@@ -144,7 +144,10 @@ impl CustomizeUISlide {
     fn render_header(&self, appearance: &Appearance) -> Box<dyn Element> {
         let title = appearance
             .ui_builder()
-            .paragraph("Customize your Dwarf")
+            .paragraph(format!(
+                "Customize your {}",
+                warp_core::channel::ChannelState::app_name_display()
+            ))
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),
@@ -258,7 +261,7 @@ impl CustomizeUISlide {
             // Conversation history chip is only shown for the agent intention.
             if is_agent {
                 chips.push(ChipSpec {
-                    label: "Conversation history",
+                    label: "Conversation history".to_string(),
                     is_enabled: ui.show_conversation_history,
                     mouse_state: self.chip_conversation_mouse.clone(),
                     on_click: Box::new(|ctx, _, _| {
@@ -277,7 +280,7 @@ impl CustomizeUISlide {
             }
 
             chips.push(ChipSpec {
-                label: "File explorer",
+                label: "File explorer".to_string(),
                 is_enabled: ui.show_project_explorer,
                 mouse_state: self.chip_file_explorer_mouse.clone(),
                 on_click: Box::new(|ctx, _, _| {
@@ -295,7 +298,7 @@ impl CustomizeUISlide {
             });
 
             chips.push(ChipSpec {
-                label: "Global file search",
+                label: "Global file search".to_string(),
                 is_enabled: ui.show_global_search,
                 mouse_state: self.chip_global_search_mouse.clone(),
                 on_click: Box::new(|ctx, _, _| {
@@ -313,7 +316,7 @@ impl CustomizeUISlide {
             });
 
             chips.push(ChipSpec {
-                label: "Dwarf Drive",
+                label: warp_core::channel::ChannelState::app_name_with_suffix("Drive"),
                 is_enabled: ui.show_warp_drive,
                 mouse_state: self.chip_warp_drive_mouse.clone(),
                 on_click: Box::new(|ctx, _, _| {

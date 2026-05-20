@@ -11,11 +11,15 @@ use warp_core::channel::ChannelState;
 pub mod text {
     use std::io::{self, Write};
 
-    /// Report the run ID with a link to the Dwarf dashboard.
+    /// Report the run ID with a link to the app dashboard.
     pub fn run_started<W: Write>(run_id: &str, w: &mut W) -> io::Result<()> {
         let run_url = super::run_url(run_id);
         writeln!(w, "Run ID: {run_id}")?;
-        writeln!(w, "Open in Dwarf: {run_url}\n")
+        writeln!(
+            w,
+            "Open in {}: {run_url}\n",
+            super::ChannelState::app_name_display()
+        )
     }
 
     /// Report that a shared session has been established.
@@ -31,13 +35,8 @@ pub mod json {
     #[derive(Serialize)]
     #[serde(tag = "type", rename_all = "snake_case")]
     enum JsonSystemEvent<'a> {
-        RunStarted {
-            run_id: &'a str,
-            run_url: &'a str,
-        },
-        SharedSessionEstablished {
-            join_url: &'a str,
-        },
+        RunStarted { run_id: &'a str, run_url: &'a str },
+        SharedSessionEstablished { join_url: &'a str },
     }
 
     fn write_event<W: Write>(event: &JsonSystemEvent<'_>, w: &mut W) -> io::Result<()> {

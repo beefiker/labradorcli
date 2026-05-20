@@ -54,7 +54,7 @@ pub enum InitStepStatus {
     Pending,
     /// Ready for user interaction (contains data for view to render)
     Ready(InitStepData),
-    /// User initiated action, e.g. AI generating WARP.md
+    /// User initiated action, e.g. AI generating LABRADOR.md
     Running,
     /// Done (accepted, skipped, or auto-completed)
     Completed(InitActionResult),
@@ -512,13 +512,13 @@ impl InitProjectModel {
                     p.file_name()
                         .map(|n| {
                             let name = n.to_string_lossy().to_lowercase();
-                            name == "agents.md" || name == "warp.md"
+                            name == "agents.md" || name == "labrador.md"
                         })
                         .unwrap_or(false)
                 });
 
                 if has_agents_md {
-                    // Already has AGENTS.md or WARP.md, mark as completed
+                    // Already has AGENTS.md or LABRADOR.md, mark as completed
                     me.set_step(
                         InitStepKind::ProjectScopedRules,
                         Some(InitStep::new_completed(

@@ -20,6 +20,7 @@ use lsp_server_selector::{create_lsp_server_selector, LSPServerInfo};
 pub use model::{InitProjectModel, InitProjectModelEvent, InitStepKind};
 use model::{InitStepData, InitStepStatus};
 use std::path::{Path, PathBuf};
+use warp_core::channel::ChannelState;
 use warp_core::ui::theme::Fill;
 use warpui::{
     elements::{
@@ -31,11 +32,16 @@ use warpui::{
     ViewHandle,
 };
 
-const ONBOARDING_TEXT: &str = "Great - let's begin setting up this project! Would you like to give me permission to index this codebase? It allows me to quickly understand context and provide more targeted solutions when working in this codebase. No code is stored on Dwarf servers.";
+fn onboarding_text() -> String {
+    format!(
+        "Great - let's begin setting up this project! Would you like to give me permission to index this codebase? It allows me to quickly understand context and provide more targeted solutions when working in this codebase. No code is stored on {} servers.",
+        ChannelState::app_name_display()
+    )
+}
 const ALREADY_SETUP_TEXT: &str = "It looks like this project has already been initialized. You can re-generate the AGENTS.md for this codebase by clicking the button below.";
 // Native Warp rules file format.
-pub const FILES_TO_CHECK: [&str; 2] = ["AGENTS.md", "WARP.md"];
-// File formats that can be linked to WARP.md.
+pub const FILES_TO_CHECK: [&str; 2] = ["AGENTS.md", "LABRADOR.md"];
+// File formats that can be linked to LABRADOR.md.
 pub const LINKABLE_FILES: [&str; 7] = [
     "CLAUDE.md",
     ".cursorrules",
@@ -566,9 +572,9 @@ impl InitStepBlock {
         let is_already_setup = self.model.as_ref(app).is_already_setup();
 
         let display_text = if !is_already_setup {
-            ONBOARDING_TEXT
+            onboarding_text()
         } else {
-            ALREADY_SETUP_TEXT
+            ALREADY_SETUP_TEXT.to_string()
         };
 
         let text = Text::new(
@@ -818,7 +824,10 @@ impl InitStepBlock {
                 };
                 Self::render_ready_with_buttons(
                     action_view,
-                    "Would you like to create an AGENTS.md file? Dwarf can create one for you with project specific rules, context, and conventions inferred from your codebase. The agent will use this context as it codes.",
+                    format!(
+                        "Would you like to create an AGENTS.md file? {} can create one for you with project specific rules, context, and conventions inferred from your codebase. The agent will use this context as it codes.",
+                        ChannelState::app_name_display()
+                    ),
                     app,
                 )
             }
@@ -967,7 +976,6 @@ impl InitStepBlock {
             },
             move |_me, result, ctx| match result {
                 Ok(()) => {
-
                     PersistedWorkspace::handle(ctx).update(ctx, |workspace, _| {
                         workspace.enable_lsp_server_for_path(&repo_root, server_type);
                     });
@@ -988,7 +996,6 @@ impl InitStepBlock {
                     });
                 }
                 Err(e) => {
-
                     ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                         toast_stack.add_ephemeral_toast(
                             DismissibleToast::error(format!(
@@ -1072,8 +1079,7 @@ impl TypedActionView for InitStepBlock {
                 }
 
                 // Send telemetry for each enabled server
-                for _server_type in enabled_servers.iter().chain(servers_to_install.iter()) {
-                }
+                for _server_type in enabled_servers.iter().chain(servers_to_install.iter()) {}
 
                 // Spawn installation tasks for uninstalled servers
                 let model = self.model.clone();

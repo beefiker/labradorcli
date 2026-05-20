@@ -3,7 +3,7 @@ name = "warp_ripgrep"
 authors = ["Warp Team <dev@warp.dev>"]
 version = "0.1.0"
 edition = "2021"
-description = "Thin wrapper around ripgrep for usage by Warp CLI"
+description = "Thin wrapper around ripgrep for usage by Dwarf CLI"
 publish.workspace = true
 license.workspace = true
 

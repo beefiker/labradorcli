@@ -269,118 +269,98 @@ impl TelemetryEventDesc for CliTelemetryEventDiscriminants {
 
     fn description(&self) -> &'static str {
         match self {
-            CliTelemetryEventDiscriminants::AgentRun => "Ran an agent from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::AgentRunAmbient => {
-                "Ran an ambient agent from the Dwarf CLI"
-            }
+            CliTelemetryEventDiscriminants::AgentRun => "Ran an agent from the CLI",
+            CliTelemetryEventDiscriminants::AgentRunAmbient => "Ran an ambient agent from the CLI",
             CliTelemetryEventDiscriminants::AgentProfileList => {
-                "Listed agent profiles from the Dwarf CLI"
+                "Listed agent profiles from the CLI"
             }
-            CliTelemetryEventDiscriminants::AgentList => "Listed agents from the Dwarf CLI",
+            CliTelemetryEventDiscriminants::AgentList => "Listed agents from the CLI",
             CliTelemetryEventDiscriminants::EnvironmentList => {
-                "Listed cloud environments from the Dwarf CLI"
+                "Listed cloud environments from the CLI"
             }
             CliTelemetryEventDiscriminants::EnvironmentCreate => {
-                "Created a cloud environment from the Dwarf CLI"
+                "Created a cloud environment from the CLI"
             }
             CliTelemetryEventDiscriminants::EnvironmentDelete => {
-                "Deleted a cloud environment from the Dwarf CLI"
+                "Deleted a cloud environment from the CLI"
             }
             CliTelemetryEventDiscriminants::EnvironmentUpdate => {
-                "Updated a cloud environment from the Dwarf CLI"
+                "Updated a cloud environment from the CLI"
             }
             CliTelemetryEventDiscriminants::EnvironmentGet => {
-                "Got cloud environment details from the Dwarf CLI"
+                "Got cloud environment details from the CLI"
             }
             CliTelemetryEventDiscriminants::EnvironmentImageList => {
-                "Listed available base images from the Dwarf CLI"
+                "Listed available base images from the CLI"
             }
-            CliTelemetryEventDiscriminants::MCPList => "Listed MCP servers from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::ModelList => "Listed models from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::TaskList => "Listed tasks from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::TaskGet => "Got status of task from the Dwarf CLI",
+            CliTelemetryEventDiscriminants::MCPList => "Listed MCP servers from the CLI",
+            CliTelemetryEventDiscriminants::ModelList => "Listed models from the CLI",
+            CliTelemetryEventDiscriminants::TaskList => "Listed tasks from the CLI",
+            CliTelemetryEventDiscriminants::TaskGet => "Got status of task from the CLI",
             CliTelemetryEventDiscriminants::ConversationGet => {
-                "Got conversation by ID from the Dwarf CLI"
+                "Got conversation by ID from the CLI"
             }
             CliTelemetryEventDiscriminants::RunConversationGet => {
-                "Got run conversation from the Dwarf CLI"
+                "Got run conversation from the CLI"
             }
-            CliTelemetryEventDiscriminants::RunMessageWatch => {
-                "Watched run messages from the Dwarf CLI"
-            }
-            CliTelemetryEventDiscriminants::RunMessageSend => {
-                "Sent a run message from the Dwarf CLI"
-            }
-            CliTelemetryEventDiscriminants::RunMessageList => {
-                "Listed run messages from the Dwarf CLI"
-            }
-            CliTelemetryEventDiscriminants::RunMessageRead => {
-                "Read a run message from the Dwarf CLI"
-            }
+            CliTelemetryEventDiscriminants::RunMessageWatch => "Watched run messages from the CLI",
+            CliTelemetryEventDiscriminants::RunMessageSend => "Sent a run message from the CLI",
+            CliTelemetryEventDiscriminants::RunMessageList => "Listed run messages from the CLI",
+            CliTelemetryEventDiscriminants::RunMessageRead => "Read a run message from the CLI",
             CliTelemetryEventDiscriminants::RunMessageMarkDelivered => {
-                "Marked a run message as delivered from the Dwarf CLI"
+                "Marked a run message as delivered from the CLI"
             }
-            CliTelemetryEventDiscriminants::Login => "Logged in via the Dwarf CLI",
-            CliTelemetryEventDiscriminants::Logout => "Logged out via the Dwarf CLI",
-            CliTelemetryEventDiscriminants::Whoami => {
-                "Printed current user info from the Dwarf CLI"
-            }
-            CliTelemetryEventDiscriminants::ProviderSetup => "Set up a provider via the Dwarf CLI",
-            CliTelemetryEventDiscriminants::ProviderList => "Listed providers from the Dwarf CLI",
+            CliTelemetryEventDiscriminants::Login => "Logged in via the CLI",
+            CliTelemetryEventDiscriminants::Logout => "Logged out via the CLI",
+            CliTelemetryEventDiscriminants::Whoami => "Printed current user info from the CLI",
+            CliTelemetryEventDiscriminants::ProviderSetup => "Set up a provider via the CLI",
+            CliTelemetryEventDiscriminants::ProviderList => "Listed providers from the CLI",
             CliTelemetryEventDiscriminants::IntegrationCreate => {
-                "Created an integration from the Dwarf CLI"
+                "Created an integration from the CLI"
             }
             CliTelemetryEventDiscriminants::IntegrationUpdate => {
-                "Updated an integration from the Dwarf CLI"
+                "Updated an integration from the CLI"
             }
-            CliTelemetryEventDiscriminants::IntegrationList => {
-                "Listed integrations from the Dwarf CLI"
-            }
-            CliTelemetryEventDiscriminants::ArtifactUpload => {
-                "Uploaded an artifact from the Dwarf CLI"
-            }
-            CliTelemetryEventDiscriminants::ArtifactGet => {
-                "Got artifact metadata from the Dwarf CLI"
-            }
+            CliTelemetryEventDiscriminants::IntegrationList => "Listed integrations from the CLI",
+            CliTelemetryEventDiscriminants::ArtifactUpload => "Uploaded an artifact from the CLI",
+            CliTelemetryEventDiscriminants::ArtifactGet => "Got artifact metadata from the CLI",
             CliTelemetryEventDiscriminants::ArtifactDownload => {
-                "Downloaded an artifact from the Dwarf CLI"
+                "Downloaded an artifact from the CLI"
             }
             CliTelemetryEventDiscriminants::ScheduleCreate => {
-                "Created a scheduled agent from the Dwarf CLI"
+                "Created a scheduled agent from the CLI"
             }
-            CliTelemetryEventDiscriminants::ScheduleList => {
-                "Listed scheduled agents from the Dwarf CLI"
-            }
+            CliTelemetryEventDiscriminants::ScheduleList => "Listed scheduled agents from the CLI",
             CliTelemetryEventDiscriminants::ScheduleGet => {
-                "Got scheduled agent configuration from the Dwarf CLI"
+                "Got scheduled agent configuration from the CLI"
             }
             CliTelemetryEventDiscriminants::SchedulePause => {
-                "Paused a scheduled agent from the Dwarf CLI"
+                "Paused a scheduled agent from the CLI"
             }
             CliTelemetryEventDiscriminants::ScheduleUnpause => {
-                "Unpaused a scheduled agent from the Dwarf CLI"
+                "Unpaused a scheduled agent from the CLI"
             }
             CliTelemetryEventDiscriminants::ScheduleUpdate => {
-                "Updated a scheduled agent from the Dwarf CLI"
+                "Updated a scheduled agent from the CLI"
             }
             CliTelemetryEventDiscriminants::ScheduleDelete => {
-                "Deleted a scheduled agent from the Dwarf CLI"
+                "Deleted a scheduled agent from the CLI"
             }
-            CliTelemetryEventDiscriminants::SecretCreate => "Created a secret from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::SecretDelete => "Deleted a secret from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::SecretUpdate => "Updated a secret from the Dwarf CLI",
-            CliTelemetryEventDiscriminants::SecretList => "Listed secrets from the Dwarf CLI",
+            CliTelemetryEventDiscriminants::SecretCreate => "Created a secret from the CLI",
+            CliTelemetryEventDiscriminants::SecretDelete => "Deleted a secret from the CLI",
+            CliTelemetryEventDiscriminants::SecretUpdate => "Updated a secret from the CLI",
+            CliTelemetryEventDiscriminants::SecretList => "Listed secrets from the CLI",
             CliTelemetryEventDiscriminants::HarnessSupportPing => {
-                "Pinged harness-support from the Dwarf CLI"
+                "Pinged harness-support from the CLI"
             }
             CliTelemetryEventDiscriminants::HarnessSupportReportArtifact => {
-                "Reported an artifact via harness-support from the Dwarf CLI"
+                "Reported an artifact via harness-support from the CLI"
             }
             CliTelemetryEventDiscriminants::HarnessSupportNotifyUser => {
-                "Sent a user notification via harness-support from the Dwarf CLI"
+                "Sent a user notification via harness-support from the CLI"
             }
             CliTelemetryEventDiscriminants::HarnessSupportFinishTask => {
-                "Reported task completion via harness-support from the Dwarf CLI"
+                "Reported task completion via harness-support from the CLI"
             }
         }
     }

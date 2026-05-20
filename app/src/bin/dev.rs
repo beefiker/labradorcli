@@ -14,8 +14,12 @@ fn main() -> Result<()> {
         ChannelState::new(
             Channel::Dev,
             ChannelConfig {
-                app_id: AppId::new("dev", "warp", "WarpDev"),
-                logfile_name: "warp.log".into(),
+                app_id: AppId::new(
+                    "dev",
+                    warp_core::channel::APP_ID_ORGANIZATION,
+                    ChannelState::app_id_application_name(Channel::Dev),
+                ),
+                logfile_name: format!("{}.log", ChannelState::app_name()).into(),
                 server_config: WarpServerConfig::production(),
                 oz_config: OzConfig::production(),
                 telemetry_config: None,

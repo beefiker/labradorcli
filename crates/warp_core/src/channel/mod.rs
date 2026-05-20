@@ -55,7 +55,7 @@ impl Channel {
             Channel::Preview => "oz-preview",
             Channel::Local => "oz-local",
             Channel::Integration => "oz-integration",
-            Channel::Oss => "dwarf",
+            Channel::Oss => APP_NAME,
         }
     }
 }
@@ -68,7 +68,7 @@ impl fmt::Display for Channel {
             Channel::Dev => "dev",
             Channel::Integration => "integration",
             Channel::Local => "local",
-            Channel::Oss => "dwarf",
+            Channel::Oss => APP_NAME,
         })
     }
 }

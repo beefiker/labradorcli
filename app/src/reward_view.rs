@@ -1,4 +1,4 @@
-use warp_core::ui::builder::UiBuilder;
+use warp_core::{channel::ChannelState, ui::builder::UiBuilder};
 use warpui::{
     accessibility::{AccessibilityContent, WarpA11yRole},
     elements::{Align, Container, Element, Flex, MouseStateHandle, ParentElement},
@@ -22,8 +22,6 @@ const TITLE: &str = "Congrats!";
 const TITLE_FONT_SIZE: f32 = 20.;
 const TITLE_MARGIN_BOTTOM: f32 = 25.;
 // Constants for the subtitle
-const SUBTITLE_SENT_REFERRAL: &str =
-    "You earned an exclusive Warp theme for referring someone to Warp.";
 const SUBTITLE_FONT_SIZE: f32 = 14.;
 const SUBTITLE_MARGIN_BOTTOM: f32 = 40.;
 // Constants for the button
@@ -77,9 +75,13 @@ impl RewardView {
         }
     }
 
-    fn subtitle(&self) -> &'static str {
+    fn subtitle(&self) -> String {
         match self.kind {
-            RewardKind::SentReferralTheme => SUBTITLE_SENT_REFERRAL,
+            RewardKind::SentReferralTheme => format!(
+                "You earned an exclusive {} theme for referring someone to {}.",
+                ChannelState::app_name_display(),
+                ChannelState::app_name_display()
+            ),
         }
     }
 

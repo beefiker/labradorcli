@@ -52,7 +52,7 @@ impl SettingsWidget for AboutPageWidget {
     type View = AboutPageView;
 
     fn search_terms(&self) -> &str {
-        "about dwarf version"
+        "about app version"
     }
 
     fn render(
@@ -65,7 +65,7 @@ impl SettingsWidget for AboutPageWidget {
 
         let version = ChannelState::app_version().unwrap_or("1.0.0");
         let title = ui_builder
-            .span("Dwarf")
+            .span(ChannelState::app_name_display())
             .with_style(UiComponentStyles {
                 font_family_id: Some(appearance.header_font_family()),
                 font_size: Some(32.),
@@ -123,7 +123,10 @@ impl SettingsWidget for AboutPageWidget {
                 .with_child(version_row.finish())
                 .with_child(
                     ui_builder
-                        .span("Copyright 2026 Dwarf")
+                        .span(format!(
+                            "Copyright 2026 {}",
+                            ChannelState::app_name_display()
+                        ))
                         .build()
                         .with_margin_top(16.)
                         .finish(),

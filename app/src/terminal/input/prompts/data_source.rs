@@ -45,4 +45,3 @@ impl SyncDataSource for PromptsMenuDataSource {
 impl Entity for PromptsMenuDataSource {
     type Event = ();
 }
-

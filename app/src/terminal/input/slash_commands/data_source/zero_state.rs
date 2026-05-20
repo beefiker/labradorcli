@@ -53,12 +53,12 @@ impl SyncDataSource for ZeroStateDataSource {
         // The results construction below basically orders all active commands, sorted
         // alphabetically, except for the commands in this vec, which are explicitly appended
         // to all the other alphabetically sorted commands, in this order.
-        let prioritized_commands = vec![
-            &*commands::EDIT,
-            &commands::CONVERSATIONS,
-            &commands::PROMPTS,
-            &*commands::PLAN,
-            &commands::AGENT,
+        let prioritized_command_names = [
+            commands::EDIT.name,
+            commands::CONVERSATIONS.name,
+            commands::PROMPTS.name,
+            commands::PLAN.name,
+            commands::AGENT.name,
         ];
 
         let mut active_prioritized_commands = vec![];
@@ -70,9 +70,9 @@ impl SyncDataSource for ZeroStateDataSource {
             .active_commands()
             .sorted_by_key(|(_, command)| std::cmp::Reverse(&command.name))
         {
-            if prioritized_commands
+            if prioritized_command_names
                 .iter()
-                .any(|prioritized_command| prioritized_command.name == active_command.name)
+                .any(|prioritized_command_name| *prioritized_command_name == active_command.name)
             {
                 active_prioritized_commands.push((active_command_id, active_command));
             } else {
@@ -84,10 +84,10 @@ impl SyncDataSource for ZeroStateDataSource {
             }
         }
 
-        for prioritized_command in prioritized_commands {
+        for prioritized_command_name in prioritized_command_names {
             if let Some((id, command)) = active_prioritized_commands
                 .iter()
-                .find(|(_, active_command)| active_command.name == prioritized_command.name)
+                .find(|(_, active_command)| active_command.name == prioritized_command_name)
             {
                 results.push(
                     InlineItem::from_slash_command(id, command, app)

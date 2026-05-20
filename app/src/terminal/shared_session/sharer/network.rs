@@ -31,7 +31,7 @@ use session_sharing_protocol::sharer::{
 };
 use session_sharing_protocol::sharer::{FailedToInitializeSessionReason, SessionEndedReason};
 use std::collections::HashMap;
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 
 use std::pin::pin;
 use std::sync::Arc;
@@ -1279,15 +1279,15 @@ pub fn failed_to_initialize_session_user_error(reason: &FailedToInitializeSessio
 
 pub fn failed_to_add_guests_user_error(reason: &FailedToAddGuestsReason) -> String {
     match reason {
-        FailedToAddGuestsReason::Invalid => "Something went wrong. Please try again.",
-        FailedToAddGuestsReason::NotWarpUsers => {
-            "One or more emails were not associated with Warp accounts."
-        }
+        FailedToAddGuestsReason::Invalid => "Something went wrong. Please try again.".to_string(),
+        FailedToAddGuestsReason::NotWarpUsers => format!(
+            "One or more emails were not associated with {} accounts.",
+            ChannelState::app_name_display()
+        ),
         FailedToAddGuestsReason::GuestAlreadyAdded => {
-            "One or more emails have already been added to the session."
+            "One or more emails have already been added to the session.".to_string()
         }
     }
-    .to_string()
 }
 
 pub enum NetworkEvent {

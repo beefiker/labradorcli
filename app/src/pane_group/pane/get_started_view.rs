@@ -1,5 +1,8 @@
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::{self, appearance::Appearance, color::blend::Blend as _};
+use warp_core::{
+    channel::ChannelState,
+    ui::{self, appearance::Appearance, color::blend::Blend as _},
+};
 use warpui::{
     elements::{
         Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
@@ -24,7 +27,7 @@ use crate::{
     pane_group::{
         focus_state::PaneFocusHandle, pane::view, BackingView, PaneConfiguration, PaneEvent,
     },
-        terminal::TerminalView,
+    terminal::TerminalView,
     util::bindings::{keybinding_name_to_display_string, BindingGroup, CustomAction},
     view_components::DismissibleToast,
     workspace::ToastStack,
@@ -223,7 +226,7 @@ impl GetStartedView {
                 .finish(),
                 appearance
                     .ui_builder()
-                    .paragraph("Welcome to Dwarf")
+                    .paragraph(format!("Welcome to {}", ChannelState::app_name_display()))
                     .with_style(UiComponentStyles {
                         font_size: Some(20.),
                         ..Default::default()

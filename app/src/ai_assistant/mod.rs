@@ -1,13 +1,11 @@
-//! AI Assistant has since been renamed to "Dwarf AI" in the product.
+//! AI Assistant has since been renamed to the product AI name.
 use std::{collections::HashSet, sync::Arc};
 
-use crate::{
-    server::telemetry::OpenedWarpAISource, terminal::model::terminal_model::BlockIndex,
-};
+use crate::{server::telemetry::OpenedWarpAISource, terminal::model::terminal_model::BlockIndex};
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use serde::{Deserialize, Serialize};
-use warp_core::command::ExitCode;
+use warp_core::{channel::ChannelState, command::ExitCode};
 
 pub mod execution_context;
 pub mod panel;
@@ -23,8 +21,13 @@ mod test_util;
 /// This is also roughly the limit at which the editor starts degrading.
 pub const PROMPT_CHARACTER_LIMIT: usize = 1000;
 
-pub const AI_ASSISTANT_FEATURE_NAME: &str = "Dwarf AI";
-pub const ASK_AI_ASSISTANT_TEXT: &str = "Ask Dwarf AI";
+pub fn ai_assistant_feature_name() -> String {
+    ChannelState::app_name_with_suffix("AI")
+}
+
+pub fn ask_ai_assistant_text() -> String {
+    format!("Ask {}", ai_assistant_feature_name())
+}
 
 pub const AI_ASSISTANT_SVG_PATH: &str = "bundled/svg/ai-assistant.svg";
 
@@ -77,4 +80,3 @@ pub enum GenerateCommandsFromNaturalLanguageError {
     RateLimited,
     Other,
 }
-

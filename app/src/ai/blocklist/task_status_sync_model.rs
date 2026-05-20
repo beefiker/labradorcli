@@ -9,6 +9,7 @@ use crate::terminal::cli_agent_sessions::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
+use warp_core::channel::ChannelState;
 use warp_graphql::ai::{AgentTaskState, PlatformErrorCode};
 use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
 
@@ -268,7 +269,10 @@ pub(crate) fn classify_renderable_error(
         RenderableAIError::ServerOverloaded => (
             AgentTaskState::Error,
             Some(TaskStatusUpdate::with_error_code(
-                "Dwarf is temporarily overloaded. Please try again shortly.",
+                format!(
+                    "{} is temporarily overloaded. Please try again shortly.",
+                    ChannelState::app_name_display()
+                ),
                 PlatformErrorCode::ResourceUnavailable,
             )),
         ),

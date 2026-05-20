@@ -18,6 +18,7 @@ use warpui::{
 };
 
 use crate::appearance::Appearance;
+use crate::channel::ChannelState;
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{ActionButton, ActionButtonTheme, ButtonSize};
 
@@ -28,44 +29,52 @@ const REPO_URL: &str = "https://github.com/warpdotdev/warp";
 const CONTRIBUTING_URL: &str = "https://github.com/warpdotdev/warp/blob/master/CONTRIBUTING.md";
 
 struct InlineLink {
-    text: &'static str,
+    text: String,
     url: &'static str,
 }
 
 struct FeatureItem {
     icon: Icon,
     title: &'static str,
-    description: &'static str,
+    description: String,
     /// If set, the first occurrence of `text` in the description is rendered as a hyperlink.
     inline_link: Option<InlineLink>,
 }
 
-const FEATURE_ITEMS: &[FeatureItem] = &[
-    FeatureItem {
-        icon: Icon::HeartHand,
-        title: "Contribute",
-        description: "Dwarf's client code is now open source. Get started by using the /feedback skill to open an issue, and follow the contribution guidelines here.",
-        inline_link: Some(InlineLink {
-            text: "here",
-            url: CONTRIBUTING_URL,
-        }),
-    },
-    FeatureItem {
-        icon: Icon::Oz,
-        title: "Open Automated Development",
-        description: "The Dwarf repo is managed by a local agent-first workflow.",
-        inline_link: Some(InlineLink {
-            text: "Dwarf",
-            url: REPO_URL,
-        }),
-    },
-    FeatureItem {
-        icon: Icon::MessageChatSquare,
-        title: "Introducing 'auto (open-weights)'",
-        description: "We've added a new auto model that picks the best open weight model for a task, like Kimi or MiniMax.",
-        inline_link: None,
-    },
-];
+fn feature_items() -> [FeatureItem; 3] {
+    [
+        FeatureItem {
+            icon: Icon::HeartHand,
+            title: "Contribute",
+            description: format!(
+                "{} client code is now open source. Get started by using the /feedback skill to open an issue, and follow the contribution guidelines here.",
+                ChannelState::app_name_possessive()
+            ),
+            inline_link: Some(InlineLink {
+                text: "here".to_string(),
+                url: CONTRIBUTING_URL,
+            }),
+        },
+        FeatureItem {
+            icon: Icon::Oz,
+            title: "Open Automated Development",
+            description: format!(
+                "The {} repo is managed by a local agent-first workflow.",
+                ChannelState::app_name_display()
+            ),
+            inline_link: Some(InlineLink {
+                text: ChannelState::app_name_display().to_string(),
+                url: REPO_URL,
+            }),
+        },
+        FeatureItem {
+            icon: Icon::MessageChatSquare,
+            title: "Introducing 'auto (open-weights)'",
+            description: "We've added a new auto model that picks the best open weight model for a task, like Kimi or MiniMax.".to_string(),
+            inline_link: None,
+        },
+    ]
+}
 
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
@@ -202,15 +211,22 @@ impl OpenWarpLaunchModal {
     }
 
     fn render_title(appearance: &Appearance) -> Box<dyn Element> {
-        Text::new("Dwarf is now open-source", appearance.ui_font_family(), 20.)
-            .with_color(PhenomenonStyle::modal_title_text())
-            .with_style(Properties::default().weight(Weight::Semibold))
-            .finish()
+        Text::new(
+            format!("{} is now open-source", ChannelState::app_name_display()),
+            appearance.ui_font_family(),
+            20.,
+        )
+        .with_color(PhenomenonStyle::modal_title_text())
+        .with_style(Properties::default().weight(Weight::Semibold))
+        .finish()
     }
 
     fn render_description(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "You, our community, can participate in building Dwarf using an agent-first workflow.",
+            format!(
+                "You, our community, can participate in building {} using an agent-first workflow.",
+                ChannelState::app_name_display()
+            ),
             appearance.ui_font_family(),
             14.,
         )
@@ -245,7 +261,7 @@ impl OpenWarpLaunchModal {
 
     fn render_feature_description(item: &FeatureItem, appearance: &Appearance) -> Box<dyn Element> {
         let Some(link) = &item.inline_link else {
-            return Text::new(item.description, appearance.ui_font_family(), 14.)
+            return Text::new(item.description.clone(), appearance.ui_font_family(), 14.)
                 .with_color(PhenomenonStyle::modal_feature_description_text())
                 .finish();
         };
@@ -253,11 +269,11 @@ impl OpenWarpLaunchModal {
         // Build a formatted description with an inline hyperlink and inline code.
         let (before, after) = item
             .description
-            .split_once(link.text)
-            .unwrap_or((item.description, ""));
+            .split_once(&link.text)
+            .unwrap_or((item.description.as_str(), ""));
 
         let link_fragment = FormattedTextFragment {
-            text: link.text.into(),
+            text: link.text.clone().into(),
             styles: FormattedTextStyles {
                 underline: true,
                 hyperlink: Some(Hyperlink::Url(link.url.into())),
@@ -326,8 +342,8 @@ impl OpenWarpLaunchModal {
         let mut features_col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(12.);
-        for item in FEATURE_ITEMS {
-            features_col.add_child(Self::render_feature_row(item, appearance));
+        for item in feature_items() {
+            features_col.add_child(Self::render_feature_row(&item, appearance));
         }
 
         let cta = ChildView::new(&self.cta_button).finish();

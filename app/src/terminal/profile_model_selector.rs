@@ -19,6 +19,7 @@ use warpui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewContext, ViewHandle,
 };
+use crate::channel::ChannelState;
 
 const SIDECAR_HORIZONTAL_GAP: f32 = 8.;
 const SIDECAR_POSITION_ID: &str = "model_sidecar_panel";
@@ -1694,8 +1695,10 @@ impl ProfileModelSelector {
         let theme = appearance.theme();
         let header = self.render_model_spec_header(
             "Model Specs".to_string(),
-            "Dwarf's benchmarks for how well a model performs in our harness and task speed."
-                .to_string(),
+            format!(
+                "{} benchmarks for how well a model performs in our harness and task speed.",
+                ChannelState::app_name_possessive()
+            ),
             app,
         );
         let spec = self.render_all_model_spec_values(

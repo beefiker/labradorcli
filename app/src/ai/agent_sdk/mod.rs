@@ -14,6 +14,7 @@ use crate::ai::agent_sdk::mcp_config::build_mcp_servers_from_specs;
 use crate::ai::llms::LLMId;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
 use crate::server::server_api::ai::AIClient;
+use crate::ChannelState;
 use anyhow::Context;
 use warp_cli::{
     agent::{AgentCommand, AgentProfileCommand, OutputFormat},
@@ -1105,7 +1106,8 @@ fn report_fatal_error(err: anyhow::Error, ctx: &mut AppContext) {
         if let Ok(path) = log_file_path() {
             let _ = write!(
                 message,
-                "\n\nFor more information, check Dwarf logs at {}",
+                "\n\nFor more information, check {} logs at {}",
+                ChannelState::app_name_display(),
                 path.display()
             );
         }

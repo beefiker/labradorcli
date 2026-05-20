@@ -31,8 +31,8 @@ use super::{
         SECTION_SPACING_BOTTOM,
     },
     sections::sections,
-    ContentSectionData, ContentSectionView, FeatureSection, FeatureSectionData,
-    FeatureSectionView, Section, TipsCompleted,
+    ContentSectionData, ContentSectionView, FeatureSection, FeatureSectionData, FeatureSectionView,
+    Section, TipsCompleted,
 };
 
 const SEND_SVG_PATH: &str = "bundled/svg/send.svg";
@@ -66,16 +66,10 @@ impl ResourceCenterMainView {
         false
     }
 
-    pub fn new(
-        ctx: &mut ViewContext<Self>,
-        tips_completed: ModelHandle<TipsCompleted>,
-    ) -> Self {
+    pub fn new(ctx: &mut ViewContext<Self>, tips_completed: ModelHandle<TipsCompleted>) -> Self {
         let action_target = ctx.add_model(|_| ActionTarget::None);
-        let section_views = Self::initialize_section_views(
-            tips_completed.clone(),
-            action_target.clone(),
-            ctx,
-        );
+        let section_views =
+            Self::initialize_section_views(tips_completed.clone(), action_target.clone(), ctx);
         Self {
             button_mouse_states: Default::default(),
             clipped_scroll_state: Default::default(),
@@ -344,9 +338,9 @@ impl ResourceCenterMainView {
                     None,
                 )
                 .with_text_and_icon_label(
-                    TextAndIcon::new(
-                        TextAndIconAlignment::IconFirst,
-                        "Invite a friend to Dwarf",
+                        TextAndIcon::new(
+                            TextAndIconAlignment::IconFirst,
+                        format!("Invite a friend to {}", ChannelState::app_name_display()),
                         Icon::new(SEND_SVG_PATH, appearance.theme().accent()),
                         MainAxisSize::Max,
                         MainAxisAlignment::Center,

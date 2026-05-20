@@ -8,6 +8,7 @@ use notify_debouncer_full::notify::{RecursiveMode, WatchFilter};
 use repo_metadata::RepositoryUpdate;
 #[cfg(any(not(target_family = "wasm"), test))]
 use repo_metadata::TargetFile;
+use warp_core::channel::ChannelState;
 #[cfg(not(target_family = "wasm"))]
 use warpui::ModelHandle;
 use warpui::{Entity, ModelContext, SingletonEntity};
@@ -30,7 +31,8 @@ pub(crate) fn ensure_warp_watch_roots_exist() {
     let data_dir = warp_data_dir();
     if let Err(err) = fs::create_dir_all(&data_dir) {
         log::warn!(
-            "Failed to create Warp data directory {}: {err}",
+            "Failed to create {} data directory {}: {err}",
+            ChannelState::app_name_display(),
             data_dir.display()
         );
     }
@@ -39,7 +41,8 @@ pub(crate) fn ensure_warp_watch_roots_exist() {
     if config_local_dir != data_dir {
         if let Err(err) = fs::create_dir_all(&config_local_dir) {
             log::warn!(
-                "Failed to create Warp config directory {}: {err}",
+                "Failed to create {} config directory {}: {err}",
+                ChannelState::app_name_display(),
                 config_local_dir.display()
             );
         }
@@ -244,13 +247,14 @@ impl WarpManagedPathsWatcher {
             let config_local_dir = warp_core::paths::config_local_dir();
             let should_register_config_local_dir = config_local_dir != data_dir;
             let worktrees_dir = data_dir.join("worktrees");
+            let app_name = ChannelState::app_name_display();
             Self::register_path(
                 ctx,
                 &watcher,
                 data_dir.clone(),
                 WatchFilter::with_filter(Arc::new(move |path| !path.starts_with(&worktrees_dir))),
                 RecursiveMode::Recursive,
-                "Warp data directory",
+                format!("{app_name} data directory"),
             );
             if should_register_config_local_dir {
                 Self::register_path(
@@ -259,7 +263,7 @@ impl WarpManagedPathsWatcher {
                     config_local_dir.clone(),
                     WatchFilter::accept_all(),
                     RecursiveMode::Recursive,
-                    "Warp config directory",
+                    format!("{app_name} config directory"),
                 );
             }
             if let Some(warp_home_skills_dir) = warp_home_skills_dir() {
@@ -274,7 +278,7 @@ impl WarpManagedPathsWatcher {
                         warp_home_skills_dir,
                         WatchFilter::accept_all(),
                         RecursiveMode::Recursive,
-                        "Warp home skills directory",
+                        format!("{app_name} home skills directory"),
                     );
                 }
             }
@@ -294,7 +298,7 @@ impl WarpManagedPathsWatcher {
                             path == warp_home_mcp_config_path
                         })),
                         RecursiveMode::NonRecursive,
-                        "Warp home MCP config directory",
+                        format!("{app_name} home MCP config directory"),
                     );
                 }
             }
@@ -309,7 +313,7 @@ impl WarpManagedPathsWatcher {
         directory_path: PathBuf,
         watch_filter: WatchFilter,
         recursive_mode: RecursiveMode,
-        description: &'static str,
+        description: String,
     ) {
         let registration_path = directory_path.clone();
         let registration = watcher.update(ctx, |watcher, _ctx| {
@@ -363,6 +367,7 @@ mod tests {
     use std::path::PathBuf;
 
     use repo_metadata::{RepositoryUpdate, TargetFile};
+    use warp_core::channel::ChannelState;
 
     use super::{
         filter_repository_update_by_prefix, warp_home_mcp_config_file_path, warp_home_skills_dir,
@@ -390,7 +395,10 @@ mod tests {
                 assert_eq!(path.config_path, warp_home_mcp_config_path);
             }
             (_, _, None) => {}
-            _ => panic!("Expected Warp MCP path when home directory is available"),
+            _ => panic!(
+                "Expected {} MCP path when home directory is available",
+                ChannelState::app_name_display()
+            ),
         }
     }
 

@@ -23,6 +23,7 @@ use crate::appearance::Appearance;
 use crate::resource_center::{Tip, TipAction, TipsCompleted};
 use crate::themes::theme::{Blend, Fill};
 use crate::util::bindings::trigger_to_keystroke;
+use warp_core::channel::ChannelState;
 
 use super::WELCOME_TIP_FEATURE_LENGTH;
 
@@ -131,7 +132,10 @@ impl TipsView {
         let tip_items = vec![
             TipItem::new(
                 "Command Palette".to_string(),
-                "Easily discover everything you can do in Warp without your hands leaving the keyboard.".to_string(),
+                format!(
+                    "Easily discover everything you can do in {} without your hands leaving the keyboard.",
+                    ChannelState::app_name_display()
+                ),
                 TipAction::CommandPalette,
                 ctx,
             ),
@@ -156,7 +160,10 @@ impl TipsView {
             ),
             TipItem::new(
                 "Theme Picker".to_string(),
-                "Make Warp your own by choosing a built-in theme. Or create your own.".to_string(),
+                format!(
+                    "Make {} your own by choosing a built-in theme. Or create your own.",
+                    ChannelState::app_name_display()
+                ),
                 TipAction::ThemePicker,
                 ctx,
             ),

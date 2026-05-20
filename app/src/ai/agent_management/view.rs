@@ -6,7 +6,7 @@ use fuzzy_match::match_indices_case_insensitive;
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use siphasher::sip::SipHasher;
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 use warpui::scene::DropShadow;
 use warpui::ui_components::button::ButtonVariant;
 
@@ -1659,7 +1659,10 @@ impl AgentManagementView {
             let mut stack = Stack::new().with_child(loading_icon);
             if mouse_state.is_hovered() {
                 let tooltip = ui_builder
-                    .tool_tip(String::from("Loading Dwarf agent runs"))
+                    .tool_tip(format!(
+                        "Loading {} agent runs",
+                        ChannelState::app_name_display()
+                    ))
                     .build()
                     .finish();
                 stack.add_positioned_overlay_child(

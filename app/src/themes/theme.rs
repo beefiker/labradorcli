@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::path::PathBuf;
-use warp_core::ui::color::pick_foreground_color;
+use warp_core::{channel::ChannelState, ui::color::pick_foreground_color};
 use warpui::assets::asset_cache::AssetSource;
 use warpui::{
     color::ColorU,
@@ -133,8 +133,12 @@ impl std::fmt::Display for ThemeKind {
             ThemeKind::Phenomenon => "Phenomenon",
             ThemeKind::SolarFlare => "Solar Flare",
             ThemeKind::Adeberry => "Adeberry",
-            ThemeKind::SentReferralReward => "Warp Referral",
-            ThemeKind::ReceivedReferralReward => "Referred to Warp",
+            ThemeKind::SentReferralReward => {
+                return write!(f, "{} Referral", ChannelState::app_name_display());
+            }
+            ThemeKind::ReceivedReferralReward => {
+                return write!(f, "Referred to {}", ChannelState::app_name_display());
+            }
             ThemeKind::Custom(custom_theme) => custom_theme.name.as_str(),
             ThemeKind::CustomBase16(custom_theme) => custom_theme.name.as_str(),
             ThemeKind::InMemory(in_memory_theme) => in_memory_theme.name.as_str(),

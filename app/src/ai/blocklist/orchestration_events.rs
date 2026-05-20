@@ -907,6 +907,7 @@ impl OrchestrationEventService {
                     | AIAgentOutputMessageType::WebFetch(_)
                     | AIAgentOutputMessageType::CommentsAddressed { .. }
                     | AIAgentOutputMessageType::DebugOutput { .. }
+                    | AIAgentOutputMessageType::LocalCLIToolOutput(_)
                     | AIAgentOutputMessageType::ArtifactCreated(_)
                     | AIAgentOutputMessageType::SkillInvoked(_) => {}
                 }

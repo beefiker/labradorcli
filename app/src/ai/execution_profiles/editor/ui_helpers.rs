@@ -8,7 +8,7 @@ use crate::Appearance;
 use crate::TemplatableMCPServerManager;
 use pathfinder_geometry::vector::vec2f;
 use uuid::Uuid;
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 use warpui::elements::Dismiss;
 use warpui::elements::Hoverable;
 use warpui::elements::MouseStateHandle;
@@ -133,13 +133,13 @@ pub fn render_section_label(label: &str, appearance: &Appearance) -> Box<dyn Ele
 fn render_filterable_dropdown_row<T: Clone + 'static + std::fmt::Debug + Send + Sync>(
     appearance: &Appearance,
     label: &str,
-    desc: &str,
+    desc: impl Into<String>,
     dropdown: &ViewHandle<FilterableDropdown<T>>,
 ) -> Box<dyn Element> {
     let label_elem = Text::new(label.to_string(), appearance.ui_font_family(), 13.)
         .with_color(appearance.theme().active_ui_text_color().into())
         .finish();
-    let desc_elem = Text::new(desc.to_string(), appearance.ui_font_family(), 11.)
+    let desc_elem = Text::new(desc.into(), appearance.ui_font_family(), 11.)
         .with_color(
             appearance
                 .theme()
@@ -260,7 +260,10 @@ pub fn render_models_section(
         .with_child(render_filterable_dropdown_row(
             appearance,
             "Base model",
-            "This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Dwarf may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
+            format!(
+                "This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. {} may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.",
+                ChannelState::app_name_display()
+            ),
             &view.base_model_dropdown,
         ));
 
@@ -610,14 +613,14 @@ pub fn render_permissions_section(
 
 fn create_section_header(
     label: &str,
-    description: &str,
+    description: impl Into<String>,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let label_elem = Text::new(label.to_string(), appearance.ui_font_family(), 13.)
         .with_color(appearance.theme().active_ui_text_color().into())
         .finish();
 
-    let desc_elem = Text::new(description.to_string(), appearance.ui_font_family(), 11.)
+    let desc_elem = Text::new(description.into(), appearance.ui_font_family(), 11.)
         .with_color(
             appearance
                 .theme()
@@ -639,7 +642,7 @@ fn create_section_header(
 #[allow(clippy::too_many_arguments)]
 fn render_list_section<T, F, D>(
     label: &str,
-    description: &str,
+    description: impl Into<String>,
     items: &[T],
     mouse_handles: &[MouseStateHandle],
     editor: Option<&ViewHandle<SubmittableTextInput>>,
@@ -726,7 +729,10 @@ fn render_command_allowlist_section(
 
     render_list_section(
         "Command allowlist",
-        "Regular expressions to match commands that can be automatically executed by Dwarf.",
+        format!(
+            "Regular expressions to match commands that can be automatically executed by {}.",
+            ChannelState::app_name_display()
+        ),
         &profile_data.command_allowlist,
         &view.command_allowlist_mouse_state_handles,
         Some(&view.command_allowlist_editor),
@@ -752,7 +758,10 @@ fn render_command_denylist_section(
 
     render_list_section(
         "Command denylist",
-        "Regular expressions to match commands that Dwarf should always ask permission to execute.",
+        format!(
+            "Regular expressions to match commands that {} should always ask permission to execute.",
+            ChannelState::app_name_display()
+        ),
         &profile_data.command_denylist,
         &view.command_denylist_mouse_state_handles,
         Some(&view.command_denylist_editor),
@@ -785,7 +794,10 @@ fn render_mcp_allowlist_section(
 
     render_list_section(
         "MCP allowlist",
-        "MCP servers that are allowed to be called by Dwarf.",
+        format!(
+            "MCP servers that are allowed to be called by {}.",
+            ChannelState::app_name_display()
+        ),
         &profile_data.mcp_allowlist,
         &view.mcp_allowlist_mouse_state_handles,
         None,
@@ -811,7 +823,10 @@ fn render_mcp_denylist_section(
 
     render_list_section(
         "MCP denylist",
-        "MCP servers that are not allowed to be called by Dwarf.",
+        format!(
+            "MCP servers that are not allowed to be called by {}.",
+            ChannelState::app_name_display()
+        ),
         &profile_data.mcp_denylist,
         &view.mcp_denylist_mouse_state_handles,
         None,
@@ -853,8 +868,10 @@ pub fn render_plan_auto_sync_toggle(
     .finish();
 
     let desc_elem = Text::new(
-        "The plans this agent creates will be automatically added and synced to Dwarf Drive."
-            .to_string(),
+        format!(
+            "The plans this agent creates will be automatically added and synced to {}.",
+            ChannelState::app_name_drive()
+        ),
         appearance.ui_font_family(),
         11.,
     )

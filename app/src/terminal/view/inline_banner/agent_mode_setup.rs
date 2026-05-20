@@ -7,6 +7,7 @@ use warpui::{
 
 use crate::{
     appearance::Appearance,
+    channel::ChannelState,
     terminal::view::{inline_banner::InlineBannerIcon, InlineBannerId, TerminalAction},
 };
 
@@ -16,7 +17,6 @@ use super::{
     InlineBannerTextButtonVariant,
 };
 
-const SPEEDBUMP_HEADER: &str = "Optimize Dwarf for this codebase?";
 const SPEEDBUMP_TEXT: &str = "Unlock smarter, more consistent responses by letting the Agent understand your codebase and generate rules for it. You can also do this at any point by running /init";
 /// Text for the button that allows execution
 const ALLOW_BUTTON_TEXT: &str = "Optimize";
@@ -79,7 +79,10 @@ pub fn render_agent_mode_setup_banner(
         InlineBannerStyle::Recommendation,
         appearance,
         InlineBannerContent {
-            title: SPEEDBUMP_HEADER.to_string(),
+            title: format!(
+                "Optimize {} for this codebase?",
+                ChannelState::app_name_display()
+            ),
             buttons: vec![open_button],
             close_button: Some(close_button),
             header_icon: Some(InlineBannerIcon {

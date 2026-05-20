@@ -118,8 +118,8 @@ impl HiddenComputerUseArgs {
         }
     }
 }
-/// The execution harness for an agent run. Dwarf is local-CLI-only; the
-/// previous Warp-hosted "oz" harness has been removed.
+/// The execution harness for an agent run. This build is local-CLI-only; the
+/// previous hosted "oz" harness has been removed.
 #[derive(Debug, Copy, Clone, ValueEnum, Eq, PartialEq, Default)]
 pub enum Harness {
     /// Delegate to the `claude` CLI.
@@ -185,9 +185,9 @@ pub enum AgentProfileCommand {
 /// Agent-related subcommands.
 #[derive(Debug, Clone, Subcommand)]
 pub enum AgentCommand {
-    /// Run a new Dwarf agent.
+    /// Run a new local agent.
     Run(RunAgentArgs),
-    /// Dispatch a Dwarf agent that runs remotely.
+    /// Dispatch an agent that runs remotely.
     RunCloud(RunCloudArgs),
     /// Manage agent profiles.
     #[command(subcommand)]
@@ -220,7 +220,7 @@ pub struct RunAgentArgs {
     ///
     /// Format: `skill_name`, `repo:skill_name`, or `org/repo:skill_name`
     ///
-    /// Skills are searched in `.agents/skills/`, `.warp/skills/`, `.claude/skills/`, and `.codex/skills/` directories.
+    /// Skills are searched in `.agents/skills/`, `.labrador/skills/`, `.claude/skills/`, and `.codex/skills/` directories.
     /// If a repo is specified, searches only that repo. If org is also specified,
     /// validates the repo's git remote matches the expected org.
     ///
@@ -236,7 +236,7 @@ pub struct RunAgentArgs {
     /// Working directory for the agent
     #[arg(short = 'C', long = "cwd")]
     pub cwd: Option<PathBuf>,
-    /// Display agent progress in the Warp interface.
+    /// Display agent progress in the app interface.
     #[arg(long = "gui", hide = true)]
     pub gui: bool,
     #[command(flatten)]
@@ -297,7 +297,7 @@ pub struct RunAgentArgs {
 
     /// Execution harness for the agent run.
     ///
-    /// "oz" (default) uses Warp's built-in agent infrastructure.
+    /// "oz" (default) uses the built-in agent infrastructure.
     /// "claude" delegates to the `claude` CLI.
     #[arg(long = "harness", value_name = "HARNESS", default_value_t = Harness::Claude, hide = true)]
     pub harness: Harness,
@@ -353,7 +353,7 @@ pub struct RunCloudArgs {
     ///
     /// Format: `skill_name`, `repo:skill_name`, or `org/repo:skill_name`
     ///
-    /// Skills are searched in `.agents/skills/`, `.warp/skills/`, `.claude/skills/`, and `.codex/skills/` directories.
+    /// Skills are searched in `.agents/skills/`, `.labrador/skills/`, `.claude/skills/`, and `.codex/skills/` directories.
     /// If a repo is specified, searches only that repo. If org is also specified,
     /// validates the repo's git remote matches the expected org.
     ///
@@ -380,7 +380,7 @@ pub struct RunCloudArgs {
     /// The environment to run this ambient agent in.
     #[command(flatten)]
     pub environment: EnvironmentCreateArgs,
-    /// Open the agent's session in Warp once it's available.
+    /// Open the agent's session in the app once it's available.
     #[arg(long = "open")]
     pub open: bool,
 
@@ -391,8 +391,8 @@ pub struct RunCloudArgs {
     #[command(flatten)]
     pub scope: ObjectScope,
 
-    /// Where this job should be hosted. Setting "warp" runs it on Warp's infrastructure. Any other
-    /// value is treated is a self-hosted job and the value will be matched with the self-hosted
+    /// Where this job should be hosted. Omitting this flag runs it on hosted infrastructure. Any
+    /// value is treated as a self-hosted job and matched with the self-hosted
     /// worker's name.
     #[arg(long = "host", value_name = "WORKER_ID")]
     pub worker_host: Option<String>,
@@ -418,7 +418,7 @@ pub struct RunCloudArgs {
 
     /// Execution harness for the agent run.
     ///
-    /// "oz" (default) uses Warp's built-in agent infrastructure.
+    /// "oz" (default) uses the built-in agent infrastructure.
     /// "claude" delegates to the `claude` CLI.
     #[arg(long = "harness", value_name = "HARNESS", default_value_t = Harness::Claude, hide = true)]
     pub harness: Harness,

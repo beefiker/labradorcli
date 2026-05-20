@@ -1,6 +1,7 @@
 use std::sync::LazyLock;
 
 use async_trait::async_trait;
+use warp_core::channel::ChannelState;
 
 use super::{CliAgentPluginManager, PluginInstructionStep, PluginInstructions};
 
@@ -33,9 +34,14 @@ impl CliAgentPluginManager for OpenCodePluginManager {
 
 static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
     PluginInstructions {
-        title: "Install Warp Plugin for OpenCode",
-        subtitle:
-            "Add the Dwarf plugin to your OpenCode configuration, then restart OpenCode.",
+        title: format!(
+            "Install {} Plugin for OpenCode",
+            ChannelState::app_name_display()
+        ),
+        subtitle: format!(
+            "Add the {} plugin to your OpenCode configuration, then restart OpenCode.",
+            ChannelState::app_name_display()
+        ),
         steps: &[
             PluginInstructionStep {
                 description: "Open or create your opencode.json. This can be in your project root, or the global config path:",
@@ -56,8 +62,11 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
 
 static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
     PluginInstructions {
-        title: "Update Warp Plugin for OpenCode",
-        subtitle: "Pin the plugin to the latest version in your opencode.json. OpenCode caches plugins per version spec, so changing the pin forces it to re-fetch on restart.",
+        title: format!(
+            "Update {} Plugin for OpenCode",
+            ChannelState::app_name_display()
+        ),
+        subtitle: "Pin the plugin to the latest version in your opencode.json. OpenCode caches plugins per version spec, so changing the pin forces it to re-fetch on restart.".to_string(),
         steps: &[
             PluginInstructionStep {
                 description: "Open or create your opencode.json. This can be in your project root, or the global config path:",

@@ -14,7 +14,7 @@ pub(super) mod util;
 
 // Re-export types that were moved to the ai crate.
 pub use ai::agent::{action::*, action_result::*, AIAgentCitation, FileLocations};
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 
 #[cfg(test)]
 mod suggestion_test;
@@ -561,6 +561,13 @@ impl AIAgentOutput {
                     result.push(format!("[DEBUG] {text}"));
                     last_was_action = false;
                 }
+                AIAgentOutputMessageType::LocalCLIToolOutput(output) => {
+                    result.push(output.title.clone());
+                    if !output.body.is_empty() {
+                        result.push(output.body.clone());
+                    }
+                    last_was_action = false;
+                }
                 AIAgentOutputMessageType::ArtifactCreated(_) => continue,
                 AIAgentOutputMessageType::SkillInvoked(_) => continue,
                 AIAgentOutputMessageType::MessagesReceivedFromAgents { messages } => {
@@ -664,9 +671,15 @@ impl Display for RenderableAIError {
         match self {
             Self::QuotaLimit => write!(f, "Quota limit reached."),
             Self::ServerOverloaded => {
-                write!(f, "Dwarf is currently overloaded. Please try again later.")
+                write!(
+                    f,
+                    "{} is currently overloaded. Please try again later.",
+                    ChannelState::app_name_display()
+                )
             }
-            Self::InternalWarpError => write!(f, "Internal Dwarf error."),
+            Self::InternalWarpError => {
+                write!(f, "Internal {} error.", ChannelState::app_name_display())
+            }
             Self::ContextWindowExceeded(message) => {
                 write!(f, "Context window exceeded: {message}")
             }
@@ -1536,6 +1549,14 @@ pub struct ReceivedMessageDisplay {
     pub message_body: String,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LocalCLIToolOutput {
+    pub title: String,
+    pub body: String,
+    pub is_complete: bool,
+    pub is_error: bool,
+}
+
 impl Display for InvokedSkill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "InvokedSkill: {}", self.name)
@@ -1575,6 +1596,7 @@ pub enum AIAgentOutputMessageType {
     DebugOutput {
         text: String,
     },
+    LocalCLIToolOutput(LocalCLIToolOutput),
     /// Notification that an artifact was created (e.g. a PR).
     ArtifactCreated(ArtifactCreatedData),
     SkillInvoked(InvokedSkill),
@@ -1756,6 +1778,12 @@ impl Display for AIAgentOutputMessage {
                 comments: comment_ids,
             } => write!(f, "Addressed {} comments", comment_ids.len())?,
             AIAgentOutputMessageType::DebugOutput { text } => write!(f, "[DEBUG] {text}")?,
+            AIAgentOutputMessageType::LocalCLIToolOutput(output) => {
+                write!(f, "{}", output.title)?;
+                if !output.body.is_empty() {
+                    write!(f, "\n{}", output.body)?;
+                }
+            }
             AIAgentOutputMessageType::ArtifactCreated(data) => match data {
                 ArtifactCreatedData::PullRequest { url, branch } => {
                     write!(f, "Created PR: {url} (branch: {branch})")?
@@ -1850,6 +1878,14 @@ impl AIAgentOutputMessage {
         Self {
             id,
             message: AIAgentOutputMessageType::DebugOutput { text },
+            citations: vec![],
+        }
+    }
+
+    pub fn local_cli_tool_output(id: MessageId, output: LocalCLIToolOutput) -> Self {
+        Self {
+            id,
+            message: AIAgentOutputMessageType::LocalCLIToolOutput(output),
             citations: vec![],
         }
     }

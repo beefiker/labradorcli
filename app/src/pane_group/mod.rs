@@ -1,15 +1,12 @@
 use crate::ai::agent::conversation::{AIAgentHarness, AIConversation, AIConversationId};
-use crate::ai::agent_conversations_model::{
-    AgentConversationsModel, AgentConversationsModelEvent,
-};
+use crate::ai::agent_conversations_model::{AgentConversationsModel, AgentConversationsModelEvent};
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::history_model::CloudConversationData;
 use crate::ai::blocklist::inline_action::code_diff_view::CodeDiffView;
 use crate::ai::blocklist::suggested_agent_mode_workflow_modal::SuggestedAgentModeWorkflowAndId;
 use crate::ai::blocklist::suggested_rule_modal::SuggestedRuleAndId;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, InputConfig};
-use ai::document::AIDocumentId;
-use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::execution_profiles::profiles::{AIExecutionProfilesModel, ClientProfileId};
 use crate::ai::llms::LLMId;
 use crate::ai::restored_conversations::RestoredAgentConversations;
@@ -43,6 +40,7 @@ use crate::uri::browser_url_handler::update_browser_url;
 #[cfg(feature = "local_fs")]
 use crate::util::openable_file_type::FileTarget;
 use crate::view_components::ToastFlavor;
+use ai::document::AIDocumentId;
 use warp_terminal::shell::{ShellName, ShellType};
 
 use std::any::Any;
@@ -76,8 +74,7 @@ use warp_util::path::convert_wsl_to_windows_host_path;
 #[cfg(feature = "local_fs")]
 use warp_util::path::LineAndColumnArg;
 use warpui::elements::{
-    CrossAxisAlignment, DispatchEventResult, EventHandler, Flex, MainAxisSize, Shrinkable,
-    Stack,
+    CrossAxisAlignment, DispatchEventResult, EventHandler, Flex, MainAxisSize, Shrinkable, Stack,
 };
 use warpui::keymap::{Context, EditableBinding, FixedBinding};
 use warpui::notification::NotificationSendError;
@@ -100,6 +97,7 @@ use crate::app_state::{
 use crate::appearance::Appearance;
 use crate::banner::{Banner, BannerEvent, BannerState, BannerTextContent, DismissalType};
 use crate::channel::{Channel, ChannelState};
+use crate::cmd_or_ctrl_shift;
 use crate::code::view::CodeView;
 use crate::features::FeatureFlag;
 use crate::launch_configs::launch_config::{self, PaneMode, PaneTemplateType};
@@ -108,7 +106,6 @@ use crate::report_if_error;
 use crate::resource_center::{
     mark_feature_used_and_write_to_user_defaults, Tip, TipAction, TipsCompleted,
 };
-use warp_server_client::ids::SyncId;
 use crate::server::telemetry::{AnonymousUserSignupEntrypoint, PaletteSource};
 use crate::session_management::SessionNavigationData;
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
@@ -129,21 +126,17 @@ use crate::terminal::view::{
     BlockNotification, ConversationRestorationInNewPaneType, ExecuteCommandEvent,
     LeftPanelTargetView, SyncEvent, TerminalViewState,
 };
-use crate::terminal::{
-    MockTerminalManager, ShellLaunchData, ShellLaunchState,
-};
-use crate::{cmd_or_ctrl_shift};
+use crate::terminal::{MockTerminalManager, ShellLaunchData, ShellLaunchState};
 use session_sharing_protocol::sharer::SessionSourceType;
 use settings::Setting as _;
+use warp_server_client::ids::SyncId;
 
 use crate::code::active_file::ActiveFileModel;
 use crate::util::bindings::{is_binding_pty_compliant, CustomAction};
 
 use crate::palette::PaletteMode;
 use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
-use crate::workspace::{
-    self, CommandSearchOptions, PaneViewLocator, TabBarLocation,
-};
+use crate::workspace::{self, CommandSearchOptions, PaneViewLocator, TabBarLocation};
 use crate::{
     server::server_api::ServerApi,
     terminal::{TerminalManager, TerminalModel, TerminalView},
@@ -1849,17 +1842,18 @@ impl PaneGroup {
         }
 
         // Finds the active pane type (currently just TerminalPane) and extracts selected text.
-        let text = if let Some(terminal_view) = self.terminal_view_from_pane_id(focused_pane_id, ctx) {
-            // NOTE: We currently don't have a way to track recency of selection events.
-            // In lieu of this, we prefer selections to the input editor over the terminal view.
-            // TODO(vkodithala): Once we have a way to track recency of selection events, we should use that instead.
-            terminal_view
-                .as_ref(ctx)
-                .selected_text_from_input(ctx)
-                .or_else(|| terminal_view.as_ref(ctx).selected_text(ctx))
-        } else {
-            None
-        };
+        let text =
+            if let Some(terminal_view) = self.terminal_view_from_pane_id(focused_pane_id, ctx) {
+                // NOTE: We currently don't have a way to track recency of selection events.
+                // In lieu of this, we prefer selections to the input editor over the terminal view.
+                // TODO(vkodithala): Once we have a way to track recency of selection events, we should use that instead.
+                terminal_view
+                    .as_ref(ctx)
+                    .selected_text_from_input(ctx)
+                    .or_else(|| terminal_view.as_ref(ctx).selected_text(ctx))
+            } else {
+                None
+            };
 
         text.filter(|text: &String| !text.is_empty())
     }
@@ -2063,7 +2057,6 @@ impl PaneGroup {
                     pane.focus(ctx);
                 }
                 ctx.notify();
-
             }
         }
     }
@@ -2415,9 +2408,10 @@ impl PaneGroup {
         let user_default_shell_changed_banner = ctx.add_typed_action_view(|_| {
             Banner::<PaneGroupAction>::new_permanently_dismissible(
                 BannerTextContent::formatted_text(vec![
-                    FormattedTextFragment::plain_text(
-                        "Warp doesn't currently support your default shell, falling back to zsh.  ",
-                    ),
+                    FormattedTextFragment::plain_text(format!(
+                        "{} doesn't currently support your default shell, falling back to zsh.  ",
+                        ChannelState::app_name_display()
+                    )),
                     FormattedTextFragment::hyperlink("Learn more", WARP_SHELL_COMPATIBILITY_DOCS),
                 ]),
             )

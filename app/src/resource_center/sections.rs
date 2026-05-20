@@ -1,4 +1,4 @@
-use warp_core::{context_flag::ContextFlag, features::FeatureFlag};
+use warp_core::{channel::ChannelState, context_flag::ContextFlag, features::FeatureFlag};
 use warpui::ViewContext;
 
 use super::{
@@ -36,13 +36,19 @@ pub fn sections(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Section> {
             ),
             FeatureItem::new(
                 "Open command palette",
-                "Access all of Warp via the keyboard.",
+                format!(
+                    "Access all of {} via the keyboard.",
+                    ChannelState::app_name_display()
+                ),
                 Tip::Action(TipAction::CommandPalette),
                 ctx,
             ),
             FeatureItem::new(
                 "Set your theme",
-                "Make Warp your own by choosing a theme.",
+                format!(
+                    "Make {} your own by choosing a theme.",
+                    ChannelState::app_name_display()
+                ),
                 Tip::Action(TipAction::ThemePicker),
                 ctx,
             ),
@@ -60,20 +66,36 @@ pub fn sections(ctx: &mut ViewContext<ResourceCenterMainView>) -> Vec<Section> {
         section_name: FeatureSection::AdvancedSetup,
         items: vec![
             ContentItem {
-                title: "Use your custom prompt",
-                description: "Set up Dwarf to honor your PS1 setting",
+                title: "Use your custom prompt".to_string(),
+                description: format!(
+                    "Set up {} to honor your PS1 setting",
+                    ChannelState::app_name_display()
+                ),
                 url: "https://docs.warp.dev/terminal/appearance/prompt",
                 button_label: "View documentation",
             },
             ContentItem {
-                title: "Integrate Warp with your IDE",
-                description: "Configure Dwarf to launch from your most used development tools",
+                title: format!(
+                    "Integrate {} with your IDE",
+                    ChannelState::app_name_display()
+                ),
+                description: format!(
+                    "Configure {} to launch from your most used development tools",
+                    ChannelState::app_name_display()
+                ),
                 url: "https://docs.warp.dev/terminal/integrations-and-plugins",
                 button_label: "View documentation",
             },
             ContentItem {
-                title: "How Warp uses Warp",
-                description: "Learn how Dwarf's engineering team uses their favorite features",
+                title: format!(
+                    "How {} uses {}",
+                    ChannelState::app_name_display(),
+                    ChannelState::app_name_display()
+                ),
+                description: format!(
+                    "Learn how {}'s engineering team uses their favorite features",
+                    ChannelState::app_name_display()
+                ),
                 url: "https://www.warp.dev/blog/how-warp-uses-warp",
                 button_label: "Read article",
             },

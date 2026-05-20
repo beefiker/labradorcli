@@ -518,7 +518,6 @@ fn root_cloud_mode_pane_sets_root_cloud_mode_context_key() {
     });
 }
 
-
 /// Test clearing of session flag state when terminal is cleared
 #[test]
 fn test_clear_session_flag_state() {

@@ -61,7 +61,7 @@ use crate::{
             icons::{self, gray_stop_icon, yellow_stop_icon},
             AIAgentAction, AIAgentActionId, AIAgentActionResult, AIAgentActionResultType,
             AIAgentActionType, AIAgentCitation, AIAgentOutputMessage, AIAgentOutputMessageType,
-            AIAgentText, AIAgentTextSection, MessageId, ReadFilesRequest,
+            AIAgentText, AIAgentTextSection, LocalCLIToolOutput, MessageId, ReadFilesRequest,
             RequestCommandOutputResult, SearchCodebaseFailureReason, SearchCodebaseResult,
             SuggestNewConversationResult, SummarizationType,
         },
@@ -858,6 +858,16 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                 ) {
                                     output_items.add_child(element);
                                 }
+                            }
+                        }
+                        AIAgentOutputMessageType::LocalCLIToolOutput(output) => {
+                            if let Some(element) = render_collapsible_local_cli_tool_output(
+                                output_message,
+                                output,
+                                props,
+                                app,
+                            ) {
+                                output_items.add_child(element);
                             }
                         }
                         AIAgentOutputMessageType::Subagent(SubagentCall {
@@ -3679,6 +3689,117 @@ fn render_collapsible_debug_output(
         container.add_child(
             Container::new(clipped_scrollable)
                 .with_margin_bottom(16.0)
+                .finish(),
+        );
+    }
+
+    Some(
+        container
+            .finish()
+            .with_agent_output_item_spacing(app)
+            .finish(),
+    )
+}
+
+fn render_collapsible_local_cli_tool_output(
+    output_message: &AIAgentOutputMessage,
+    output: &LocalCLIToolOutput,
+    props: Props,
+    app: &AppContext,
+) -> Option<Box<dyn Element>> {
+    let state = props.collapsible_block_states.get(&output_message.id)?;
+    let appearance = Appearance::as_ref(app);
+    let theme = appearance.theme();
+    let text_color = blended_colors::text_disabled(theme, theme.surface_2());
+    let icon_size = icon_size(app);
+    let has_body = !output.body.trim().is_empty();
+
+    let is_expanded = has_body
+        && matches!(
+            state.expansion_state,
+            CollapsibleExpansionState::Expanded { .. }
+        );
+
+    let mut container = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+    let title = output.title.clone();
+    let message_id_clone = output_message.id.clone();
+    let toggle_mouse_state = state.expansion_toggle_mouse_state.clone();
+
+    let header = Hoverable::new(toggle_mouse_state, move |_is_hovered| {
+        let mut row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        if has_body {
+            let chevron_icon = if is_expanded {
+                Icon::ChevronDown
+            } else {
+                Icon::ChevronRight
+            };
+            row.add_child(
+                Container::new(
+                    ConstrainedBox::new(chevron_icon.to_warpui_icon(text_color.into()).finish())
+                        .with_width(icon_size - 2.)
+                        .with_height(icon_size - 2.)
+                        .finish(),
+                )
+                .with_margin_right(4.)
+                .finish(),
+            );
+        }
+        row.add_child(
+            Text::new(
+                title.clone(),
+                appearance.ai_font_family(),
+                appearance.monospace_font_size(),
+            )
+            .with_color(text_color)
+            .with_selectable(false)
+            .finish(),
+        );
+        row.finish()
+    });
+
+    let header = if has_body {
+        header
+            .with_cursor(Cursor::PointingHand)
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(AIBlockAction::ToggleCollapsibleBlockExpanded(
+                    message_id_clone.clone(),
+                ));
+            })
+            .finish()
+    } else {
+        header.finish()
+    };
+
+    container.add_child(
+        Container::new(Flex::row().with_child(header).finish())
+            .with_margin_bottom(if is_expanded { 8. } else { 0. })
+            .finish(),
+    );
+
+    if is_expanded {
+        let body = Text::new(
+            output.body.clone(),
+            appearance.monospace_font_family(),
+            appearance.monospace_font_size(),
+        )
+        .with_color(text_color)
+        .with_selectable(true)
+        .finish();
+        let scrollable = NewScrollable::vertical(
+            SingleAxisConfig::Clipped {
+                handle: state.scroll_state.clone(),
+                child: body,
+            },
+            Fill::None,
+            Fill::None,
+            Fill::None,
+        )
+        .with_propagate_mousewheel_if_not_handled(true)
+        .finish();
+
+        container.add_child(
+            ConstrainedBox::new(scrollable)
+                .with_max_height(200.)
                 .finish(),
         );
     }

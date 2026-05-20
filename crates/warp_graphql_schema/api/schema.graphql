@@ -74,7 +74,7 @@ type AIConversationFormat {
   """
   blockSnapshot: SerializedBlockFormat
 
-  """True if there's a Warp MAA task list available for this format."""
+  """True if there's a Dwarf MAA task list available for this format."""
   hasTaskList: Boolean!
 }
 
@@ -741,12 +741,12 @@ type ConversationUsageMetadata {
 
   """
   Deprecated: Use warpTokenUsage and byokTokenUsage instead.
-  This field combines both Warp API key and user API key usage.
+  This field combines both Dwarf API key and user API key usage.
   """
   tokenUsage: [ModelTokenUsage!]! @deprecated(reason: "Use warpTokenUsage and byokTokenUsage instead")
   toolUsageMetadata: ToolUsageMetadata!
 
-  """Token usage using the Warp API key, keyed by model."""
+  """Token usage using the Dwarf API key, keyed by model."""
   warpTokenUsage: [TokenUsage!]!
 }
 
@@ -1770,7 +1770,7 @@ type ListAIConversationsOutput implements Response {
 union ListAIConversationsResult = ListAIConversationsOutput | UserFacingError
 
 type ListWarpDevImagesOutput implements Response {
-  """List of available Warp dev base images from Docker Hub"""
+  """List of available Dwarf dev base images from Docker Hub"""
   images: [ImageTag!]!
   responseContext: ResponseContext!
 }

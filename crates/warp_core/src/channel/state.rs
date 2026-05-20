@@ -13,6 +13,22 @@ use crate::{
 
 use super::Channel;
 
+pub const APP_NAME: &str = "labrador";
+pub const APP_NAME_DISPLAY: &str = "Labrador";
+pub const APP_NAME_AGENT: &str = "Labrador Agent";
+pub const APP_NAME_AI: &str = "Labrador AI";
+pub const APP_NAME_CLI: &str = "Labrador CLI";
+pub const APP_NAME_DRIVE: &str = "Labrador Drive";
+pub const APP_NAME_API_KEY: &str = "Labrador API Key";
+pub const APP_ID_ORGANIZATION: &str = "labrador";
+pub const APP_CLI_ABOUT: &str = r#"The local agent platform
+
+The CLI is a tool for running, managing, and orchestrating coding agents locally.
+Use the CLI to:
+* Launch and inspect local agents
+* Manage MCP servers
+* Inspect local model and provider configuration"#;
+
 lazy_static! {
     static ref CHANNEL_STATE: Mutex<ChannelState> = Mutex::new(ChannelState::init());
 }
@@ -37,7 +53,11 @@ pub struct ChannelState {
 impl ChannelState {
     pub fn init() -> Self {
         let channel = Channel::Oss;
-        let app_id = AppId::new("dev", "warp", "Dwarf");
+        let app_id = AppId::new(
+            "dev",
+            APP_ID_ORGANIZATION,
+            Self::app_id_application_name(channel),
+        );
         Self {
             channel,
             additional_features: Default::default(),
@@ -122,6 +142,72 @@ impl ChannelState {
     /// should make use of [`Self::data_domain`] instead.
     pub fn app_id() -> AppId {
         CHANNEL_STATE.lock().config.app_id.clone()
+    }
+
+    pub fn app_name() -> &'static str {
+        APP_NAME
+    }
+
+    pub fn app_name_display() -> &'static str {
+        APP_NAME_DISPLAY
+    }
+
+    pub fn app_name_with_suffix(suffix: &str) -> String {
+        format!("{APP_NAME_DISPLAY} {suffix}")
+    }
+
+    pub fn app_name_ai() -> String {
+        APP_NAME_AI.to_string()
+    }
+
+    pub fn app_name_agent() -> String {
+        APP_NAME_AGENT.to_string()
+    }
+
+    pub fn app_name_cli() -> String {
+        APP_NAME_CLI.to_string()
+    }
+
+    pub fn app_name_drive() -> String {
+        APP_NAME_DRIVE.to_string()
+    }
+
+    pub const fn app_name_api_key() -> &'static str {
+        APP_NAME_API_KEY
+    }
+
+    pub fn app_name_possessive() -> String {
+        format!("{APP_NAME_DISPLAY}'s")
+    }
+
+    pub fn app_name_verbify() -> String {
+        format!("{APP_NAME_DISPLAY}ify")
+    }
+
+    pub fn app_name_verbification() -> String {
+        format!("{APP_NAME_DISPLAY}ification")
+    }
+
+    pub fn app_name_verbifying() -> String {
+        format!("{APP_NAME_DISPLAY}ifying")
+    }
+
+    pub fn app_name_verbed() -> String {
+        format!("{APP_NAME_DISPLAY}ified")
+    }
+
+    pub fn app_name_gerund() -> String {
+        format!("{APP_NAME_DISPLAY}ing")
+    }
+
+    pub fn app_id_application_name(channel: Channel) -> String {
+        match channel {
+            Channel::Stable | Channel::Oss => APP_NAME_DISPLAY.to_owned(),
+            Channel::Preview => format!("{APP_NAME_DISPLAY}Preview"),
+            Channel::Dev => format!("{APP_NAME_DISPLAY}Dev"),
+            Channel::Local => format!("{APP_NAME_DISPLAY}Local"),
+            Channel::Integration => format!("{APP_NAME_DISPLAY}Integration"),
+        }
     }
 
     /// Returns a profile name for isolating user data. This should be used to
@@ -379,13 +465,13 @@ impl ChannelState {
 
     pub fn url_scheme() -> &'static str {
         match Self::channel() {
-            Channel::Stable => "warp",
-            Channel::Preview => "warppreview",
-            Channel::Dev => "warpdev",
+            Channel::Stable => APP_NAME,
+            Channel::Preview => "labradorpreview",
+            Channel::Dev => "labradordev",
             // Dummy value--integration tests shouldn't support URL schemes.
-            Channel::Integration => "warpintegration",
-            Channel::Local => "warplocal",
-            Channel::Oss => "dwarf",
+            Channel::Integration => "labradorintegration",
+            Channel::Local => "labradorlocal",
+            Channel::Oss => APP_NAME,
         }
     }
 }

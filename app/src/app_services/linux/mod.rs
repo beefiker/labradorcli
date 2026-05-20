@@ -149,14 +149,9 @@ impl ApplicationService {
     }
 }
 
-// A D-Bus client for connecting to an already-running instance of Warp and
+// A D-Bus client for connecting to an already-running instance of the app and
 // invoking org.freedesktop.Application IPC methods.
-#[proxy(
-    interface = "org.freedesktop.Application",
-    default_service = "dev.warp.WarpLocal",
-    default_path = "/dev/warp/WarpLocal",
-    gen_blocking = false
-)]
+#[proxy(interface = "org.freedesktop.Application", gen_blocking = false)]
 trait ExistingApplication {
     fn activate(&self, platform_data: HashMap<&str, zvariant::Value<'_>>) -> zbus::fdo::Result<()>;
 

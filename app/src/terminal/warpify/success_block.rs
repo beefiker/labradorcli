@@ -11,6 +11,7 @@ use crate::ui_components::icons::Icon as UiIcon;
 use crate::workspace::WorkspaceAction;
 use channel_versions::overrides::TargetOS;
 use parking_lot::RwLock;
+use warp_core::channel::ChannelState;
 use warp_core::semantic_selection::SemanticSelection;
 use warp_core::ui::theme::WarpTheme;
 use warpui::elements::{
@@ -116,10 +117,17 @@ impl WarpifySuccessBlock {
         let auto_warpify_snippet = auto_warpify_snippet.map(|(output_grid, can_write_to_rc)| {
             AutoWarpifySnippet {
                 description: (if !output_grid.is_empty() {
-                    "Run the following to automatically Dwarfify in the future:"
+                    format!(
+                        "Run the following to automatically {} in the future:",
+                        ChannelState::app_name_verbify()
+                    )
                 } else {
-                    "In remote subshells, Dwarf runs commands in the background to power completions, syntax highlighting, and other features."
-                }).into(),
+                    format!(
+                        "In remote subshells, {} runs commands in the background to power completions, syntax highlighting, and other features.",
+                        ChannelState::app_name_display()
+                    )
+                })
+                .into(),
                 output_grid: output_grid.into(),
                 selection_handle: Default::default(),
                 selected_text: Default::default(),
@@ -156,7 +164,7 @@ impl WarpifySuccessBlock {
 
     pub fn render_title_ui(&self, theme: &WarpTheme, appearance: &Appearance) -> Box<dyn Element> {
         let header_contents = render::build_header_row(
-            "Session Dwarfified",
+            format!("Session {}", ChannelState::app_name_verbed()),
             Icon::new(UiIcon::Warp.into(), theme.active_ui_detail()),
             theme,
             appearance,

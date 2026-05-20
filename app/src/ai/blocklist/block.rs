@@ -1901,6 +1901,7 @@ impl AIBlock {
             if matches!(
                 &message.message,
                 AIAgentOutputMessageType::DebugOutput { .. }
+                    | AIAgentOutputMessageType::LocalCLIToolOutput(_)
             ) {
                 self.collapsible_block_states
                     .entry(message.id.clone())

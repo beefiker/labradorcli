@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use warp_core::channel::ChannelState;
 use warp_multi_agent_api as api;
 
 /// A citation listed in an AI response.
@@ -14,10 +15,14 @@ impl Display for AIAgentCitation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AIAgentCitation::WarpDriveObject { uid } => {
-                write!(f, "Dwarf Drive Object: {uid}")
+                write!(f, "{} Object: {uid}", ChannelState::app_name_drive())
             }
             AIAgentCitation::WarpDocumentation { path } => {
-                write!(f, "Dwarf Documentation: {path}")
+                write!(
+                    f,
+                    "{} Documentation: {path}",
+                    ChannelState::app_name_display()
+                )
             }
             AIAgentCitation::WebPage { url } => {
                 write!(f, "Web Page: {url}")

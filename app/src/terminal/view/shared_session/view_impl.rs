@@ -21,8 +21,8 @@ use crate::terminal::shared_session::{
     COPY_LINK_TEXT,
 };
 use crate::terminal::view::{
-    ContextMenuAction, Event, InlineBannerItem, InlineBannerType,
-    SharedSessionBanners, SizeUpdateBuilder, TerminalAction, TerminalView,
+    ContextMenuAction, Event, InlineBannerItem, InlineBannerType, SharedSessionBanners,
+    SizeUpdateBuilder, TerminalAction, TerminalView,
 };
 use crate::terminal::TerminalModel;
 use crate::view_components::{DismissibleToast, ToastFlavor};
@@ -475,8 +475,7 @@ impl TerminalView {
             scrollback_type,
             source_type,
         });
-        if let Some(_source) = source {
-        }
+        if let Some(_source) = source {}
     }
 
     /// Sets the PresenceManager and decorates the view accordingly when a shared session has been started.
@@ -545,7 +544,6 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         ctx.emit(Event::StopSharingCurrentSession { reason });
-
     }
 
     // TODO: why do we need to pass through input replica ID as a separate argument?
@@ -634,7 +632,6 @@ impl TerminalView {
 
         self.update_shared_session_pane_header(ctx);
         // Cloud mode details panel was removed in this fork; nothing to auto-open.
-
     }
 
     pub fn rejoin_session_share(&mut self, ctx: &mut ViewContext<Self>) {
@@ -1045,7 +1042,6 @@ impl TerminalView {
         } else {
             return;
         }
-
     }
 
     // If open, ensure that participant avatar context menu is not triggered
@@ -1164,7 +1160,6 @@ impl TerminalView {
                 crate::uri::web_intent_parser::open_url_on_desktop(&url);
             }
         }
-
     }
 
     // Called when viewer receives acknowledgment from server
@@ -1270,7 +1265,6 @@ impl TerminalView {
             let toast = DismissibleToast::default(COPY_LINK_TEXT.to_string());
             toast_stack.add_ephemeral_toast(toast, window_id, ctx);
         });
-
     }
 
     fn insert_shared_session_started_banner(
@@ -1651,4 +1645,3 @@ impl TerminalView {
             .finish()
     }
 }
-

@@ -29,7 +29,8 @@ fn create_symlink_with_admin(source: &Path, target: &Path) -> Result<()> {
 
     // Use osascript to run the ln command with admin privileges, with a custom prompt
     let script = format!(
-        "do shell script \"ln -sf {escaped_source} {escaped_target}\" with prompt \"Dwarf needs administrator privileges to install the command in /usr/local/bin.\" with administrator privileges"
+        "do shell script \"ln -sf {escaped_source} {escaped_target}\" with prompt \"{} needs administrator privileges to install the command in /usr/local/bin.\" with administrator privileges",
+        ChannelState::app_name_display()
     );
 
     log::debug!("Creating symlink with admin privileges");
@@ -65,7 +66,8 @@ fn remove_file_with_admin(target: &Path) -> Result<()> {
     let escaped_target = ShellFamily::Posix.shell_escape(target_str);
 
     let script = format!(
-        "do shell script \"rm {escaped_target}\" with prompt \"Dwarf needs administrator privileges to uninstall the command from /usr/local/bin.\" with administrator privileges"
+        "do shell script \"rm {escaped_target}\" with prompt \"{} needs administrator privileges to uninstall the command from /usr/local/bin.\" with administrator privileges",
+        ChannelState::app_name_display()
     );
 
     log::debug!("Removing file with admin privileges");
@@ -143,7 +145,10 @@ pub fn uninstall_cli() -> Result<()> {
     let cli_path = cli_install_target_path();
 
     if !cli_path.exists() {
-        return Err(anyhow!("Dwarf command is not currently installed."));
+        return Err(anyhow!(
+            "{} command is not currently installed.",
+            ChannelState::app_name_display()
+        ));
     }
 
     // Safety check: verify it's actually a symlink before removing

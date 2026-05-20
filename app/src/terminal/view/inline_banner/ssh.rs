@@ -1,6 +1,6 @@
 use warpui::{elements::MouseStateHandle, Element};
 
-use crate::{appearance::Appearance, terminal::view::TerminalAction};
+use crate::{appearance::Appearance, channel::ChannelState, terminal::view::TerminalAction};
 
 use super::{
     render_inline_block_list_banner, InlineBannerButtonState, InlineBannerContent,
@@ -38,12 +38,12 @@ pub fn render_inline_ssh_wrapper_banner(
     let (style, title) = if state.wrapper_enabled {
         (
             InlineBannerStyle::LowPriority,
-            "Dwarf SSH wrapper enabled".to_string(),
+            format!("{} SSH wrapper enabled", ChannelState::app_name_display()),
         )
     } else {
         (
             InlineBannerStyle::VeryLowPriority,
-            "Dwarf SSH wrapper disabled".to_string(),
+            format!("{} SSH wrapper disabled", ChannelState::app_name_display()),
         )
     };
     let buttons = vec![

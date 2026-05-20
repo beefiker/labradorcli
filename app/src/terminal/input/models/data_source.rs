@@ -2,6 +2,7 @@ use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use ordered_float::OrderedFloat;
+use warp_core::channel::ChannelState;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::icons::Icon;
 use warp_core::ui::theme::color::internal_colors;
@@ -38,8 +39,8 @@ use warpui::keymap::Keystroke;
 use warpui::platform::OperatingSystem;
 
 use super::model_spec_scores::{
-    render_model_spec_header, render_model_spec_scores, CostRow, ModelSpecScoresLayout,
-    MODEL_SPECS_DESCRIPTION, MODEL_SPECS_TITLE, REASONING_LEVEL_DESCRIPTION, REASONING_LEVEL_TITLE,
+    model_specs_description, render_model_spec_header, render_model_spec_scores, CostRow,
+    ModelSpecScoresLayout, MODEL_SPECS_TITLE, REASONING_LEVEL_DESCRIPTION, REASONING_LEVEL_TITLE,
 };
 
 #[derive(Clone, Debug)]
@@ -47,8 +48,13 @@ pub struct AcceptModel {
     pub id: LLMId,
 }
 
-pub const SETUP_CODEX_AUTH_MODEL_ID: &str = "dwarf-setup-codex-auth";
-pub const SETUP_CLAUDE_AUTH_MODEL_ID: &str = "dwarf-setup-claude-auth";
+fn setup_codex_auth_model_id() -> String {
+    format!("{}-setup-codex-auth", ChannelState::app_name())
+}
+
+fn setup_claude_auth_model_id() -> String {
+    format!("{}-setup-claude-auth", ChannelState::app_name())
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LocalAuthSetupKind {
@@ -59,8 +65,8 @@ pub enum LocalAuthSetupKind {
 impl LocalAuthSetupKind {
     fn id(self) -> LLMId {
         match self {
-            Self::Codex => SETUP_CODEX_AUTH_MODEL_ID.into(),
-            Self::Claude => SETUP_CLAUDE_AUTH_MODEL_ID.into(),
+            Self::Codex => setup_codex_auth_model_id().into(),
+            Self::Claude => setup_claude_auth_model_id().into(),
         }
     }
 
@@ -78,14 +84,16 @@ impl LocalAuthSetupKind {
         }
     }
 
-    fn details_text(self) -> &'static str {
+    fn details_text(self) -> String {
         match self {
-            Self::Codex => {
-                "Runs `codex login` in Dwarf. Codex owns the browser sign-in flow and writes ~/.codex/auth.json."
-            }
-            Self::Claude => {
-                "Runs `claude auth login --claudeai` in Dwarf. Claude Code owns the browser sign-in flow and writes ~/.claude.json."
-            }
+            Self::Codex => format!(
+                "Runs `codex login` in {}. Codex owns the browser sign-in flow and writes ~/.codex/auth.json.",
+                ChannelState::app_name_display()
+            ),
+            Self::Claude => format!(
+                "Runs `claude auth login --claudeai` in {}. Claude Code owns the browser sign-in flow and writes ~/.claude.json.",
+                ChannelState::app_name_display()
+            ),
         }
     }
 
@@ -98,10 +106,14 @@ impl LocalAuthSetupKind {
 }
 
 pub fn local_auth_setup_for_model_id(id: &LLMId) -> Option<LocalAuthSetupKind> {
-    match id.as_str() {
-        SETUP_CODEX_AUTH_MODEL_ID => Some(LocalAuthSetupKind::Codex),
-        SETUP_CLAUDE_AUTH_MODEL_ID => Some(LocalAuthSetupKind::Claude),
-        _ => None,
+    let setup_codex_auth_model_id = setup_codex_auth_model_id();
+    let setup_claude_auth_model_id = setup_claude_auth_model_id();
+    if id.as_str() == setup_codex_auth_model_id.as_str() {
+        Some(LocalAuthSetupKind::Codex)
+    } else if id.as_str() == setup_claude_auth_model_id.as_str() {
+        Some(LocalAuthSetupKind::Claude)
+    } else {
+        None
     }
 }
 
@@ -610,9 +622,12 @@ impl SearchItem for ModelSearchItem {
         let theme = appearance.theme();
 
         let (title, description) = if self.reasoning_level.is_some() {
-            (REASONING_LEVEL_TITLE, REASONING_LEVEL_DESCRIPTION)
+            (
+                REASONING_LEVEL_TITLE,
+                REASONING_LEVEL_DESCRIPTION.to_string(),
+            )
         } else {
-            (MODEL_SPECS_TITLE, MODEL_SPECS_DESCRIPTION)
+            (MODEL_SPECS_TITLE, model_specs_description())
         };
         let header = render_model_spec_header(title, description, app);
 

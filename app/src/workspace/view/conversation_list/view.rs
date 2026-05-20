@@ -23,8 +23,8 @@ use crate::workspace::view::conversation_list::item::{
 };
 use crate::workspace::ToastStack;
 use crate::workspace::WorkspaceAction;
-use warp_core::features::FeatureFlag;
 use warp_core::ui::Icon;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 
 use super::view_model::{ConversationEntry, ConversationListViewModel};
 use warp_editor::editor::NavigationKey;
@@ -514,8 +514,7 @@ impl ConversationListView {
     /// Send telemetry for opening a conversation or task
     fn send_open_telemetry(id: &ConversationOrTaskId, _ctx: &mut ViewContext<Self>) {
         match id {
-            ConversationOrTaskId::ConversationId(_conversation_id) => {
-            }
+            ConversationOrTaskId::ConversationId(_conversation_id) => {}
         }
     }
 
@@ -632,7 +631,10 @@ fn render_zero_state(
         .with_child(
             ConstrainedBox::new(
                 FormattedTextElement::from_str(
-                    "Your active and past Dwarf conversations will appear here.",
+                    format!(
+                        "Your active and past {} conversations will appear here.",
+                        ChannelState::app_name_display()
+                    ),
                     appearance.ui_font_family(),
                     14.,
                 )
@@ -863,9 +865,9 @@ impl TypedActionView for ConversationListView {
 
                     let delete_item = MenuItemFields::new("Delete")
                         .with_override_text_color(Appearance::as_ref(ctx).theme().ansi_fg_red())
-                        .with_on_select_action(ConversationListViewAction::DeleteFromOverflowMenu {
-                            conversation_id,
-                        });
+                        .with_on_select_action(
+                            ConversationListViewAction::DeleteFromOverflowMenu { conversation_id },
+                        );
 
                     let is_shareable = match conversation_id {
                         ConversationOrTaskId::ConversationId(conv_id) => {

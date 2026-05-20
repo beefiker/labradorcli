@@ -21,10 +21,10 @@ impl RegistryBackedPreferences {
         }
     }
 
-    /// Gets Warp's registry key, creating it if it does not already exist.
+    /// Gets the app's registry key, creating it if it does not already exist.
     fn get_warp_registry(&self) -> Result<Key, super::Error> {
         CURRENT_USER.create(self.app_key_path.clone()).map_err(|e| {
-            log::error!("unable to access Warp app key in Windows Registry: {e:#}");
+            log::error!("unable to access app key in Windows Registry: {e:#}");
             super::Error::IoError(io::Error::from(e))
         })
     }

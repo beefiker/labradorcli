@@ -33,7 +33,10 @@ pub(super) async fn download_update_and_cleanup(
             appimage::download_update_and_cleanup(version_info, &appimage_path, client).await
         }
         UpdateMethod::PackageManager(package_manager) => {
-            log::info!("Detected that Warp was installed using {package_manager:?}");
+            log::info!(
+                "Detected that {} was installed using {package_manager:?}",
+                ChannelState::app_name_display()
+            );
             Ok(DownloadReady::Yes)
         }
     }
@@ -200,6 +203,7 @@ mod package_manager {
             let appearance = Appearance::as_ref(app);
             let theme = appearance.theme();
             let package_manager_name = self.package_manager.to_string();
+            let app_name = ChannelState::app_name_display();
 
             let mut lines = vec![
                 FormattedTextLine::Heading(FormattedTextHeader {
@@ -210,10 +214,10 @@ mod package_manager {
                     ))],
                 }),
                 FormattedTextLine::Line(vec![
-                    FormattedTextFragment::plain_text("If you installed Warp using "),
+                    FormattedTextFragment::plain_text(format!("If you installed {app_name} using ")),
                     FormattedTextFragment::bold(package_manager_name),
                     FormattedTextFragment::plain_text(
-                        " or a compatible tool, the pre-filled command will update Warp for you.",
+                        format!(" or a compatible tool, the pre-filled command will update {app_name} for you."),
                     ),
                 ]),
             ];
@@ -221,7 +225,7 @@ mod package_manager {
             if self.package_manager.needs_repository_configuration() {
                 lines.push(FormattedTextLine::Line(vec![
                     FormattedTextFragment::plain_text(
-                        "\nThe command below includes a one-time configuration of the Warp package repository and PGP signing key.",
+                        format!("\nThe command below includes a one-time configuration of the {app_name} package repository and PGP signing key."),
                     ),
                 ]));
             }
@@ -236,7 +240,7 @@ mod package_manager {
                     ),
                     FormattedTextFragment::inline_code("warp_handle_dist_upgrade"),
                     FormattedTextFragment::plain_text(
-                        " function ensures the Warp package repository is enabled, as we've detected you recently upgraded your distribution.",
+                        format!(" function ensures the {app_name} package repository is enabled, as we've detected you recently upgraded your distribution."),
                     ),
                 ]));
             }
@@ -244,7 +248,9 @@ mod package_manager {
             lines.push(FormattedTextLine::Line(vec![
                 FormattedTextFragment::plain_text("\nReview the command below, then "),
                 FormattedTextFragment::bold("press enter"),
-                FormattedTextFragment::plain_text(" to install the update and re-launch Warp.  "),
+                FormattedTextFragment::plain_text(format!(
+                    " to install the update and re-launch {app_name}.  "
+                )),
                 FormattedTextFragment::hyperlink(
                     "Please report any issues",
                     "https://github.com/warpdotdev/Warp/issues/new/choose",
@@ -658,7 +664,7 @@ fn package_name(channel: Channel) -> &'static str {
         Channel::Dev => "warp-terminal-dev",
         Channel::Integration => "warp-terminal-integration",
         Channel::Local => "warp-terminal-local",
-        Channel::Oss => "dwarf",
+        Channel::Oss => ChannelState::app_name(),
     }
 }
 

@@ -30,6 +30,7 @@ use crate::ai::agent_events::{
 use crate::ai::agent_sdk::driver::{AgentDriver, OZ_MESSAGE_LISTENER_STATE_ROOT_ENV};
 use crate::server::server_api::ai::AgentRunEvent;
 use crate::server::server_api::ServerApi;
+use crate::ChannelState;
 
 const LEGACY_MESSAGE_LISTENER_STATE_ROOT_ENV: &str = "OZ_PARENT_STATE_ROOT";
 const PARENT_BRIDGE_DEFAULT_STATE_ROOT: &str = ".claude-code/oz-parent-bridge";
@@ -38,7 +39,12 @@ const PARENT_BRIDGE_HOOK_OUTPUT_FILE_NAME: &str = "pending-hook-output.json";
 const PARENT_BRIDGE_HOOK_OUTPUT_ACK_FILE_NAME: &str = "pending-hook-output.ack";
 const PARENT_BRIDGE_MAX_CONTEXT_CHARS_ENV: &str = "OZ_PARENT_MAX_CONTEXT_CHARS";
 const PARENT_BRIDGE_DEFAULT_MAX_CONTEXT_CHARS: usize = 6000;
-pub(super) const MESSAGE_BRIDGE_CONTEXT_PREAMBLE: &str = "Lead-agent updates arrived from Dwarf. Treat the latest lead-agent instructions below as authoritative.\n";
+fn message_bridge_context_preamble() -> String {
+    format!(
+        "Lead-agent updates arrived from {}. Treat the latest lead-agent instructions below as authoritative.\n",
+        ChannelState::app_name_display()
+    )
+}
 const PARENT_BRIDGE_REMAINING_MESSAGES_NOTE: &str =
     "\n\nMore lead-agent messages are still staged and will be surfaced on a later turn.";
 
@@ -375,7 +381,7 @@ fn build_parent_bridge_hook_output(
         return None;
     }
 
-    let mut additional_context = String::from(MESSAGE_BRIDGE_CONTEXT_PREAMBLE);
+    let mut additional_context = message_bridge_context_preamble();
     for (index, message) in selected.messages.iter().enumerate() {
         if index > 0 {
             additional_context.push_str("\n\n");
@@ -447,7 +453,7 @@ async fn select_parent_bridge_messages_for_hook_output(
 ) -> Result<SelectedMessageBridgeMessages> {
     let total_available_count = records.len();
     let mut messages = Vec::new();
-    let mut context_chars = parent_bridge_char_count(MESSAGE_BRIDGE_CONTEXT_PREAMBLE);
+    let mut context_chars = parent_bridge_char_count(&message_bridge_context_preamble());
 
     for (path, record) in records {
         let separator_chars = if messages.is_empty() { 0 } else { 2 };

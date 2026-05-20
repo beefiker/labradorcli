@@ -13,7 +13,7 @@ use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryT
 use crate::TemplatableMCPServerManager;
 use std::path::PathBuf;
 use uuid::Uuid;
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 use warpui::elements::ParentElement;
 use warpui::SingletonEntity;
 use warpui::{
@@ -362,7 +362,7 @@ impl View for ExecutionProfileView {
                         permissions_column.add_child(with_standard_vertical_margin(
                             render_bool_permission_line_with_icon(
                                 Icon::Compass,
-                                "Auto-sync plans to Dwarf Drive:",
+                                &format!("Auto-sync plans to {}:", ChannelState::app_name_drive()),
                                 profile.autosync_plans_to_warp_drive,
                                 appearance,
                                 is_any_ai_enabled,

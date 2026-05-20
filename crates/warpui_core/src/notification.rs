@@ -110,10 +110,15 @@ pub enum NotificationSendError {
 }
 
 impl NotificationSendError {
-    pub fn notifications_error_banner_title(&self) -> &str {
+    pub fn notifications_error_banner_title(&self, app_name: &str) -> String {
         match self {
-            NotificationSendError::PermissionsDenied | NotificationSendError::PermissionsNotYetGranted => "Warp tried to send you a notification for the last block but does not have permission.",
-            NotificationSendError::Other { .. } => "Warp tried to send you a notification for the last block, but something went wrong.",
+            NotificationSendError::PermissionsDenied
+            | NotificationSendError::PermissionsNotYetGranted => format!(
+                "{app_name} tried to send you a notification for the last block but does not have permission."
+            ),
+            NotificationSendError::Other { .. } => format!(
+                "{app_name} tried to send you a notification for the last block, but something went wrong."
+            ),
         }
     }
 }

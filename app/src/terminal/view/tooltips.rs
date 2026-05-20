@@ -14,6 +14,7 @@ use super::{TerminalAction, TerminalView};
 use crate::util::tooltips::{TooltipLink, TooltipRedaction};
 use crate::{
     appearance::Appearance,
+    channel::ChannelState,
     terminal::{
         links::directly_open_link_keybinding_string,
         model::{ObfuscateSecrets, Secret},
@@ -66,7 +67,7 @@ fn open_in_warp_tooltip(
         None
     };
     Some(GridTooltipLink {
-        text: "Open in Dwarf".to_string(),
+        text: format!("Open in {}", ChannelState::app_name_display()),
         action: TerminalAction::OpenCodeInWarp {
             path,
             layout: *EditorSettings::as_ref(app).open_file_layout.value(),

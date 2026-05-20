@@ -5,14 +5,14 @@ use serde::{Serialize, Serializer};
 use warpui::{platform::Cursor, ViewContext};
 
 use crate::terminal::{
-        model::{
-            grid::grid_handler::Link,
-            index::Point,
-            terminal_model::{WithinBlock, WithinModel},
-            RespectObfuscatedSecrets,
-        },
-        TerminalModel,
-    };
+    model::{
+        grid::grid_handler::Link,
+        index::Point,
+        terminal_model::{WithinBlock, WithinModel},
+        RespectObfuscatedSecrets,
+    },
+    TerminalModel,
+};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {

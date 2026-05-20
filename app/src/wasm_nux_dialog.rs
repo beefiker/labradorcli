@@ -7,6 +7,7 @@ use crate::settings::{NativePreferenceSettings, UserNativePreference};
 use crate::ui_components::dialog::{dialog_styles, Dialog};
 use crate::uri::web_intent_parser::{self, WebIntent};
 use settings::Setting as _;
+use warp_core::channel::ChannelState;
 use warpui::elements::{Align, CrossAxisAlignment, Flex};
 use warpui::ui_components::{
     button::ButtonVariant,
@@ -153,19 +154,21 @@ impl View for WasmNUXDialog {
         };
 
         let dialog = if self.requested_download {
+            let app_name = ChannelState::app_name_display();
             Dialog::new(
-                "Open in Dwarf Desktop?".to_string(),
+                format!("Open in {app_name} Desktop?"),
                 Some("Future links will automatically open on desktop.".to_string()),
                 dialog_styles,
             )
             .with_bottom_row_child(Self::render_dialog_button(
-                "Open in Dwarf",
+                &format!("Open in {app_name}"),
                 WasmNUXDialogAction::OpenNativeAndClose,
                 &self.confirm_mouse_state,
                 appearance,
             ))
         } else if app_install_detected == &UserAppInstallStatus::NotDetected {
-            Dialog::new("Download Dwarf Desktop?".to_string(), None, dialog_styles)
+            let app_name = ChannelState::app_name_display();
+            Dialog::new(format!("Download {app_name} Desktop?"), None, dialog_styles)
                 .with_child(
                     Flex::column()
                         .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
@@ -173,7 +176,7 @@ impl View for WasmNUXDialog {
                         .with_child(
                             appearance
                                 .ui_builder()
-                                .span("Dwarf is the intelligent terminal with AI and your dev team's knowledge built-in.")
+                                .span(&format!("{app_name} is the intelligent terminal with AI and your dev team's knowledge built-in."))
                                 .with_style(UiComponentStyles {
                                     font_weight: Some(Weight::Thin),
                                     font_color: Some(
@@ -217,10 +220,11 @@ impl View for WasmNUXDialog {
                     appearance,
                 ))
         } else {
+            let app_name = ChannelState::app_name_display();
             let object_kind = match web_intent_parser::current_web_intent() {
-                Some(WebIntent::DriveObject(_)) => "Dwarf Drive objects",
-                Some(WebIntent::SessionView(_)) => "shared sessions",
-                _ => "Dwarf links",
+                Some(WebIntent::DriveObject(_)) => format!("{app_name} Drive objects"),
+                Some(WebIntent::SessionView(_)) => "shared sessions".to_string(),
+                _ => format!("{app_name} links"),
             };
 
             Dialog::new(

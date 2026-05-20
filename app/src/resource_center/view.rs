@@ -1,5 +1,7 @@
 use vec1::{vec1, Vec1};
-use warp_core::{features::FeatureFlag, ui::builder::AnimatedButtonOptions};
+use warp_core::{
+    channel::ChannelState, features::FeatureFlag, ui::builder::AnimatedButtonOptions,
+};
 use warpui::{
     elements::{
         Align, Border, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Icon,
@@ -113,10 +115,7 @@ pub enum ResourceCenterAction {
 }
 
 impl ResourceCenterView {
-    pub fn new(
-        ctx: &mut ViewContext<Self>,
-        tips_completed: ModelHandle<TipsCompleted>,
-    ) -> Self {
+    pub fn new(ctx: &mut ViewContext<Self>, tips_completed: ModelHandle<TipsCompleted>) -> Self {
         let main_view = ResourceCenterPageView {
             page: ResourceCenterPage::Main,
             page_view_handle: ResourceCenterViewHandle::Main(Self::build_main_view(
@@ -155,9 +154,8 @@ impl ResourceCenterView {
         ctx: &mut ViewContext<Self>,
         tips_completed: ModelHandle<TipsCompleted>,
     ) -> ViewHandle<ResourceCenterMainView> {
-        let main_view = ctx.add_typed_action_view(|ctx| {
-            ResourceCenterMainView::new(ctx, tips_completed.clone())
-        });
+        let main_view = ctx
+            .add_typed_action_view(|ctx| ResourceCenterMainView::new(ctx, tips_completed.clone()));
 
         ctx.subscribe_to_view(&main_view, move |me, _, event, ctx| {
             me.handle_main_event(event, ctx);
@@ -332,7 +330,7 @@ impl ResourceCenterView {
                 if FeatureFlag::AvatarInTabBar.is_enabled() {
                     String::new()
                 } else {
-                    "Dwarf Essentials".to_string()
+                    format!("{} Essentials", ChannelState::app_name_display())
                 }
             }
         };

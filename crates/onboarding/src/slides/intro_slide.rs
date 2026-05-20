@@ -63,7 +63,6 @@ impl View for IntroSlide {
 
 impl IntroSlide {
     fn get_started_clicked(&mut self, ctx: &mut ViewContext<Self>) {
-
         self.onboarding_state.update(ctx, |model, ctx| {
             model.next(ctx);
         });
@@ -83,7 +82,10 @@ impl IntroSlide {
         let base_color: ColorU = internal_colors::fg_overlay_4(theme).into();
         let shimmer_color: ColorU = theme.foreground().into();
         let title = ShimmeringTextElement::new(
-            "Welcome to Dwarf",
+            format!(
+                "Welcome to {}",
+                warp_core::channel::ChannelState::app_name_display()
+            ),
             appearance.ui_font_family(),
             32.,
             base_color,

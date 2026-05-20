@@ -9,6 +9,7 @@ use lsp::{
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
+use warp_core::channel::ChannelState;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::{Fill as ThemeFill, WarpTheme};
 use warp_core::ui::{appearance::Appearance, Icon};
@@ -1728,7 +1729,7 @@ impl View for CodeFooterView {
                     Self::render_status_text(
                         theme,
                         appearance,
-                        "Use Dwarf to update this config".to_string(),
+                        format!("Use {} to update this config", ChannelState::app_name_display()),
                     ),
                 )
                 .finish(),

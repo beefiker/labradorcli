@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
+use warp_core::channel::ChannelState;
 use warpui::prelude::Empty;
 use warpui::{
     elements::{
@@ -33,14 +34,20 @@ impl WarpifyFooterView {
         let button_size = ButtonSize::XSmall;
 
         let warpify_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Dwarfify subshell", AgentFooterButtonTheme::new(None))
-                .with_icon(Icon::AgentMode)
-                .with_size(button_size)
-                .with_tooltip("Enable Dwarf shell integration in this session")
-                .with_tooltip_alignment(TooltipAlignment::Left)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(WarpifyFooterViewAction::Warpify);
-                })
+            ActionButton::new(
+                format!("{} subshell", ChannelState::app_name_verbify()),
+                AgentFooterButtonTheme::new(None),
+            )
+            .with_icon(Icon::AgentMode)
+            .with_size(button_size)
+            .with_tooltip(format!(
+                "Enable {} shell integration in this session",
+                ChannelState::app_name_display()
+            ))
+            .with_tooltip_alignment(TooltipAlignment::Left)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(WarpifyFooterViewAction::Warpify);
+            })
         });
 
         let use_agent_button = ctx.add_typed_action_view(|ctx| {
@@ -48,7 +55,10 @@ impl WarpifyFooterView {
                 .with_icon(Icon::AgentMode)
                 .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
                 .with_size(button_size)
-                .with_tooltip("Ask the Dwarf agent to assist")
+                .with_tooltip(format!(
+                    "Ask the {} agent to assist",
+                    ChannelState::app_name_display()
+                ))
                 .with_tooltip_alignment(TooltipAlignment::Left)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(WarpifyFooterViewAction::UseAgent);
@@ -75,12 +85,14 @@ impl WarpifyFooterView {
     /// Updates the warpify button label, keybinding, and stores the current warpification mode.
     pub fn set_mode(&mut self, mode: WarpificationMode, ctx: &mut ViewContext<Self>) {
         let (label, binding_name) = match mode {
-            WarpificationMode::Ssh { .. } => {
-                ("Dwarfify SSH session", "terminal:warpify_ssh_session")
-            }
-            WarpificationMode::Subshell { .. } => {
-                ("Dwarfify subshell", "terminal:warpify_subshell")
-            }
+            WarpificationMode::Ssh { .. } => (
+                format!("{} SSH session", ChannelState::app_name_verbify()),
+                "terminal:warpify_ssh_session",
+            ),
+            WarpificationMode::Subshell { .. } => (
+                format!("{} subshell", ChannelState::app_name_verbify()),
+                "terminal:warpify_subshell",
+            ),
         };
         self.warpify_button.update(ctx, |button, ctx| {
             button.set_label(label, ctx);

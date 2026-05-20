@@ -253,7 +253,10 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
 
     // Add command palette entry for toggling between Warp and Classic input modes
     app.register_fixed_bindings(vec![FixedBinding::empty(
-        "Toggle Input Mode (Dwarf/Classic)".to_string(),
+        format!(
+            "Toggle Input Mode ({}/Classic)",
+            ChannelState::app_name_display()
+        ),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleInputMode,
         )),
@@ -610,8 +613,7 @@ impl TypedActionView for AppearanceSettingsPageView {
                         .focus_panes_on_hover
                         .toggle_and_save_value(ctx)
                     {
-                        Ok(_new_val) => {
-                        }
+                        Ok(_new_val) => {}
                         Err(e) => {
                             report_error!(e);
                         }
@@ -1504,33 +1506,38 @@ impl AppearanceSettingsPageView {
         initial_dropdown_item
     }
 
-    fn input_mode_dropdown_item_label(val: InputMode) -> &'static str {
+    fn input_mode_dropdown_item_label(val: InputMode) -> String {
         match val {
-            InputMode::PinnedToBottom => "Pin to the bottom (Dwarf mode)",
-            InputMode::PinnedToTop => "Pin to the top (Reverse mode)",
-            InputMode::Waterfall => "Start at the top (Classic mode)",
+            InputMode::PinnedToBottom => {
+                format!(
+                    "Pin to the bottom ({} mode)",
+                    ChannelState::app_name_display()
+                )
+            }
+            InputMode::PinnedToTop => "Pin to the top (Reverse mode)".to_string(),
+            InputMode::Waterfall => "Start at the top (Classic mode)".to_string(),
         }
     }
 
-    fn app_icon_dropdown_item_label(val: AppIcon) -> &'static str {
+    fn app_icon_dropdown_item_label(val: AppIcon) -> String {
         match val {
-            AppIcon::Aurora => "Aurora",
-            AppIcon::Default => "Default",
-            AppIcon::Classic1 => "Classic 1",
-            AppIcon::Classic2 => "Classic 2",
-            AppIcon::Classic3 => "Classic 3",
-            AppIcon::Comets => "Comets",
-            AppIcon::GlassSky => "Glass Sky",
-            AppIcon::Glitch => "Glitch",
-            AppIcon::Cow => "Cow",
-            AppIcon::Glow => "Glow",
-            AppIcon::Holographic => "Holographic",
-            AppIcon::Mono => "Mono",
-            AppIcon::Neon => "Neon",
-            AppIcon::Original => "Original",
-            AppIcon::Starburst => "Starburst",
-            AppIcon::Sticker => "Sticker",
-            AppIcon::WarpOne => "Dwarf 1",
+            AppIcon::Aurora => "Aurora".to_string(),
+            AppIcon::Default => "Default".to_string(),
+            AppIcon::Classic1 => "Classic 1".to_string(),
+            AppIcon::Classic2 => "Classic 2".to_string(),
+            AppIcon::Classic3 => "Classic 3".to_string(),
+            AppIcon::Comets => "Comets".to_string(),
+            AppIcon::GlassSky => "Glass Sky".to_string(),
+            AppIcon::Glitch => "Glitch".to_string(),
+            AppIcon::Cow => "Cow".to_string(),
+            AppIcon::Glow => "Glow".to_string(),
+            AppIcon::Holographic => "Holographic".to_string(),
+            AppIcon::Mono => "Mono".to_string(),
+            AppIcon::Neon => "Neon".to_string(),
+            AppIcon::Original => "Original".to_string(),
+            AppIcon::Starburst => "Starburst".to_string(),
+            AppIcon::Sticker => "Sticker".to_string(),
+            AppIcon::WarpOne => format!("{} 1", ChannelState::app_name_display()),
         }
     }
 
@@ -1738,8 +1745,7 @@ impl AppearanceSettingsPageView {
         should_set_defaults: bool,
         ctx: &mut ViewContext<Self>,
     ) {
-        if should_set_defaults {
-        }
+        if should_set_defaults {}
         WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
             report_if_error!(window_settings
                 .background_opacity
@@ -1754,8 +1760,7 @@ impl AppearanceSettingsPageView {
         should_set_defaults: bool,
         ctx: &mut ViewContext<Self>,
     ) {
-        if should_set_defaults {
-        }
+        if should_set_defaults {}
 
         ctx.windows()
             .set_all_windows_background_blur_radius(blur_value as u8);
@@ -1790,7 +1795,6 @@ impl AppearanceSettingsPageView {
         let current_line_height = appearance.ui_builder().line_height_ratio();
 
         if (current_line_height - new_line_height).abs() > f32::EPSILON {
-
             if (MIN_LINE_SPACING..=MAX_LINE_SPACING).contains(&new_line_height) {
                 FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
                     report_if_error!(font_settings
@@ -2026,8 +2030,7 @@ impl AppearanceSettingsPageView {
     fn set_thin_strokes(&mut self, value: &ThinStrokes, ctx: &mut ViewContext<Self>) {
         FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
             match font_settings.use_thin_strokes.set_value(*value, ctx) {
-                Ok(_) => {
-                }
+                Ok(_) => {}
                 Err(e) => {
                     report_error!(e);
                 }
@@ -2088,8 +2091,7 @@ impl AppearanceSettingsPageView {
                 .should_dim_inactive_panes
                 .toggle_and_save_value(ctx)
             {
-                Ok(_new_value) => {
-                }
+                Ok(_new_value) => {}
                 Err(e) => {
                     report_error!(e);
                 }
@@ -2194,7 +2196,6 @@ impl AppearanceSettingsPageView {
         ctx.update_model(&tab_settings, move |tab_settings, ctx| {
             report_if_error!(tab_settings.show_indicators.set_value(new_value, ctx));
         });
-
     }
 
     fn toggle_show_code_review_button(&mut self, ctx: &mut ViewContext<Self>) {
@@ -2217,7 +2218,6 @@ impl AppearanceSettingsPageView {
                 .preserve_active_tab_color
                 .set_value(new_value, ctx));
         });
-
     }
 
     fn toggle_vertical_tabs(&mut self, ctx: &mut ViewContext<Self>) {
@@ -2408,7 +2408,6 @@ impl AppearanceSettingsPageView {
                     .ligature_rendering_enabled
                     .set_value(new_value, ctx));
             });
-
         }
     }
 
@@ -2755,7 +2754,10 @@ impl SettingsWidget for CustomAppIconWidget {
                         appearance
                             .ui_builder()
                             .wrappable_text(
-                                "You may need to restart Dwarf for MacOS to apply the preferred icon style.",
+                                format!(
+                                    "You may need to restart {} for MacOS to apply the preferred icon style.",
+                                    ChannelState::app_name_display()
+                                ),
                                 true,
                             )
                             .with_style(UiComponentStyles {
@@ -3233,7 +3235,7 @@ impl SettingsWidget for InputTypeWidget {
             .radio_buttons(
                 self.radio_buttons_states.clone(),
                 vec![
-                    RadioButtonItem::text("Dwarf"),
+                    RadioButtonItem::text(ChannelState::app_name_display()),
                     RadioButtonItem::text("Shell (PS1)"),
                 ],
                 view.input_type_radio_state.clone(),
@@ -4591,8 +4593,10 @@ impl SettingsWidget for UseLatestUserPromptAsConversationTitleInTabNamesWidget {
                 })
                 .finish(),
             Some(
-                "Show the latest user prompt instead of the generated conversation title for Dwarf and third-party agent sessions in vertical tabs."
-                    .to_string(),
+                format!(
+                    "Show the latest user prompt instead of the generated conversation title for {} and third-party agent sessions in vertical tabs.",
+                    ChannelState::app_name_display()
+                ),
             ),
         )
     }

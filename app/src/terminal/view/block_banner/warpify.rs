@@ -1,4 +1,5 @@
 use pathfinder_color::ColorU;
+use warp_core::channel::ChannelState;
 use warpui::{
     elements::{
         Align, ConstrainedBox, Container, CrossAxisAlignment, Flex, HighlightedHyperlink,
@@ -95,10 +96,14 @@ impl WarpifyBannerState {
         self.mode.is_ssh()
     }
 
-    pub fn title(&self) -> &str {
+    pub fn title(&self) -> String {
         match &self.mode {
-            WarpificationMode::Ssh { .. } => "Dwarfify SSH session",
-            WarpificationMode::Subshell { .. } => "Dwarfify subshell",
+            WarpificationMode::Ssh { .. } => {
+                format!("{} SSH session", ChannelState::app_name_verbify())
+            }
+            WarpificationMode::Subshell { .. } => {
+                format!("{} subshell", ChannelState::app_name_verbify())
+            }
         }
     }
 
@@ -235,7 +240,7 @@ fn render_yes_button(
     let yes_button = match initialize_warpification_keybinding {
         Some(keystroke) => appearance
             .ui_builder()
-            .keyboard_shortcut_button(state.title().to_owned(), keystroke, mouse_state.clone())
+            .keyboard_shortcut_button(state.title(), keystroke, mouse_state.clone())
             .with_style(UiComponentStyles {
                 height: Some(36.),
                 padding: Some(Coords {
@@ -249,7 +254,7 @@ fn render_yes_button(
         None => appearance
             .ui_builder()
             .button(ButtonVariant::Basic, mouse_state.clone())
-            .with_text_label(state.title().to_owned())
+            .with_text_label(state.title())
             .with_style(UiComponentStyles {
                 background: Some(Fill::Solid(ColorU::transparent_black()).into()),
                 height: Some(36.),

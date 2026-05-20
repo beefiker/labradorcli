@@ -1,6 +1,7 @@
 use settings::{
     macros::define_settings_group, RespectUserSyncSetting, SupportedPlatforms, SyncToCloud,
 };
+use warp_core::channel::ChannelState;
 
 define_settings_group!(CodeSettings, settings: [
     code_as_default_editor: CodeAsDefaultEditor {
@@ -10,7 +11,7 @@ define_settings_group!(CodeSettings, settings: [
         sync_to_cloud: SyncToCloud::Never,
         private: false,
         toml_path: "code.editor.use_warp_as_default_editor",
-        description: "Whether Dwarf is used as the default code editor.",
+        description: format!("Whether {} is used as the default code editor.", ChannelState::app_name_display()),
     }
     codebase_context_enabled: CodebaseContextEnabled {
         type: bool,

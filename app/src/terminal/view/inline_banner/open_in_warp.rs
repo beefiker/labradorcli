@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use warp_core::channel::ChannelState;
 use warpui::{elements::MouseStateHandle, fonts::Weight, Element, EntityId};
 
 use crate::{
@@ -46,12 +47,13 @@ impl OpenInWarpBannerState {
     }
 }
 
-/// Given an openable file, format a file-specific title for the Open in Dwarf banner.
+/// Given an openable file, format a file-specific title for the open-in-app banner.
 fn file_title_text(openable_path: &OpenablePath) -> String {
     match openable_path.file_type {
-        OpenableFileType::Markdown => {
-            "Did you know that Dwarf can directly display Markdown files?".to_string()
-        }
+        OpenableFileType::Markdown => format!(
+            "Did you know that {} can directly display Markdown files?",
+            ChannelState::app_name_display()
+        ),
         OpenableFileType::Code | OpenableFileType::Text => {
             cfg_if::cfg_if! {
                 if #[cfg(not(target_family = "wasm"))] {
@@ -61,13 +63,22 @@ fn file_title_text(openable_path: &OpenablePath) -> String {
 
                     match language.as_ref().map(|language| language.display_name()) {
                         Some(display_name) => {
-                            format!("Did you know that Dwarf can directly edit {display_name} files?")
+                            format!(
+                                "Did you know that {} can directly edit {display_name} files?",
+                                ChannelState::app_name_display()
+                            )
                         }
-                        None => "Did you know that Dwarf can directly edit code?".to_string(),
+                        None => format!(
+                            "Did you know that {} can directly edit code?",
+                            ChannelState::app_name_display()
+                        ),
                     }
                 } else {
                     // The `languages` crate is not available on WASM, so use a fallback message.
-                    "Did you know that Dwarf can directly edit code?".to_string()
+                    format!(
+                        "Did you know that {} can directly edit code?",
+                        ChannelState::app_name_display()
+                    )
                 }
             }
         }
@@ -80,12 +91,14 @@ pub fn render_open_in_warp_banner(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let button_text = match state.target.file_type {
-        OpenableFileType::Markdown => "View in Dwarf",
-        OpenableFileType::Code | OpenableFileType::Text => "Edit in Dwarf",
+        OpenableFileType::Markdown => format!("View in {}", ChannelState::app_name_display()),
+        OpenableFileType::Code | OpenableFileType::Text => {
+            format!("Edit in {}", ChannelState::app_name_display())
+        }
     };
 
     let open_button = InlineBannerTextButton {
-        text: button_text.to_string(),
+        text: button_text,
         text_color: appearance.theme().active_ui_text_color().into_solid(),
         button_state: InlineBannerButtonState {
             on_click_event: TerminalAction::OpenInWarpBanner(OpenInWarpBannerAction::OpenFile),

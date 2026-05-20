@@ -66,7 +66,7 @@ pub(super) enum AgentModalityCalloutState {
     MeetTerminalInput,
     /// Step 2: "Natural language support" with checkbox
     NaturalLanguageSupport,
-    /// Step 3: "Introducing Dwarf's new agent experience" (Agent intention only)
+    /// Step 3: introducing the new agent experience (Agent intention only)
     IntroducingAgentExperience,
     /// Step 4: "Updated agent input" (Agent intention only)
     UpdatedAgentInput,
@@ -353,8 +353,7 @@ impl OnboardingCalloutModel {
             }
             _ => None,
         };
-        if let Some(_callout) = callout_name {
-        }
+        if let Some(_callout) = callout_name {}
     }
 
     fn set_state(&mut self, new_state: OnboardingCalloutState, ctx: &mut ModelContext<Self>) {

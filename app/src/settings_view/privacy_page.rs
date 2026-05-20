@@ -73,11 +73,14 @@ use warpui::fonts::Weight;
 const FONT_SIZE: f32 = 12.;
 
 const SAFE_MODE_TITLE: &str = "Secret redaction";
-static SAFE_MODE_DESCRIPTION: LazyLock<&'static str> = LazyLock::new(|| {
-    "When this setting is enabled, Warp will scan blocks, the contents of \
-        Dwarf Drive objects, and Oz prompts for potential sensitive \
+static SAFE_MODE_DESCRIPTION: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "When this setting is enabled, Warp will scan blocks, the contents of \
+        {} objects, and Oz prompts for potential sensitive \
         information and prevent saving or sending this data to any \
-        servers. You can customize this list via regexes."
+        servers. You can customize this list via regexes.",
+        ChannelState::app_name_drive()
+    )
 });
 const USER_SECRET_REGEX_TITLE: &str = "Custom secret redaction";
 const USER_SECRET_REGEX_DESCRIPTION: &str =
@@ -87,23 +90,39 @@ const USER_SECRET_REGEX_DESCRIPTION: &str =
 const TELEMETRY_DESCRIPTION_OLD: &str =
     "App analytics help us make the product better for you. We only collect \
     app usage metadata, never console input or output.";
-const TELEMETRY_TITLE: &str = "Help improve Dwarf";
-const TELEMETRY_DESCRIPTION: &str =
-    "App analytics help us make the product better for you. We may collect \
-    certain console interactions to improve Dwarf's AI capabilities.";
+fn telemetry_title() -> String {
+    format!("Help improve {}", ChannelState::app_name_display())
+}
+
+fn telemetry_description() -> String {
+    format!(
+        "App analytics help us make the product better for you. We may collect \
+    certain console interactions to improve {} AI capabilities.",
+        ChannelState::app_name_possessive()
+    )
+}
 const TELEMETRY_FREE_TIER_NOTE: &str =
     "On the free tier, analytics must be enabled to use AI features.";
 const TELEMETRY_DOCS_URL: &str =
     "https://docs.warp.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-warp-collect-and-why";
 
 const DATA_MANAGEMENT_TITLE: &str = "Manage your data";
-const DATA_MANAGEMENT_DESCRIPTION: &str =
-    "At any time, you may choose to delete your Dwarf account permanently. \
-    You will no longer be able to use Warp.";
+fn data_management_description() -> String {
+    format!(
+        "At any time, you may choose to delete your {} account permanently. \
+    You will no longer be able to use Warp.",
+        ChannelState::app_name_display()
+    )
+}
 const DATA_MANAGEMENT_LINK_TEXT: &str = "Visit the data management page";
 
 const PRIVACY_POLICY_TITLE: &str = "Privacy policy";
-const PRIVACY_POLICY_LINK_TEXT: &str = "Read Dwarf's privacy policy";
+fn privacy_policy_link_text() -> String {
+    format!(
+        "Read {} privacy policy",
+        ChannelState::app_name_possessive()
+    )
+}
 
 pub fn data_management_url(custom_token: Option<&str>) -> String {
     match custom_token {
@@ -1215,7 +1234,7 @@ impl SettingsWidget for SecretRedactionWidget {
             .with_child(secret_redaction_title_row)
             .with_child(
                 ui_builder
-                    .paragraph((*SAFE_MODE_DESCRIPTION).to_owned())
+                    .paragraph(SAFE_MODE_DESCRIPTION.clone())
                     .with_style(UiComponentStyles {
                         font_color: Some(description_text_color),
                         font_size: Some(FONT_SIZE + 1.), // One size up from current 12px to 13px
@@ -1461,9 +1480,9 @@ impl SettingsWidget for AppAnalyticsWidget {
             .is_some_and(|w| w.billing_metadata.customer_type == CustomerType::Enterprise);
         // Keep the old description for enterprise users because we do not collect block input/output for them.
         let description = if is_enterprise {
-            TELEMETRY_DESCRIPTION_OLD
+            TELEMETRY_DESCRIPTION_OLD.to_string()
         } else {
-            TELEMETRY_DESCRIPTION
+            telemetry_description()
         };
 
         let org_setting = UserWorkspaces::handle(app)
@@ -1482,7 +1501,7 @@ impl SettingsWidget for AppAnalyticsWidget {
             Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(render_body_item_label::<PrivacyPageAction>(
-                    TELEMETRY_TITLE.into(),
+                    telemetry_title(),
                     None,
                     None,
                     LocalOnlyIconState::Hidden,
@@ -1493,7 +1512,7 @@ impl SettingsWidget for AppAnalyticsWidget {
                 .finish()
         } else {
             render_body_item_label::<PrivacyPageAction>(
-                TELEMETRY_TITLE.into(),
+                telemetry_title(),
                 None,
                 None,
                 LocalOnlyIconState::Hidden,
@@ -1574,7 +1593,10 @@ impl SettingsWidget for AppAnalyticsWidget {
             Align::new(
                 ui_builder
                     .link(
-                        "Read more about Dwarf's use of data".into(),
+                        format!(
+                            "Read more about {} use of data",
+                            ChannelState::app_name_possessive()
+                        ),
                         Some(TELEMETRY_DOCS_URL.into()),
                         None,
                         self.docs_link_mouse_state.clone(),
@@ -1748,18 +1770,19 @@ impl SettingsWidget for CloudConversationStorageWidget {
             ))
             .with_child(
                 ui_builder
-                    .paragraph(
-                        if is_checked {
+                    .paragraph(if is_checked {
+                        format!(
                             "Agent conversations can be shared with others and are retained \
                             when you log in on different devices. This data is only stored \
-                            for product functionality, and Dwarf will not use it for analytics."
-                        } else {
-                            "Agent conversations are only stored locally on your machine, are \
+                            for product functionality, and {} will not use it for analytics.",
+                            ChannelState::app_name_display()
+                        )
+                    } else {
+                        "Agent conversations are only stored locally on your machine, are \
                             lost upon logout, and cannot be shared. Note: conversation data \
                             for ambient agents are still stored in the cloud."
-                        }
-                        .to_owned(),
-                    )
+                            .to_owned()
+                    })
                     .with_style(UiComponentStyles {
                         font_color: Some(
                             appearance
@@ -1891,7 +1914,7 @@ impl SettingsWidget for DataManagementWidget {
             ))
             .with_child(
                 ui_builder
-                    .paragraph(DATA_MANAGEMENT_DESCRIPTION)
+                    .paragraph(data_management_description())
                     .with_style(UiComponentStyles {
                         font_color: Some(
                             appearance
@@ -1969,7 +1992,7 @@ impl SettingsWidget for PrivacyPolicyWidget {
                     appearance
                         .ui_builder()
                         .link(
-                            PRIVACY_POLICY_LINK_TEXT.into(),
+                            privacy_policy_link_text(),
                             Some(PRIVACY_POLICY_URL.into()),
                             None,
                             self.link_mouse_state.clone(),

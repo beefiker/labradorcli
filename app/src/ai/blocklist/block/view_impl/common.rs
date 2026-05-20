@@ -17,6 +17,7 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use std::sync::Arc;
 use warp_core::{
+    channel::ChannelState,
     features::FeatureFlag,
     ui::{appearance::Appearance, color::blend::Blend, theme::color::internal_colors},
 };
@@ -24,13 +25,13 @@ use warpui::{
     assets::asset_cache::{AssetCache, AssetSource, AssetState},
     elements::{
         new_scrollable::{ScrollableAppearance, SingleAxisConfig},
-        Align, Axis, Border, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox,
-        Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler,
-        Expanded, Fill, Flex, FormattedTextElement, HeadingFontSizeMultipliers, Hoverable,
-        Image as WarpImage, MainAxisAlignment, MainAxisSize, MouseStateHandle, NewScrollable,
-        OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition,
-        ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Table,
-        TableColumnWidth, TableConfig, TableHeader, TableVerticalSizing, Text, Wrap,
+        Align, Axis, Border, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox, Container,
+        CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Expanded, Fill,
+        Flex, FormattedTextElement, HeadingFontSizeMultipliers, Hoverable, Image as WarpImage,
+        MainAxisAlignment, MainAxisSize, MouseStateHandle, NewScrollable, OffsetPositioning,
+        ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollTarget,
+        ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Table, TableColumnWidth,
+        TableConfig, TableHeader, TableVerticalSizing, Text, Wrap,
     },
     fonts::{Properties, Weight},
     image_cache::{CacheOption, ImageType},
@@ -107,11 +108,7 @@ use crate::{
     },
     workspace::WorkspaceAction,
 };
-use crate::{
-    search::slash_command_menu::static_commands::commands,
-    settings::InputSettings,
-};
-use warp_core::channel::ChannelState;
+use crate::{search::slash_command_menu::static_commands::commands, settings::InputSettings};
 use warp_editor::content::{
     edit::resolve_asset_source_relative_to_directory, mermaid_diagram::mermaid_asset_source,
 };
@@ -125,9 +122,9 @@ pub const WAITING_FOR_USER_INPUT_MESSAGE: &str = "Agent waiting for instructions
 const IMAGE_SOURCE_LINK_LINE_INDEX: usize = 1;
 
 const ERROR_APOLOGY_TEXT: &str = "I'm sorry, I couldn't complete that request.";
-const INTERNAL_WARP_ERROR: &str = "Internal Dwarf error.";
-
-pub const LOAD_OUTPUT_MESSAGE: &str = "Dwarfing...";
+pub fn load_output_message() -> String {
+    format!("{}...", ChannelState::app_name_gerund())
+}
 pub const LOAD_OUTPUT_MESSAGE_FOR_ADJUSTING: &str = "Adjusting tasks...";
 pub const LOAD_OUTPUT_MESSAGE_FOR_PASSIVE_CODE_GEN: &str = "Generating fix...";
 pub const LOAD_OUTPUT_MESSAGE_FOR_CREATING_DIFF: &str = "Creating diff...";
@@ -2925,15 +2922,19 @@ pub fn render_failed_output(props: FailedOutputProps, app: &AppContext) -> Box<d
 
     let error_text = match props.error {
         RenderableAIError::QuotaLimit => {
-            format!(
-                "{ERROR_APOLOGY_TEXT}\n\nYou've reached your credit limit.",
-            )
+            format!("{ERROR_APOLOGY_TEXT}\n\nYou've reached your credit limit.",)
         }
         RenderableAIError::ServerOverloaded => {
-            "Dwarf is currently overloaded. Please try again later.".to_string()
+            format!(
+                "{} is currently overloaded. Please try again later.",
+                ChannelState::app_name_display()
+            )
         }
         RenderableAIError::InternalWarpError => {
-            format!("{ERROR_APOLOGY_TEXT}\n\n{INTERNAL_WARP_ERROR}")
+            format!(
+                "{ERROR_APOLOGY_TEXT}\n\nInternal {} error.",
+                ChannelState::app_name_display()
+            )
         }
         RenderableAIError::Other {
             error_message,

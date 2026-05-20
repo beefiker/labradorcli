@@ -32,7 +32,6 @@ use crate::ai::blocklist::agent_view::{AgentViewEntryOrigin, EphemeralMessageMod
 use crate::ai::blocklist::block::cli_controller::CLISubagentController;
 use crate::ai::blocklist::block::status_bar::BlocklistAIStatusBar;
 use crate::ai::blocklist::{ai_indicator_height, BlocklistAIActionModel, SlashCommandRequest};
-use ai::document::{AIDocumentId, AIDocumentVersion};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::predict::prompt_suggestions::{
     has_pending_code_or_unit_test_prompt_suggestion,
@@ -43,6 +42,7 @@ use crate::context_chips::spacing;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
 use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND_REGISTRY};
+use ai::document::{AIDocumentId, AIDocumentVersion};
 
 use crate::server::telemetry::PaletteSource;
 use crate::settings::PrivacySettings;
@@ -141,8 +141,7 @@ use crate::{
         EditorDecoratorElements, EditorOptions, EditorSnapshot, EditorView, Event as EditorEvent,
         ImageContextOptions, InteractionState, PathTransformerFn, PlainTextEditorViewAction,
         Point as BufferPoint, PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys,
-        PropagateHorizontalNavigationKeys, ReplicaId, TextColors,
-        MAX_IMAGES_PER_CONVERSATION,
+        PropagateHorizontalNavigationKeys, ReplicaId, TextColors, MAX_IMAGES_PER_CONVERSATION,
     },
     features::FeatureFlag,
     input_suggestions::{
@@ -163,11 +162,12 @@ use crate::{
         },
         QueryFilter,
     },
-        server::{
+    server::{
         ids::SyncId,
         server_api::ServerApi,
         telemetry::{
-            AICommandSearchEntrypoint, AgentModeAutoDetectionFalsePositivePayload, AnonymousUserSignupEntrypoint, CommandXRayTrigger,
+            AICommandSearchEntrypoint, AgentModeAutoDetectionFalsePositivePayload,
+            AnonymousUserSignupEntrypoint, CommandXRayTrigger,
         },
     },
     session_management::SessionNavigationPromptElements,
@@ -238,9 +238,8 @@ use warpui::{
         resizable_state_handle, Align, AnchorPair, Clipped, ConstrainedBox, Container,
         CornerRadius, CrossAxisAlignment, DispatchEventResult, DropTargetData, Element,
         EventHandler, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
-        OffsetType, ParentElement, PositionedElementOffsetBounds, PositioningAxis,
-        Radius, ResizableStateHandle, SavePosition, SelectionHandle, Text, Wrap, XAxisAnchor,
-        YAxisAnchor,
+        OffsetType, ParentElement, PositionedElementOffsetBounds, PositioningAxis, Radius,
+        ResizableStateHandle, SavePosition, SelectionHandle, Text, Wrap, XAxisAnchor, YAxisAnchor,
     },
     end_trace,
     keymap::{BindingDescription, EditableBinding, FixedBinding, Keystroke},
@@ -339,7 +338,12 @@ pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_TOP_PADDING: f32 = 10.;
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_BOTTOM_PADDING: f32 = 8.;
 pub(super) const CLI_AGENT_RICH_INPUT_HINT_TEXT: &str = "Tell the agent what to build...";
 
-const CLOUD_MODE_V2_HINT_TEXT: &str = "Kick off a Dwarf agent";
+fn cloud_mode_v2_hint_text() -> String {
+    format!(
+        "Kick off a {} agent",
+        ChannelState::app_name_display()
+    )
+}
 const SHORT_CIRCUIT_HIGHLIGHTING_ACTIONS: [Option<PlainTextEditorViewAction>; 7] = [
     Some(PlainTextEditorViewAction::Space),
     Some(PlainTextEditorViewAction::NonExpandingSpace),
@@ -369,42 +373,46 @@ const AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT: &str = "Run comma
 
 // Rotating hint text options for new Agent Mode conversations
 const AGENT_MODE_HINT_OPTIONS: &[&str] = &[
-    "Ask Dwarf e.g. Inspect this repo and summarize the main entry points",
-    "Ask Dwarf e.g. Find why my Python tests are failing and suggest the next command",
-    "Ask Dwarf e.g. Search this project for TODOs and group them by file",
-    "Ask Dwarf e.g. Find and explain the slowest build step in this project",
-    "Ask Dwarf e.g. Create a backup script for my PostgreSQL database",
-    "Ask Dwarf e.g. Plan a MySQL to PostgreSQL migration and list the commands",
-    "Ask Dwarf e.g. Check the local service logs and summarize the errors",
-    "Ask Dwarf e.g. Build a FastAPI route and add a focused test",
-    "Ask Dwarf e.g. Explain why this SQL query is slow and suggest an index",
-    "Ask Dwarf e.g. Create a GitHub Actions workflow for this repo",
-    "Ask Dwarf e.g. Add Redis caching around the slow request path",
-    "Ask Dwarf e.g. Troubleshoot why my Kubernetes pods keep crashing",
-    "Ask Dwarf e.g. Build a local data pipeline for CSV files",
-    "Ask Dwarf e.g. Check SSL certificate setup for this project",
-    "Ask Dwarf e.g. Refactor this legacy module with narrow diffs",
-    "Ask Dwarf e.g. Add unit tests for the authentication service",
-    "Ask Dwarf e.g. Summarize recent logs and identify the failure pattern",
-    "Ask Dwarf e.g. Implement OAuth2 authentication in my Express app",
-    "Ask Dwarf e.g. Optimize Docker image size and build time",
-    "Ask Dwarf e.g. Compare two branches and summarize risky changes",
+    "Inspect this repo and summarize the main entry points",
+    "Find why my Python tests are failing and suggest the next command",
+    "Search this project for TODOs and group them by file",
+    "Find and explain the slowest build step in this project",
+    "Create a backup script for my PostgreSQL database",
+    "Plan a MySQL to PostgreSQL migration and list the commands",
+    "Check the local service logs and summarize the errors",
+    "Build a FastAPI route and add a focused test",
+    "Explain why this SQL query is slow and suggest an index",
+    "Create a GitHub Actions workflow for this repo",
+    "Add Redis caching around the slow request path",
+    "Troubleshoot why my Kubernetes pods keep crashing",
+    "Build a local data pipeline for CSV files",
+    "Check SSL certificate setup for this project",
+    "Refactor this legacy module with narrow diffs",
+    "Add unit tests for the authentication service",
+    "Summarize recent logs and identify the failure pattern",
+    "Implement OAuth2 authentication in my Express app",
+    "Optimize Docker image size and build time",
+    "Compare two branches and summarize risky changes",
 ];
 
-fn get_agent_mode_new_conversation_hint_text() -> &'static str {
+fn get_agent_mode_new_conversation_hint_text() -> String {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static HINT_INDEX: AtomicUsize = AtomicUsize::new(0);
 
     let index = HINT_INDEX.fetch_add(1, Ordering::Relaxed) % AGENT_MODE_HINT_OPTIONS.len();
-    AGENT_MODE_HINT_OPTIONS[index]
+    format!(
+        "Ask {} e.g. {}",
+        ChannelState::app_name_display(),
+        AGENT_MODE_HINT_OPTIONS[index]
+    )
 }
 
-fn get_stable_agent_mode_hint_text(cached_hint: &mut Option<&'static str>) -> &'static str {
+fn get_stable_agent_mode_hint_text(cached_hint: &mut Option<String>) -> String {
     if let Some(hint) = cached_hint {
-        hint
+        hint.clone()
     } else {
         let new_hint = get_agent_mode_new_conversation_hint_text();
-        *cached_hint = Some(new_hint);
+        *cached_hint = Some(new_hint.clone());
         new_hint
     }
 }
@@ -744,7 +752,6 @@ impl InputSuggestionsMode {
             _ => None,
         }
     }
-
 }
 
 /// Where a command execution request originates from.
@@ -1410,7 +1417,7 @@ pub struct Input {
     conn: Option<Arc<Mutex<SqliteConnection>>>,
 
     /// Cached hint text to ensure it remains stable during shell initialization hooks
-    cached_agent_mode_hint_text: Option<&'static str>,
+    cached_agent_mode_hint_text: Option<String>,
 
     predict_am_queries_future_handle: Option<SpawnedFutureHandle>,
 
@@ -1574,7 +1581,7 @@ pub fn init(app: &mut AppContext) {
 
     app.register_editable_bindings([EditableBinding::new(
         "input:insert_network_logging_workflow",
-        "Show Warp network log",
+        format!("Show {} network log", ChannelState::app_name_display()),
         WorkspaceAction::OpenNetworkLogPane,
     )
     .with_enabled(|| ContextFlag::NetworkLogConsole.is_enabled())]);
@@ -3250,7 +3257,6 @@ impl Input {
             let _is_udi_enabled =
                 InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
             let _current_input_mode = self.ai_input_model.as_ref(ctx).input_type();
-
         } else if self.suggestions_mode_model.as_ref(ctx).is_ai_context_menu() {
             self.close_ai_context_menu(ctx);
         }
@@ -4687,7 +4693,7 @@ impl Input {
     // Returns the appropriate hint/placeholder text to render in an empty input when Agent Mode is
     // enabled (the feature flag, not the specific AI input mode). This method ensures that hint text
     // is cached when needed for new conversations.
-    fn agent_mode_hint_text(&mut self, app: &AppContext) -> &str {
+    fn agent_mode_hint_text(&mut self, app: &AppContext) -> String {
         let input_model = self.ai_input_model.as_ref(app);
         let is_udi_enabled = InputSettings::as_ref(app).is_universal_developer_input_enabled(app);
 
@@ -4695,14 +4701,16 @@ impl Input {
             input_model.input_type(),
             input_model.should_run_input_autodetection(app),
         ) {
-            (InputType::Shell, false) => AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT,
+            (InputType::Shell, false) => {
+                AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT.to_string()
+            }
             (InputType::Shell, true) => {
                 // Ensure hint text is cached for new conversations
                 get_stable_agent_mode_hint_text(&mut self.cached_agent_mode_hint_text)
             }
             (InputType::AI, _) => {
                 // Follow the `agent_indicator` pattern (see `app/src/tab.rs`):
-                //  * `None` (no conversation, empty, passive, or untitled) => new conversation => "Warp anything"
+                //  * `None` (no conversation, empty, passive, or untitled) => new conversation => app prompt placeholder
                 //  * `InProgress`                                           => agent running    => "Steer"
                 //  * Any other status                                       => finished         => "Ask a follow up"
                 match self
@@ -4712,16 +4720,16 @@ impl Input {
                 {
                     Some(status) if status.is_in_progress() => {
                         if is_udi_enabled {
-                            AGENT_MODE_AI_ENABLED_STEER_HINT_TEXT_UDI
+                            AGENT_MODE_AI_ENABLED_STEER_HINT_TEXT_UDI.to_string()
                         } else {
-                            AGENT_MODE_AI_ENABLED_STEER_HINT_TEXT_CLASSIC
+                            AGENT_MODE_AI_ENABLED_STEER_HINT_TEXT_CLASSIC.to_string()
                         }
                     }
                     Some(_) => {
                         if is_udi_enabled {
-                            AGENT_MODE_AI_ENABLED_FOLLOW_UP_HINT_TEXT_UDI
+                            AGENT_MODE_AI_ENABLED_FOLLOW_UP_HINT_TEXT_UDI.to_string()
                         } else {
-                            AGENT_MODE_AI_ENABLED_FOLLOW_UP_HINT_TEXT_CLASSIC
+                            AGENT_MODE_AI_ENABLED_FOLLOW_UP_HINT_TEXT_CLASSIC.to_string()
                         }
                     }
                     None => {
@@ -5150,7 +5158,7 @@ impl Input {
             let show_hint = *InputSettings::as_ref(ctx).show_hint_text;
             self.editor.update(ctx, |editor, ctx| {
                 if show_hint {
-                    editor.set_placeholder_text(CLOUD_MODE_V2_HINT_TEXT, ctx);
+                    editor.set_placeholder_text(&cloud_mode_v2_hint_text(), ctx);
                 } else {
                     editor.clear_placeholder_text(ctx);
                 }
@@ -5194,7 +5202,7 @@ impl Input {
         if toggled_on && AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
             if FeatureFlag::AgentMode.is_enabled() {
                 // agent_mode_hint_text now handles caching internally
-                let hint_text = self.agent_mode_hint_text(ctx).to_string();
+                let hint_text = self.agent_mode_hint_text(ctx);
                 self.editor.update(ctx, |editor, ctx| {
                     editor.set_placeholder_text(&hint_text, ctx);
                 });
@@ -7781,9 +7789,7 @@ impl Input {
 
                         self.maybe_generate_autosuggestion(ctx);
 
-                        if buffer_text.is_empty()
-                            && false
-                        {
+                        if buffer_text.is_empty() && false {
                             self.clear_current_workflow(ctx);
                         }
 
@@ -11962,8 +11968,7 @@ impl TypedActionView for Input {
                             .ai_autodetection_enabled_internal
                             .toggle_and_save_value(model_ctx)
                     })
-                {
-                }
+                {}
             }
             InputAction::CycleNextCommandSuggestion => {
                 self.cycle_next_command_suggestion(ctx);
@@ -12291,8 +12296,7 @@ impl View for Input {
         }
         let is_universal_input = self.should_show_universal_developer_input(app);
 
-        if FeatureFlag::AgentView.is_enabled()
-            && self.agent_view_controller.as_ref(app).is_active()
+        if FeatureFlag::AgentView.is_enabled() && self.agent_view_controller.as_ref(app).is_active()
         {
             self.render_agent_input(app)
         } else if FeatureFlag::AgentView.is_enabled()
@@ -12470,4 +12474,3 @@ impl Input {
             .cli_display_chip_kinds(app)
     }
 }
-

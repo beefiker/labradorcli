@@ -107,6 +107,22 @@ fn upload_artifact_tool_call_message(path: &str, description: &str) -> api::Mess
     }
 }
 
+fn agent_output_message(text: &str, server_message_data: &str) -> api::Message {
+    api::Message {
+        id: "message-id".to_string(),
+        task_id: "task-id".to_string(),
+        server_message_data: server_message_data.to_string(),
+        citations: vec![],
+        message: Some(api::message::Message::AgentOutput(
+            api::message::AgentOutput {
+                text: text.to_string(),
+            },
+        )),
+        request_id: "request-id".to_string(),
+        timestamp: None,
+    }
+}
+
 fn remote_start_agent_v2_execution_mode(
     environment_id: &str,
 ) -> api::start_agent_v2::ExecutionMode {
@@ -389,6 +405,34 @@ fn converts_file_artifact_created_message_with_filename() {
         Some("Build output for the latest run")
     );
     assert_eq!(size_bytes, 42);
+}
+
+#[test]
+fn converts_local_cli_tool_output_agent_output_metadata() {
+    let task_id = TaskId::new("task-id".to_string());
+    let message = agent_output_message(
+        "/tmp\n",
+        r#"{"type":"local_cli_tool_output","title":"Ran pwd","is_complete":true,"is_error":false}"#,
+    );
+
+    let output = message
+        .to_client_output_message(ConversionParams {
+            task_id: &task_id,
+            current_todo_list: None,
+            active_code_review: None,
+        })
+        .expect("conversion should succeed");
+
+    let MaybeAIAgentOutputMessage::Message(output_message) = output else {
+        panic!("expected output message");
+    };
+    let AIAgentOutputMessageType::LocalCLIToolOutput(output) = output_message.message else {
+        panic!("expected local CLI tool output message");
+    };
+    assert_eq!(output.title, "Ran pwd");
+    assert_eq!(output.body, "/tmp\n");
+    assert!(output.is_complete);
+    assert!(!output.is_error);
 }
 
 #[test]

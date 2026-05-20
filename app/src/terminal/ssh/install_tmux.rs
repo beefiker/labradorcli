@@ -11,6 +11,7 @@ use crate::terminal::warpify::settings::WarpifySettings;
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon as UiIcon;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use warp_core::channel::ChannelState;
 use warp_core::ui::theme::WarpTheme;
 use warpui::elements::{
     FormattedTextElement, HighlightedHyperlink, Hoverable, Icon, MainAxisAlignment, MainAxisSize,
@@ -377,9 +378,15 @@ impl View for SshInstallTmuxBlock {
         );
 
         let explanation = if self.outdated_version {
-            "In order to Dwarfify your SSH session, a more recent version of tmux (>=3.0) must be installed. "
+            format!(
+                "In order to {} your SSH session, a more recent version of tmux (>=3.0) must be installed. ",
+                ChannelState::app_name_verbify()
+            )
         } else {
-            "In order to Dwarfify your SSH session, tmux must be installed. "
+            format!(
+                "In order to {} your SSH session, tmux must be installed. ",
+                ChannelState::app_name_verbify()
+            )
         };
 
         let warpify_description = vec![

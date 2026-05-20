@@ -677,8 +677,9 @@ impl Action {
             }
             Action::CreateEnvironment { repos } => {
                 log::info!(
-                    "Ignoring create-environment URI with {} repo(s); Dwarf does not expose cloud environments",
-                    repos.len()
+                    "Ignoring create-environment URI with {} repo(s); {} does not expose cloud environments",
+                    repos.len(),
+                    ChannelState::app_name_display()
                 );
             }
             Action::FocusCloudMode => {
@@ -743,7 +744,7 @@ impl Action {
             | Self::FocusCloudMode => W::default(),
             Self::NewTab => W::ShowPrimaryWindow(WindowActivationFallbackBehavior::Notify {
                 title: "New tab created".to_owned(),
-                description: "Go to Dwarf to see your new tab.".to_owned(),
+                description: format!("Go to {} to see your new tab.", ChannelState::app_name_display()),
             }),
             Self::NewWindow => W::Nothing,
         }

@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use chrono::{DateTime, Local};
-use warp_core::ui::Icon;
+use warp_core::{channel::ChannelState, ui::Icon};
 use warp_multi_agent_api as api;
 
 /// Temporary AWS credentials loaded from the AWS SDK.
@@ -79,13 +79,18 @@ impl AwsCredentialsState {
             ),
             Self::Disabled => (
                 "AWS Bedrock Disabled".to_string(),
-                "Dwarf will not load your AWS CLI credentials until AWS Bedrock is enabled by you or your workspace admin"
-                    .to_string(),
+                format!(
+                    "{} will not load your AWS CLI credentials until AWS Bedrock is enabled by you or your workspace admin",
+                    ChannelState::app_name_display()
+                ),
                 Icon::Key,
             ),
             Self::Refreshing => (
                 "Refreshing credentials...".to_string(),
-                "Loading your AWS CLI credentials into Dwarf".to_string(),
+                format!(
+                    "Loading your AWS CLI credentials into {}",
+                    ChannelState::app_name_display()
+                ),
                 Icon::RefreshCw04,
             ),
             Self::Loaded {

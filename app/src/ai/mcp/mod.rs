@@ -12,6 +12,7 @@ use diesel::{QueryDsl, RunQueryDsl, SqliteConnection};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+use warp_core::channel::ChannelState;
 use warp_core::ui::Icon;
 
 pub mod templatable_manager;
@@ -53,12 +54,12 @@ pub enum MCPProvider {
 }
 
 impl MCPProvider {
-    pub fn display_name(&self) -> &str {
+    pub fn display_name(&self) -> String {
         match self {
-            MCPProvider::Warp => "Dwarf",
-            MCPProvider::Claude => "Claude",
-            MCPProvider::Codex => "Codex",
-            MCPProvider::Agents => "Other Agents",
+            MCPProvider::Warp => ChannelState::app_name_display().to_string(),
+            MCPProvider::Claude => "Claude".to_string(),
+            MCPProvider::Codex => "Codex".to_string(),
+            MCPProvider::Agents => "Other Agents".to_string(),
         }
     }
 
@@ -74,7 +75,7 @@ impl MCPProvider {
     /// Returns the path of the provider's config file relative to the home directory.
     pub fn home_config_path(&self) -> &'static Path {
         match self {
-            MCPProvider::Warp => Path::new(".warp/.mcp.json"),
+            MCPProvider::Warp => Path::new(".labrador/.mcp.json"),
             MCPProvider::Claude => Path::new(".claude.json"),
             MCPProvider::Codex => Path::new(".codex/config.toml"),
             MCPProvider::Agents => Path::new(".agents/.mcp.json"),
@@ -84,7 +85,7 @@ impl MCPProvider {
     /// Returns the path of the provider's config file relative to a project root.
     pub fn project_config_path(&self) -> &'static Path {
         match self {
-            MCPProvider::Warp => Path::new(".warp/.mcp.json"),
+            MCPProvider::Warp => Path::new(".labrador/.mcp.json"),
             MCPProvider::Claude => Path::new(".mcp.json"),
             MCPProvider::Codex => Path::new(".codex/config.toml"),
             MCPProvider::Agents => Path::new(".agents/.mcp.json"),

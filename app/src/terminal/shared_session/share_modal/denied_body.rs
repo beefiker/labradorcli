@@ -9,7 +9,8 @@ use warpui::{
 
 use super::style::{self, MODAL_PADDING};
 
-const SESSION_BUILD_FREE_PLAN_SUBHEADER: &str = "Dwarf's free and pro plans come with a limited number of shared sessions.\n\nFor increased access to session sharing upgrade to the Build plan.";
+use crate::channel::ChannelState;
+
 const VIEW_PLANS_TEXT: &str = "View plans";
 
 pub struct DeniedBody {
@@ -46,7 +47,10 @@ impl View for DeniedBody {
         let appearance = Appearance::as_ref(app);
 
         let mut col = Flex::column();
-        let subheader = SESSION_BUILD_FREE_PLAN_SUBHEADER;
+        let subheader = format!(
+            "{} free and pro plans come with a limited number of shared sessions.\n\nFor increased access to session sharing upgrade to the Build plan.",
+            ChannelState::app_name_possessive()
+        );
 
         let text = appearance
             .ui_builder()

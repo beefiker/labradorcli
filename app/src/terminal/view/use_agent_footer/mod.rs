@@ -27,8 +27,10 @@ use anyhow::anyhow;
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use warp_core::{
+    channel::ChannelState,
     features::FeatureFlag,
-    report_error,     settings::Setting,
+    report_error,
+    settings::Setting,
     ui::{
         appearance::Appearance,
         color::contrast::{
@@ -537,8 +539,7 @@ impl TerminalView {
         let cli_agent_type: Option<CLIAgentType> = CLIAgentSessionsModel::as_ref(ctx)
             .session(self.view_id)
             .map(|s| s.agent.into());
-        if let Some(_cli_agent) = cli_agent_type {
-        }
+        if let Some(_cli_agent) = cli_agent_type {}
 
         self.redetermine_terminal_focus(ctx);
         ctx.notify();
@@ -586,8 +587,7 @@ impl TerminalView {
         let cli_agent: Option<CLIAgentType> = CLIAgentSessionsModel::as_ref(ctx)
             .session(self.view_id)
             .map(|s| s.agent.into());
-        if let Some(_cli_agent) = cli_agent {
-        }
+        if let Some(_cli_agent) = cli_agent {}
 
         // Clear any saved draft so submitted text isn't restored on the next open.
         let view_id = self.view_id;
@@ -907,7 +907,10 @@ impl UseAgentToolbar {
             .with_icon(Icon::AgentMode)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
-            .with_tooltip("Ask the Dwarf agent to assist")
+            .with_tooltip(format!(
+                "Ask the {} agent to assist",
+                ChannelState::app_name_display()
+            ))
             .with_tooltip_alignment(TooltipAlignment::Left)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(TerminalAction::SetInputModeAgent);
@@ -921,7 +924,10 @@ impl UseAgentToolbar {
             .with_icon(Icon::AgentMode)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
-            .with_tooltip("Ask the Dwarf agent to resume")
+            .with_tooltip(format!(
+                "Ask the {} agent to resume",
+                ChannelState::app_name_display()
+            ))
             .with_tooltip_alignment(TooltipAlignment::Left)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(TerminalAction::SetInputModeAgent);
@@ -1321,4 +1327,3 @@ impl ActionButtonTheme for AgentFooterButtonTheme {
         color
     }
 }
-

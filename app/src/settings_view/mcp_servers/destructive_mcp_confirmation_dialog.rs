@@ -6,6 +6,7 @@ use warpui::{
 
 use crate::{
     appearance::Appearance,
+    channel::ChannelState,
     ui_components::dialog::{dialog_styles, Dialog},
     view_components::action_button::{ActionButton, DangerPrimaryTheme, NakedTheme},
 };
@@ -66,13 +67,19 @@ impl From<&DestructiveMCPConfirmationDialogVariant>
             ),
             DestructiveMCPConfirmationDialogVariant::DeleteShared => DestructiveMCPConfirmationDialogDisplayOptions::new(
                 "Delete shared MCP server?".to_string(),
-                "This will not only delete this MCP server for yourself, but also uninstall and remove this MCP server from Dwarf and across all of your teammates' devices.".to_string(),
+                format!(
+                    "This will not only delete this MCP server for yourself, but also uninstall and remove this MCP server from {} and across all of your teammates' devices.",
+                    ChannelState::app_name_display()
+                ),
                 "Delete MCP".to_string(),
                 "Cancel".to_string(),
             ),
             DestructiveMCPConfirmationDialogVariant::Unshare => DestructiveMCPConfirmationDialogDisplayOptions::new(
                 "Remove shared MCP server from team?".to_string(),
-                "This will uninstall and remove this MCP server from Dwarf and across all of your teammates' devices.".to_string(),
+                format!(
+                    "This will uninstall and remove this MCP server from {} and across all of your teammates' devices.",
+                    ChannelState::app_name_display()
+                ),
                 "Remove from team".to_string(),
                 "Cancel".to_string(),
             ),

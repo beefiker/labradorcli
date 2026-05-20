@@ -18,6 +18,7 @@ use markdown_parser::FormattedTextFragment;
 use std::path::Path;
 use std::sync::LazyLock;
 use std::time::Duration;
+use warp_core::channel::ChannelState;
 use warpui::keymap::Keystroke;
 use warpui::r#async::SpawnedFutureHandle;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
@@ -101,7 +102,10 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::SlashCommands,
         },
         AgentTip {
-            description: "<keybinding> to open the Command Palette and access Dwarf actions and shortcuts.".to_string(),
+            description: format!(
+                "<keybinding> to open the Command Palette and access {} actions and shortcuts.",
+                ChannelState::app_name_display()
+            ),
             link: Some("https://docs.warp.dev/terminal/command-palette".to_string()),
             binding_name: Some(TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME),
             action: Some(WorkspaceAction::OpenPalette {
@@ -119,7 +123,10 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::General,
         },
         AgentTip {
-            description: "`@` to add context from files, blocks, or Dwarf Drive objects to your prompt.".to_string(),
+            description: format!(
+                "`@` to add context from files, blocks, or {} objects to your prompt.",
+                ChannelState::app_name_drive()
+            ),
             link: Some("https://docs.warp.dev/agent-platform/local-agents/agent-context/using-to-add-context".to_string()),
             binding_name: None,
             action: None,
@@ -245,7 +252,10 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::General,
         },
         AgentTip {
-            description: "Use the Dwarf command to run a local agent in headless mode.".to_string(),
+            description: format!(
+                "Use the {} command to run a local agent in headless mode.",
+                ChannelState::app_name_display()
+            ),
             link: Some("https://docs.warp.dev/reference/cli".to_string()),
             binding_name: None,
             action: None,
@@ -273,7 +283,11 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::Context,
         },
         AgentTip {
-            description: "Dwarfify a remote SSH session to enable Dwarf inside that environment.".to_string(),
+            description: format!(
+                "{} a remote SSH session to enable {} inside that environment.",
+                ChannelState::app_name_verbify(),
+                ChannelState::app_name_display()
+            ),
             link: Some("https://docs.warp.dev/terminal/warpify".to_string()),
             binding_name: None,
             action: None,
@@ -516,4 +530,3 @@ impl AITipModel<AgentTip> {
 }
 
 impl SingletonEntity for AITipModel<AgentTip> {}
-

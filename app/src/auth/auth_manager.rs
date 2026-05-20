@@ -23,9 +23,7 @@ use crate::persistence::ModelEvent;
 use crate::server::server_api::auth::FetchUserResult;
 use crate::server::{
     server_api::{
-        auth::{
-            AuthClient, UserAuthenticationError,
-        },
+        auth::{AuthClient, UserAuthenticationError},
         ServerApi,
     },
     telemetry::AnonymousUserSignupEntrypoint,
@@ -37,9 +35,7 @@ use crate::terminal::shared_session::manager::Manager as SharedSessionManager;
 #[cfg(target_family = "wasm")]
 use crate::uri::browser_url_handler::{parse_current_url, update_browser_url};
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::{
-    persistence, report_error, report_if_error, GlobalResourceHandlesProvider,
-};
+use crate::{persistence, report_error, report_if_error, GlobalResourceHandlesProvider};
 #[cfg(target_family = "wasm")]
 use url::Url;
 use user_persistence::PersistedUser;
@@ -55,9 +51,7 @@ pub enum AuthManagerEvent {
     /// refresh the entire user, only their token, which is when this event might be emitted.
     NeedsReauth,
     /// The user is anonymous and has attempted to access a login-gated feature or link.
-    AttemptedLoginGatedFeature {
-        auth_view_variant: AuthViewVariant,
-    },
+    AttemptedLoginGatedFeature { auth_view_variant: AuthViewVariant },
     /// Received a device authorization code as part of the device auth flow.
     ReceivedDeviceAuthorizationCode {
         #[cfg_attr(target_family = "wasm", allow(unused))]
@@ -311,8 +305,7 @@ impl AuthManager {
                 ctx.spawn(
                     async { warp_isolation_platform::detect() },
                     |_, platform, _ctx| {
-                        if let Some(_platform) = platform {
-                        }
+                        if let Some(_platform) = platform {}
                     },
                 );
 
@@ -558,4 +551,3 @@ impl Entity for AuthManager {
 }
 
 impl SingletonEntity for AuthManager {}
-

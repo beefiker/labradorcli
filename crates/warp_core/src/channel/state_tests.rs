@@ -1,4 +1,27 @@
-use super::derive_http_origin_from_ws_url;
+use super::{derive_http_origin_from_ws_url, Channel, ChannelState};
+
+#[test]
+fn app_name_is_shared_labrador_value() {
+    assert_eq!(ChannelState::app_name(), "labrador");
+    assert_eq!(ChannelState::app_name_display(), "Labrador");
+    assert_eq!(ChannelState::app_name_with_suffix("AI"), "Labrador AI");
+    assert_eq!(ChannelState::app_name_ai(), "Labrador AI");
+    assert_eq!(ChannelState::app_name_agent(), "Labrador Agent");
+    assert_eq!(ChannelState::app_name_cli(), "Labrador CLI");
+    assert_eq!(ChannelState::app_name_drive(), "Labrador Drive");
+    assert_eq!(ChannelState::app_name_api_key(), "Labrador API Key");
+    assert!(!crate::channel::APP_CLI_ABOUT.is_empty());
+    assert_eq!(ChannelState::app_name_possessive(), "Labrador's");
+    assert_eq!(ChannelState::app_name_verbify(), "Labradorify");
+    assert_eq!(ChannelState::app_name_verbification(), "Labradorification");
+    assert_eq!(ChannelState::app_name_verbifying(), "Labradorifying");
+    assert_eq!(ChannelState::app_name_verbed(), "Labradorified");
+    assert_eq!(ChannelState::app_name_gerund(), "Labradoring");
+    assert_eq!(
+        ChannelState::app_id_application_name(Channel::Local),
+        "LabradorLocal"
+    );
+}
 
 #[test]
 fn wss_becomes_https_and_strips_path() {

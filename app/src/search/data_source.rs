@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::any::Any;
 use std::{collections::HashSet, sync::Arc};
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 use warp_core::ui::theme::Fill;
 use warpui::{Action, AppContext, Element, Entity, ModelHandle};
 
@@ -295,8 +295,8 @@ impl QueryFilter {
     }
 
     /// Returns the display name (e.g. the string to be used in UI) representing the filter.
-    pub fn display_name(&self) -> &'static str {
-        match self {
+    pub fn display_name(&self) -> String {
+        let name = match self {
             QueryFilter::History => "history",
             QueryFilter::Workflows => "workflows",
             QueryFilter::AgentModeWorkflows => "prompts",
@@ -307,7 +307,7 @@ impl QueryFilter {
             QueryFilter::Sessions => "sessions",
             QueryFilter::Conversations => "conversations",
             QueryFilter::LaunchConfigurations => "launch configurations",
-            QueryFilter::Drive => "Dwarf Drive",
+            QueryFilter::Drive => return ChannelState::app_name_drive(),
             QueryFilter::EnvironmentVariables => "environment variables",
             QueryFilter::PromptHistory => "prompt history",
             QueryFilter::Files => "files",
@@ -323,7 +323,8 @@ impl QueryFilter {
             QueryFilter::BaseModels => "base models",
             QueryFilter::FullTerminalUseModels => "full terminal use models",
             QueryFilter::CurrentDirectoryConversations => "current directory conversations",
-        }
+        };
+        name.to_string()
     }
 
     /// Returns the path to the canonical icon for the filter.

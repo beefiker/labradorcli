@@ -1,10 +1,13 @@
 use asset_macro::bundled_or_fetched_asset;
 use pathfinder_color::ColorU;
-use warp_core::ui::{
-    color::{blend::Blend, coloru_with_opacity, OPAQUE},
-    theme::{
-        color::CustomDetails, AnsiColor, AnsiColors, Details, Fill, HorizontalGradient, Image,
-        TerminalColors, VerticalGradient, WarpTheme,
+use warp_core::{
+    channel::ChannelState,
+    ui::{
+        color::{blend::Blend, coloru_with_opacity, OPAQUE},
+        theme::{
+            color::CustomDetails, AnsiColor, AnsiColors, Details, Fill, HorizontalGradient, Image,
+            TerminalColors, VerticalGradient, WarpTheme,
+        },
     },
 };
 
@@ -581,7 +584,7 @@ pub(super) fn sent_referral_reward() -> WarpTheme {
             source: bundled_or_fetched_asset!("jpg/sent_referral_reward_bg.jpg"),
             opacity: 100,
         }),
-        Some("Warp Referral".to_string()),
+        Some(format!("{} Referral", ChannelState::app_name_display())),
     )
 }
 

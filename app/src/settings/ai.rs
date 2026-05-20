@@ -323,13 +323,13 @@ settings::macros::implement_setting_for_enum!(
 
 impl DefaultSessionMode {
     /// Display name for the settings dropdown.
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            DefaultSessionMode::Terminal => "Terminal",
-            DefaultSessionMode::Agent => "Agent",
-            DefaultSessionMode::CloudAgent => "Dwarf Agent",
-            DefaultSessionMode::TabConfig => "Tab Config",
-            DefaultSessionMode::DockerSandbox => "Local Docker Sandbox",
+            DefaultSessionMode::Terminal => "Terminal".to_string(),
+            DefaultSessionMode::Agent => "Agent".to_string(),
+            DefaultSessionMode::CloudAgent => ChannelState::app_name_agent(),
+            DefaultSessionMode::TabConfig => "Tab Config".to_string(),
+            DefaultSessionMode::DockerSandbox => "Local Docker Sandbox".to_string(),
         }
     }
 }
@@ -1029,7 +1029,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "agents.knowledge.warp_drive_context_enabled",
-        description: "Whether Dwarf Drive context is included in AI requests.",
+        description: format!("Whether {} context is included in AI requests.", ChannelState::app_name_drive()),
     }
 
     // Whether the codebase speedbump banner has been permanently dismissed for a given repo path.
@@ -1130,7 +1130,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "cloud_platform.third_party_api_keys.can_use_warp_credits_with_byok",
-        description: "Whether Dwarf credits can be used even when providing your own API key.",
+        description: format!("Whether {} credits can be used even when providing your own API key.", ChannelState::app_name_display()),
     }
 
     should_render_use_agent_footer_for_user_commands: ShouldRenderUseAgentToolbarForUserCommands {
@@ -1386,7 +1386,7 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
         private: false,
         toml_path: "agents.warp_agent.other.agent_attribution_enabled",
-        description: "Whether the Dwarf Agent adds an attribution co-author line to commit messages and pull requests it creates.",
+        description: format!("Whether the {} adds an attribution co-author line to commit messages and pull requests it creates.", ChannelState::app_name_agent()),
     },
     // Which local CLI agent dwarf prefers when both `codex` and `claude` are
     // installed. Stored as a lowercase string ("codex" | "claude"); read via
@@ -1425,7 +1425,12 @@ impl AISettings {
     /// the stored string is empty or unrecognized.
     pub fn default_local_provider(&self) -> crate::ai::local_llm::Provider {
         use crate::ai::local_llm::Provider;
-        match self.default_local_provider_internal.trim().to_ascii_lowercase().as_str() {
+        match self
+            .default_local_provider_internal
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
             "claude" => Provider::Claude,
             _ => Provider::Codex,
         }

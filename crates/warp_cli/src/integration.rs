@@ -50,7 +50,7 @@ pub struct CreateIntegrationArgs {
     pub prompt: Option<String>,
 
     /// Worker host ID for self-hosted workers.
-    /// If not specified or set to "warp", tasks will run on Warp-hosted workers.
+    /// If not specified, tasks will run on hosted workers.
     #[arg(long = "host")]
     pub worker_host: Option<String>,
 }
@@ -91,7 +91,7 @@ pub struct UpdateIntegrationArgs {
     pub prompt: Option<String>,
 
     /// Worker host ID for self-hosted workers.
-    /// If not specified or set to "warp", tasks will run on Warp-hosted workers.
+    /// If not specified, tasks will run on hosted workers.
     #[arg(long = "host")]
     pub worker_host: Option<String>,
 }

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use futures::FutureExt;
 use itertools::Itertools as _;
 use persistence::model::AgentConversationRecord;
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 use warpui::{AppContext, SingletonEntity};
 
 use crate::ai::agent::api::convert_conversation::{
@@ -124,12 +124,16 @@ pub async fn load_conversation_from_server(
                         RestorationMode::Continue,
                     ) {
                         Some(conversation) => {
-                            log::info!("Loaded Dwarf conversation {conversation_id} from server");
+                            log::info!(
+                                "Loaded {} conversation {conversation_id} from server",
+                                ChannelState::app_name_display()
+                            );
                             Some(CloudConversationData::Oz(Box::new(conversation)))
                         }
                         None => {
                             log::warn!(
-                                "Failed to convert Dwarf server conversation data for {conversation_id}"
+                                "Failed to convert {} server conversation data for {conversation_id}",
+                                ChannelState::app_name_display()
                             );
                             None
                         }
@@ -137,7 +141,10 @@ pub async fn load_conversation_from_server(
                 }
                 AIAgentHarness::ClaudeCode | AIAgentHarness::Codex => {
                     if !FeatureFlag::AgentHarness.is_enabled() {
-                        log::warn!("Ignoring non-Dwarf conversation {conversation_id}: AgentHarness flag is disabled");
+                        log::warn!(
+                            "Ignoring non-{} conversation {conversation_id}: AgentHarness flag is disabled",
+                            ChannelState::app_name_display()
+                        );
                         return None;
                     }
                     // Fetch snapshot data for third-party harness conversations.

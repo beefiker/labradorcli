@@ -9,8 +9,11 @@ use serde::{Deserialize, Serialize};
 pub use startup_shell::*;
 pub use working_directory_config::*;
 
-use warp_core::settings::{
-    macros::define_settings_group, RespectUserSyncSetting, SupportedPlatforms, SyncToCloud,
+use warp_core::{
+    channel::ChannelState,
+    settings::{
+        macros::define_settings_group, RespectUserSyncSetting, SupportedPlatforms, SyncToCloud,
+    },
 };
 
 use crate::ai::blocklist::agent_view::toolbar_item::AgentToolbarItemKind;
@@ -285,7 +288,7 @@ define_settings_group!(SessionSettings, settings: [
         sync_to_cloud: SyncToCloud::Never,
         private: false,
         toml_path: "session.startup_shell_override",
-        description: "The shell to use when Dwarf starts up.",
+        description: format!("The shell to use when {} starts up.", ChannelState::app_name_display()),
     },
     new_session_shell_override: NewSessionShellOverride {
         type: Option<NewSessionShell>,
@@ -303,7 +306,7 @@ define_settings_group!(SessionSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "terminal.input.honor_ps1",
-        description: "Whether to use your shell's PS1 prompt instead of the Dwarf prompt.",
+        description: format!("Whether to use your shell's PS1 prompt instead of the {} prompt.", ChannelState::app_name_display()),
     },
     saved_prompt: SavedPrompt {
         type: PromptSelection,

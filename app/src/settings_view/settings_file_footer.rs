@@ -8,6 +8,7 @@
 //!   error *and* the user has dismissed the workspace banner.
 //! * Otherwise, a plain bordered "Open settings file" button.
 use crate::appearance::Appearance;
+use crate::channel::ChannelState;
 use crate::settings::SettingsFileError;
 use crate::ui_components::icons::Icon;
 use crate::WorkspaceAction;
@@ -34,10 +35,10 @@ const OPEN_BUTTON_HEIGHT: f32 = 32.;
 const ALERT_ACTION_BUTTON_HEIGHT: f32 = 24.;
 /// Size of the leading icons (search-sm, code-02, alert-circle, oz).
 const FOOTER_ICON_SIZE: f32 = 16.;
-/// Size of the agent mark inside the "Fix with Dwarf" button. Matches the
+/// Size of the agent mark inside the AI fix button. Matches the
 /// Figma spec and the workspace banner's secondary-button icon sizing.
 const ALERT_OZ_ICON_SIZE: f32 = 14.;
-/// Horizontal padding inside the "Open file" / "Fix with Dwarf" action buttons.
+/// Horizontal padding inside the "Open file" / AI fix action buttons.
 /// Matches the workspace banner's secondary button pad.
 const ALERT_BUTTON_HORIZONTAL_PADDING: f32 = 8.;
 /// Spacing between the two action buttons when they fit on one row.
@@ -249,7 +250,7 @@ pub fn render_settings_error_alert(
             ui_font_family,
             text_color,
             mouse_states.alert_fix_with_oz_button.clone(),
-            "Fix with Dwarf",
+            format!("Fix with {}", ChannelState::app_name_display()),
             Some(Icon::Oz),
             /*bordered=*/ false,
             WorkspaceAction::FixSettingsWithOz { error_description },
@@ -319,11 +320,12 @@ fn render_alert_action_button(
     ui_font_family: FamilyId,
     text_color: ColorU,
     mouse_state: MouseStateHandle,
-    text: &'static str,
+    text: impl Into<String>,
     icon: Option<Icon>,
     bordered: bool,
     action: WorkspaceAction,
 ) -> Box<dyn Element> {
+    let text = text.into();
     Hoverable::new(mouse_state, move |state| {
         let mut row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -342,7 +344,7 @@ fn render_alert_action_button(
             );
         }
         row.add_child(
-            Text::new_inline(text.to_owned(), ui_font_family, FOOTER_FONT_SIZE)
+            Text::new_inline(text.clone(), ui_font_family, FOOTER_FONT_SIZE)
                 .with_color(text_color)
                 .with_style(Properties {
                     weight: Weight::Semibold,

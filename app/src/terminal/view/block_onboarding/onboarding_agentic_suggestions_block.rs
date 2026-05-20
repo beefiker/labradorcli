@@ -18,6 +18,7 @@ use markdown_parser::FormattedTextFragment;
 use markdown_parser::FormattedTextLine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use warp_core::channel::ChannelState;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::CornerRadius;
@@ -153,7 +154,10 @@ impl OnboardingAgenticSuggestionsBlock {
         let matrix_save_directory = themes_dir()
             .into_os_string()
             .into_string()
-            .unwrap_or("the Dwarf themes directory.".to_string());
+            .unwrap_or(format!(
+                "the {} themes directory.",
+                ChannelState::app_name_display()
+            ));
 
         let agent_suggestions = vec![
             (
@@ -180,7 +184,10 @@ impl OnboardingAgenticSuggestionsBlock {
                 AgenticSuggestionsContent {
                     title: "Create a Matrix-styled custom theme".to_string(),
                     description: "Make your terminal look like you entered the Matrix".to_string(),
-                    prompt: format!("First check if {matrix_save_directory} exists, and create this path if it doesn't already exist. Then create a matrix theme for my Dwarf terminal without a background image field, following exact YAML structure on the warp website without any extra or missing fields. Call it matrix.yaml and save it in the directory we previously created. Once you've verified that the theme is correct and ready to be applied, let me know by only saying 'The matrix theme is now available at <path>.'."),
+                    prompt: format!(
+                        "First check if {matrix_save_directory} exists, and create this path if it doesn't already exist. Then create a matrix theme for my {} terminal without a background image field, following the exact documented YAML structure without any extra or missing fields. Call it matrix.yaml and save it in the directory we previously created. Once you've verified that the theme is correct and ready to be applied, let me know by only saying 'The matrix theme is now available at <path>.'.",
+                        ChannelState::app_name_display()
+                    ),
                     chip_type: OnboardingChipType::MatrixThemePicker,
                     icon: UIIcon::Icon::PaintBrush,
                 },
@@ -589,7 +596,7 @@ impl OnboardingAgenticSuggestionsBlock {
         let font_size = appearance.monospace_font_size();
         let font_color = current_theme.main_text_color(current_theme.background());
 
-        const WELCOME_TEXT_LINE_ONE: &str = "Welcome to Dwarf!";
+        let welcome_text_line_one = format!("Welcome to {}!", ChannelState::app_name_display());
         const WELCOME_TEXT_LINE_TWO_PART_ONE: &str =
             "Here are a few examples of how to leverage the power of AI in your terminal using";
         const WELCOME_TEXT_LINE_TWO_PART_TWO: &str = " Agent Mode";
@@ -597,7 +604,7 @@ impl OnboardingAgenticSuggestionsBlock {
         Flex::column()
             .with_children(vec![
                 Container::new(
-                    Text::new(WELCOME_TEXT_LINE_ONE, font_family, font_size)
+                    Text::new(welcome_text_line_one, font_family, font_size)
                         .with_color(font_color.into_solid())
                         .finish(),
                 )

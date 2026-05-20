@@ -35,7 +35,6 @@ const UNSUPPORTED_TMUX_VERSION_ERROR: &str =
     "The tmux version available on the remote machine is below 3.0. Please install tmux 3.0 or greater using a different method and try again.";
 const TMUX_FAILED_ERROR: &str =
     "tmux failed to execute on the remote machine. Please re-install tmux and try again.";
-const WARPIFY_TIMEOUT_ERROR: &str = "Dwarfifying the session hit a timeout.";
 const UNSUPPORTED_SHELL_ERROR: &str =
     "Unsupported shell. Please set bash, zsh, or fish as your default shell and try again.";
 const TMUX_INSTALL_FAILED_ERROR: &str =
@@ -56,37 +55,46 @@ fn get_ssh_github_issue_url(title: &str) -> String {
 }
 
 impl WarpificationUnavailableReason {
-    fn error_message(&self) -> &'static str {
+    fn error_message(&self) -> String {
         match self {
-            WarpificationUnavailableReason::TmuxNotInstalled { .. } => TMUX_NOT_INSTALLED_ERROR,
-            WarpificationUnavailableReason::UnsupportedTmuxVersion { .. } => {
-                UNSUPPORTED_TMUX_VERSION_ERROR
+            WarpificationUnavailableReason::TmuxNotInstalled { .. } => {
+                TMUX_NOT_INSTALLED_ERROR.to_string()
             }
-            WarpificationUnavailableReason::TmuxFailed => TMUX_FAILED_ERROR,
-            WarpificationUnavailableReason::Timeout { .. } => WARPIFY_TIMEOUT_ERROR,
-            WarpificationUnavailableReason::UnsupportedShell { .. } => UNSUPPORTED_SHELL_ERROR,
-            WarpificationUnavailableReason::TmuxInstallFailed { .. } => TMUX_INSTALL_FAILED_ERROR,
+            WarpificationUnavailableReason::UnsupportedTmuxVersion { .. } => {
+                UNSUPPORTED_TMUX_VERSION_ERROR.to_string()
+            }
+            WarpificationUnavailableReason::TmuxFailed => TMUX_FAILED_ERROR.to_string(),
+            WarpificationUnavailableReason::Timeout { .. } => format!(
+                "{} the session hit a timeout.",
+                ChannelState::app_name_verbifying()
+            ),
+            WarpificationUnavailableReason::UnsupportedShell { .. } => {
+                UNSUPPORTED_SHELL_ERROR.to_string()
+            }
+            WarpificationUnavailableReason::TmuxInstallFailed { .. } => {
+                TMUX_INSTALL_FAILED_ERROR.to_string()
+            }
         }
     }
 
-    fn error_title(&self) -> &'static str {
+    fn error_title(&self) -> String {
         match self {
-            WarpificationUnavailableReason::TmuxNotInstalled { .. } => "tmux Not Installed",
+            WarpificationUnavailableReason::TmuxNotInstalled { .. } => "tmux Not Installed".into(),
             WarpificationUnavailableReason::UnsupportedTmuxVersion { .. } => {
-                "Unsupported Tmux Version"
+                "Unsupported Tmux Version".into()
             }
-            WarpificationUnavailableReason::TmuxFailed => "tmux Failed",
+            WarpificationUnavailableReason::TmuxFailed => "tmux Failed".into(),
             WarpificationUnavailableReason::Timeout {
                 is_tmux_install, ..
             } => {
                 if *is_tmux_install {
-                    "tmux Install Timeout"
+                    "tmux Install Timeout".into()
                 } else {
-                    "SSH Dwarfify Timeout"
+                    format!("SSH {} Timeout", ChannelState::app_name_verbify())
                 }
             }
-            WarpificationUnavailableReason::UnsupportedShell { .. } => "Unsupported Shell",
-            WarpificationUnavailableReason::TmuxInstallFailed { .. } => "tmux Install Failed",
+            WarpificationUnavailableReason::UnsupportedShell { .. } => "Unsupported Shell".into(),
+            WarpificationUnavailableReason::TmuxInstallFailed { .. } => "tmux Install Failed".into(),
         }
     }
 }
@@ -174,7 +182,7 @@ impl SshErrorBlock {
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let header_contents = warpify::render::build_header_row(
-            "Error Dwarfifying session",
+            format!("Error {} session", ChannelState::app_name_verbifying()),
             Icon::new(UiIcon::AlertTriangle.into(), theme.ui_error_color()),
             theme,
             appearance,
@@ -228,7 +236,7 @@ impl View for SshErrorBlock {
         content.add_child(self.render_title_ui(app, theme, appearance));
 
         content.add_child(warpify::render::description_row(
-            self.error_reason.error_message(),
+            &self.error_reason.error_message(),
             theme,
             appearance,
         ));
@@ -237,8 +245,8 @@ impl View for SshErrorBlock {
 
         if self.should_show_report_to_warp_button() {
             let report_issue_text = build_description_row(FormattedText::new([FormattedTextLine::Line(vec![
-                    FormattedTextFragment::plain_text("We are actively working on improving the stability of SSH in Dwarf. Please consider "),
-                    FormattedTextFragment::hyperlink("filing an issue", get_ssh_github_issue_url(self.error_reason.error_title())),
+                    FormattedTextFragment::plain_text(format!("We are actively working on improving the stability of SSH in {}. Please consider ", ChannelState::app_name_display())),
+                    FormattedTextFragment::hyperlink("filing an issue", get_ssh_github_issue_url(&self.error_reason.error_title())),
                     FormattedTextFragment::plain_text(" on GitHub so we can better identify the problem."),
                 ])]),
                 theme, appearance, self.report_link_highlight_index.clone())
@@ -258,7 +266,7 @@ impl View for SshErrorBlock {
                             ButtonVariant::Accent,
                             self.warpify_without_tmux_button_mouse_state.clone(),
                         )
-                        .with_centered_text_label("Dwarfify without TMUX".into())
+                        .with_centered_text_label(format!("{} without TMUX", ChannelState::app_name_verbify()))
                         .with_style(UiComponentStyles {
                             font_size: Some(appearance.monospace_font_size()),
                             ..Default::default()
@@ -279,7 +287,7 @@ impl View for SshErrorBlock {
                         ButtonVariant::Secondary,
                         self.continue_button_mouse_state.clone(),
                     )
-                    .with_centered_text_label("Continue without Dwarfification".into())
+                    .with_centered_text_label(format!("Continue without {}", ChannelState::app_name_verbification()))
                     .with_style(UiComponentStyles {
                         font_size: Some(appearance.monospace_font_size()),
                         ..Default::default()

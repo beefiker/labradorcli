@@ -27,7 +27,6 @@ use crate::ai::agent::{
     UploadArtifactResult, WriteToLongRunningShellCommandResult,
 };
 use crate::ai::block_context::BlockContext;
-use ai::document::{AIDocumentId, AIDocumentVersion};
 use crate::ai::llms::LLMId;
 use crate::ai_assistant::execution_context::{WarpAiExecutionContext, WarpAiOsContext};
 use crate::terminal::model::block::BlockId;
@@ -37,6 +36,7 @@ use ai::agent::action_result::{
     RequestComputerUseResult, SendMessageToAgentResult, StartAgentResult, StartAgentVersion,
     UseComputerResult,
 };
+use ai::document::{AIDocumentId, AIDocumentVersion};
 use ai::skills::ParsedSkill;
 use chrono::{DateTime, Local, TimeZone};
 use persistence::model::AgentConversationData;

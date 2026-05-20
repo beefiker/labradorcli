@@ -15,6 +15,7 @@ use warpui::{
 #[cfg(feature = "local_fs")]
 use crate::code::editor_management::CodeSource;
 use crate::{
+    channel::ChannelState,
     report_if_error,
     terminal::{
         event::UserBlockCompleted,
@@ -99,7 +100,7 @@ impl TerminalView {
         }
     }
 
-    /// Whether or not the "Open in Dwarf" banner is open.
+    /// Whether or not the open-in-app banner is open.
     #[cfg(feature = "integration_tests")]
     pub fn is_open_in_warp_banner_open(&self) -> bool {
         self.inline_banners_state.open_in_warp_banner.is_some()
@@ -237,7 +238,11 @@ impl TerminalView {
                 match &self.inline_banners_state.open_in_warp_banner {
                     Some(banner_state) => {
                         ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
-                            format!("Open {} in Dwarf", banner_state.target.path.display()),
+                            format!(
+                                "Open {} in {}",
+                                banner_state.target.path.display(),
+                                ChannelState::app_name_display()
+                            ),
                             WarpA11yRole::UserAction,
                         ))
                     }
@@ -246,14 +251,17 @@ impl TerminalView {
             }
             OpenInWarpBannerAction::Close => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
-                    "Close View in Dwarf banner",
+                    format!("Close View in {} banner", ChannelState::app_name_display()),
                     WarpA11yRole::UserAction,
                 ))
             }
             OpenInWarpBannerAction::LearnMore => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new(
                     "Learn more",
-                    "Learn more about opening Markdown files in Dwarf",
+                    format!(
+                        "Learn more about opening Markdown files in {}",
+                        ChannelState::app_name_display()
+                    ),
                     WarpA11yRole::UserAction,
                 ))
             }

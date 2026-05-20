@@ -19,12 +19,13 @@ use itertools::Itertools;
 pub use user_uid::UserUid;
 use warpui::modals::{AlertDialogWithCallbacks, ModalButton};
 
-use warp_core::user_preferences::GetUserPreferences as _;
+use warp_core::{channel::ChannelState, user_preferences::GetUserPreferences as _};
 use warpui::{AppContext, SingletonEntity};
 
 use crate::focus_running_window_and_show_native_modal;
 use crate::palette::PaletteMode;
-use crate::server::telemetry::{PaletteSource};
+use crate::report_if_error;
+use crate::server::telemetry::PaletteSource;
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::{
     CloudPreferencesSettings, PrivacySettings, CRASH_REPORTING_ENABLED_DEFAULTS_KEY,
@@ -34,7 +35,6 @@ use crate::terminal::shared_session::manager::Manager as SharedSessionManager;
 use crate::workspace::{Workspace, WorkspaceAction};
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::{persistence, GlobalResourceHandlesProvider};
-use crate::{report_if_error};
 
 /// Prefix for API keys used in authentication
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
@@ -47,7 +47,6 @@ pub fn init(_app: &mut AppContext) {
 /// If the app has running processes or dirty objects, we'll show a confirmation modal before logging out.
 /// If the user aborts, the user will not be logged out.
 pub fn maybe_log_out(app: &mut AppContext) {
-
     let sessions = SessionNavigationData::all_sessions(app).collect_vec();
     let num_long_running_commands = RunningSessionSummary::new(&sessions)
         .long_running_cmds
@@ -128,8 +127,9 @@ pub fn maybe_log_out(app: &mut AppContext) {
                 "object"
             };
             info_text_vec.push(format!(
-                "You have {num_unsaved_objects} unsynced Dwarf Drive {plural}. \
-            Logging out will cause you to lose the {plural}."
+                "You have {num_unsaved_objects} unsynced {} {plural}. \
+            Logging out will cause you to lose the {plural}.",
+                ChannelState::app_name_drive()
             ));
         }
 
@@ -145,8 +145,7 @@ pub fn maybe_log_out(app: &mut AppContext) {
             ));
         }
 
-        button_data.push(ModalButton::for_app("Cancel", move |_ctx| {
-        }));
+        button_data.push(ModalButton::for_app("Cancel", move |_ctx| {}));
 
         let alert_data = AlertDialogWithCallbacks::for_app(
             "Log out?",
@@ -177,7 +176,6 @@ pub fn maybe_log_out(app: &mut AppContext) {
 
 // Log out the user, clears workspace state, stops running processes, and deletes database.
 pub fn log_out(app: &mut AppContext) {
-
     CodebaseIndexManager::handle(app).update(app, |index_manager, ctx| {
         index_manager.reset_codebase_indexing(ctx);
     });

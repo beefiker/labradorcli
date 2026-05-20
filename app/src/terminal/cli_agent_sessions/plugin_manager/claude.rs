@@ -7,6 +7,7 @@ use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use serde_json::Value;
+use warp_core::channel::ChannelState;
 
 use super::{
     compare_versions, run_cli_command_logged, CliAgentPluginManager, PluginInstallError,
@@ -121,12 +122,18 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         Ok(())
     }
 
-    fn install_success_message(&self) -> &'static str {
-        "Dwarf plugin installed. Please run /reload-plugins to activate."
+    fn install_success_message(&self) -> String {
+        format!(
+            "{} plugin installed. Please run /reload-plugins to activate.",
+            ChannelState::app_name_display()
+        )
     }
 
-    fn update_success_message(&self) -> &'static str {
-        "Dwarf plugin updated. Please run /reload-plugins to activate."
+    fn update_success_message(&self) -> String {
+        format!(
+            "{} plugin updated. Please run /reload-plugins to activate.",
+            ChannelState::app_name_display()
+        )
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
@@ -163,17 +170,21 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
 
 static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
     PluginInstructions {
-        title: "Install Warp Plugin for Claude Code",
-        subtitle: "Ensure that jq is installed on your machine. Then, run these commands.",
+        title: format!(
+            "Install {} Plugin for Claude Code",
+            ChannelState::app_name_display()
+        ),
+        subtitle: "Ensure that jq is installed on your machine. Then, run these commands."
+            .to_string(),
         steps: &[
             PluginInstructionStep {
-                description: "Add the Dwarf plugin marketplace repository",
+                description: "Add the app plugin marketplace repository",
                 command: "claude plugin marketplace add warpdotdev/claude-code-warp",
                 executable: true,
                 link: None,
             },
             PluginInstructionStep {
-                description: "Install the Dwarf plugin",
+                description: "Install the app plugin",
                 command: "claude plugin install warp@claude-code-warp",
                 executable: true,
                 link: None,
@@ -188,8 +199,11 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
 });
 
 static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
-    title: "Update Warp Plugin for Claude Code",
-    subtitle: "Run the following commands.",
+    title: format!(
+        "Update {} Plugin for Claude Code",
+        ChannelState::app_name_display()
+    ),
+    subtitle: "Run the following commands.".to_string(),
     steps: &[
         PluginInstructionStep {
             description: "Remove the existing marketplace (if present)",

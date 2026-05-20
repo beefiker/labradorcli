@@ -3,6 +3,7 @@ use crate::{
     settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier},
     themes::theme::Fill,
 };
+use warp_core::channel::ChannelState;
 use warpui::{
     elements::{
         Align, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Hoverable, Icon,
@@ -33,11 +34,13 @@ pub enum FeatureSection {
 }
 
 impl FeatureSection {
-    pub fn section_name_string(&self) -> &'static str {
+    pub fn section_name_string(&self) -> String {
         match self {
-            FeatureSection::GettingStarted => "Getting Started",
-            FeatureSection::MaximizeWarp => "Maximize Warp",
-            FeatureSection::AdvancedSetup => "Advanced Setup",
+            FeatureSection::GettingStarted => "Getting Started".to_string(),
+            FeatureSection::MaximizeWarp => {
+                format!("Maximize {}", ChannelState::app_name_display())
+            }
+            FeatureSection::AdvancedSetup => "Advanced Setup".to_string(),
         }
     }
 }

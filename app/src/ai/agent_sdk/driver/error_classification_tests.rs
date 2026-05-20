@@ -95,4 +95,3 @@ fn share_session_failed_includes_reason() {
     assert_eq!(state, AgentTaskState::Error);
     assert!(update.message.contains("server rejected"));
 }
-

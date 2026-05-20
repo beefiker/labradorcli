@@ -321,7 +321,7 @@ pub struct ConversationDetailsPanel {
     show_open_button: bool,
     #[cfg(not(target_family = "wasm"))]
     continue_locally_button: ViewHandle<ActionButton>,
-    /// Text button "View in Dwarf" shown next to "Continue locally".
+    /// Text button for viewing in the app, shown next to "Continue locally".
     open_in_oz_button: ViewHandle<ActionButton>,
     /// Tracks when each copy button was last clicked (for checkmark feedback).
     copy_feedback_times: HashMap<CopyButtonKind, Instant>,
@@ -354,12 +354,18 @@ impl ConversationDetailsPanel {
                 })
         });
         let open_in_oz_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("View in Dwarf", SecondaryTheme)
-                .with_tooltip("View this run in Dwarf")
-                .with_size(ButtonSize::Small)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(ConversationDetailsPanelAction::OpenInOz);
-                })
+            ActionButton::new(
+                format!("View in {}", ChannelState::app_name_display()),
+                SecondaryTheme,
+            )
+            .with_tooltip(format!(
+                "View this run in {}",
+                ChannelState::app_name_display()
+            ))
+            .with_size(ButtonSize::Small)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(ConversationDetailsPanelAction::OpenInOz);
+            })
         });
         #[cfg(not(target_family = "wasm"))]
         ctx.subscribe_to_model(&AISettings::handle(ctx), |_, _, event, ctx| {
@@ -493,7 +499,6 @@ impl ConversationDetailsPanel {
                 }
             }
             AgentDetailsButtonEvent::ForkConversation { conversation_id } => {
-
                 ctx.dispatch_typed_action(&WorkspaceAction::ForkAIConversation {
                     conversation_id: *conversation_id,
                     fork_from_exchange: None,
@@ -574,7 +579,6 @@ impl ConversationDetailsPanel {
                 .finish(),
         )
     }
-
 
     fn render_status_section(&self, appearance: &Appearance) -> Option<Box<dyn Element>> {
         let theme = appearance.theme();
@@ -713,7 +717,7 @@ impl ConversationDetailsPanel {
         let oz_link = appearance
             .ui_builder()
             .link(
-                "Open in Dwarf".to_string(),
+                format!("Open in {}", ChannelState::app_name_display()),
                 Some(skill_url),
                 None,
                 self.mouse_states.skill_link.clone(),

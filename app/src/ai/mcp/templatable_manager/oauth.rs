@@ -291,19 +291,20 @@ pub async fn make_authenticated_client(
             log::warn!(
                 "File-based MCP server {uuid} requires OAuth authentication; \
                  skipping in headless mode. To use this server, authenticate it \
-                 in the Dwarf desktop app first."
+                 in the {} desktop app first.",
+                ChannelState::app_name_display()
             );
         }
-        return Err(AuthError::AuthorizationFailed(
+        return Err(AuthError::AuthorizationFailed(format!(
             "MCP server requires OAuth authentication. Please authenticate this server in the \
-             Dwarf desktop app first, then try again."
-                .to_string(),
-        ));
+             {} desktop app first, then try again.",
+            ChannelState::app_name_display()
+        )));
     }
 
     // Start the authorization process with our custom redirect URI
     oauth_state
-        .start_authorization(&[], &redirect_uri, Some("Dwarf"))
+        .start_authorization(&[], &redirect_uri, Some(ChannelState::app_name_display()))
         .await?;
 
     let OAuthState::Session(AuthorizationSession {
@@ -321,7 +322,10 @@ pub async fn make_authenticated_client(
     // For apps for which we have static client IDs (e.g. GitHub), we manually override scopes.
     let mut scopes: &[&str] = &[];
 
-    let config = match auth_manager.register_client("Dwarf", &redirect_uri).await {
+    let config = match auth_manager
+        .register_client(ChannelState::app_name_display(), &redirect_uri)
+        .await
+    {
         Ok(config) => config,
         Err(err @ AuthError::RegistrationFailed(_)) => {
             // If we failed dynamic registration, check to see if this is an auth

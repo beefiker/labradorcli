@@ -1,12 +1,12 @@
 pub mod feature_section;
 pub use feature_section::FeatureSectionView;
 pub mod content_section;
-pub use content_section::ContentSectionView;
-use warp_core::features::FeatureFlag;
 use crate::{
     appearance::Appearance,
     resource_center::{section_views::feature_section::FeatureSection, TipAction},
 };
+pub use content_section::ContentSectionView;
+use warp_core::features::FeatureFlag;
 use warpui::{
     elements::{
         Align, Border, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Hoverable,

@@ -1,4 +1,5 @@
 use crate::server::server_api::ai::TaskStatusUpdate;
+use crate::ChannelState;
 use warp_graphql::ai::{AgentTaskState, PlatformErrorCode};
 
 use super::terminal::ShareSessionError;
@@ -65,7 +66,10 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
         AgentDriverError::WarpDriveSyncFailed => (
             AgentTaskState::Error,
             TaskStatusUpdate::with_error_code(
-                "Dwarf Drive failed to sync. Please check your network connection and try again.",
+                format!(
+                    "{} failed to sync. Please check your network connection and try again.",
+                    ChannelState::app_name_drive()
+                ),
                 PlatformErrorCode::InternalError,
             ),
         ),
@@ -86,7 +90,8 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
             AgentTaskState::Failed,
             TaskStatusUpdate::with_error_code(
                 format!(
-                    "Saved prompt not found for ID {id}. Verify the prompt exists in your Dwarf Drive."
+                    "Saved prompt not found for ID {id}. Verify the prompt exists in your {}.",
+                    ChannelState::app_name_drive()
                 ),
                 PlatformErrorCode::ResourceNotFound,
             ),

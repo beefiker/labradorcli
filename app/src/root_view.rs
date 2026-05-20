@@ -44,7 +44,7 @@ use crate::{
     app_state::{AppState, PaneUuid, WindowSnapshot},
     autoupdate::{RequestType, UpdateReady},
     pane_group::{NewTerminalOptions, PanesLayout},
-        server::server_api::ServerTime,
+    server::server_api::ServerTime,
     UpdateQuakeModeEventArg,
 };
 use crate::{
@@ -85,10 +85,10 @@ use crate::ai::onboarding::{
 
 use ui_components::{button, Component as _, Options as _};
 use warpui::elements::{
-    Align, CacheOption, ChildAnchor, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, DispatchEventResult, EventHandler, Fill as ElementFill, Flex,
-    FormattedTextElement, Hoverable, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Point, Radius, Stack,
+    Align, CacheOption, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    DispatchEventResult, EventHandler, Fill as ElementFill, Flex, FormattedTextElement, Hoverable,
+    Image, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Point, Radius, Stack,
 };
 use warpui::rendering::OnGPUDeviceSelected;
 use warpui::{id, AddWindowOptions, DisplayId, SingletonEntity};
@@ -99,8 +99,6 @@ use warpui::{
     PaintContext, SizeConstraint, TypedActionView, View, ViewContext, ViewHandle, WindowId,
 };
 use warpui::{FocusContext, NextNewWindowsHasThisWindowsBoundsUponClose};
-
-const WINDOW_TITLE: &str = "Dwarf";
 
 lazy_static! {
     static ref FALLBACK_WINDOW_SIZE: Vector2F = vec2f(800.0, 600.0);
@@ -528,7 +526,6 @@ fn open_launch_config(arg: &OpenLaunchConfigArg, ctx: &mut AppContext) {
             );
         }
     }
-
 }
 
 fn send_feedback(_: &(), ctx: &mut AppContext) {
@@ -617,7 +614,7 @@ pub fn create_transferred_window(
         AddWindowOptions {
             window_style,
             window_bounds,
-            title: Some(WINDOW_TITLE.to_owned()),
+            title: Some(ChannelState::app_name_display().to_owned()),
             background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
             background_blur_texture: *window_settings.background_blur_texture,
             on_gpu_driver_selected: on_gpu_driver_selected_callback(),
@@ -712,7 +709,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                         AddWindowOptions {
                             window_style: WindowStyle::Pin,
                             window_bounds: WindowBounds::ExactPosition(frame_args.window_bounds),
-                            title: Some("Warp".to_owned()),
+                            title: Some(ChannelState::app_name_display().to_owned()),
                             fullscreen_state: window.fullscreen_state,
                             background_blur_radius_pixels,
                             background_blur_texture,
@@ -755,7 +752,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                         ctx.add_window(
                             AddWindowOptions {
                                 window_bounds: WindowBounds::new(window.bounds),
-                                title: Some("Warp".to_owned()),
+                                title: Some(ChannelState::app_name_display().to_owned()),
                                 fullscreen_state: window.fullscreen_state,
                                 background_blur_radius_pixels,
                                 background_blur_texture,
@@ -807,7 +804,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                 ctx.add_window(
                     AddWindowOptions {
                         window_bounds: WindowBounds::new(window.bounds),
-                        title: Some("Warp".to_owned()),
+                        title: Some(ChannelState::app_name_display().to_owned()),
                         fullscreen_state: window.fullscreen_state,
                         background_blur_radius_pixels,
                         background_blur_texture,
@@ -886,13 +883,19 @@ fn open_conversation_viewer(conversation_id: &ServerConversationToken, ctx: &mut
 /// Opens a new window and starts the guided `/create-environment` setup flow.
 fn create_environment(arg: &CreateEnvironmentArg, ctx: &mut AppContext) {
     let _ = (arg, ctx);
-    log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
+    log::info!(
+        "Ignoring create-environment action; {} does not expose cloud environments",
+        ChannelState::app_name_display()
+    );
 }
 
 /// Opens a new window and starts the guided `/create-environment` setup flow immediately.
 fn create_environment_and_run(arg: &CreateEnvironmentArg, ctx: &mut AppContext) {
     let _ = (arg, ctx);
-    log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
+    log::info!(
+        "Ignoring create-environment action; {} does not expose cloud environments",
+        ChannelState::app_name_display()
+    );
 }
 fn open_settings_page_in_new_window(section: &SettingsSection, ctx: &mut AppContext) {
     let root_handle = open_new_window_get_handles(None, ctx).1;
@@ -1028,7 +1031,7 @@ fn default_window_options(window_settings: &WindowSettings, ctx: &AppContext) ->
     AddWindowOptions {
         window_style,
         window_bounds: next_bounds,
-        title: Some("Warp".to_owned()),
+        title: Some(ChannelState::app_name_display().to_owned()),
         background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
         background_blur_texture: *window_settings.background_blur_texture,
         on_gpu_driver_selected: on_gpu_driver_selected_callback(),
@@ -1196,7 +1199,6 @@ fn toggle_quake_mode_window(global_resource_handles: &GlobalResourceHandles, ctx
     let state = get_quake_mode_state(ctx);
     match state {
         None => {
-
             let config = quake_mode_config(
                 &KeysSettings::as_ref(ctx)
                     .quake_mode_settings
@@ -1212,7 +1214,7 @@ fn toggle_quake_mode_window(global_resource_handles: &GlobalResourceHandles, ctx
                 AddWindowOptions {
                     window_style: WindowStyle::Pin,
                     window_bounds: WindowBounds::ExactPosition(config.window_bounds),
-                    title: Some("Warp".to_owned()),
+                    title: Some(ChannelState::app_name_display().to_owned()),
                     background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
                     background_blur_texture: *window_settings.background_blur_texture,
                     // Ignore the quake window for positioning the next window
@@ -1245,7 +1247,6 @@ fn toggle_quake_mode_window(global_resource_handles: &GlobalResourceHandles, ctx
             });
         }
         Some(state) if matches!(state.window_state, WindowState::Hidden) => {
-
             // If quake mode does not have a set pin screen -- move it to the current active screen.
             if KeysSettings::as_ref(ctx)
                 .quake_mode_settings
@@ -1463,13 +1464,16 @@ impl LocalWelcomeView {
         })
         .finish();
 
-        let title =
-            FormattedTextElement::from_str("Welcome to Dwarf", appearance.ui_font_family(), 42.)
-                .with_color(main_text_color)
-                .with_weight(Weight::Bold)
-                .with_alignment(TextAlignment::Center)
-                .with_line_height_ratio(1.0)
-                .finish();
+        let title = FormattedTextElement::from_str(
+            format!("Welcome to {}", ChannelState::app_name_display()),
+            appearance.ui_font_family(),
+            42.,
+        )
+        .with_color(main_text_color)
+        .with_weight(Weight::Bold)
+        .with_alignment(TextAlignment::Center)
+        .with_line_height_ratio(1.0)
+        .finish();
 
         let subtitle = FormattedTextElement::from_str(
             "Your local agent terminal is ready. Local auth stays on this machine.",
@@ -1486,7 +1490,9 @@ impl LocalWelcomeView {
         let start_button = self.start_button.render(
             appearance,
             button::Params {
-                content: button::Content::Label("Start Dwarf".into()),
+                content: button::Content::Label(
+                    format!("Start {}", ChannelState::app_name_display()).into(),
+                ),
                 theme: &button::themes::Primary,
                 options: button::Options {
                     keystroke: Some(enter),
@@ -2644,7 +2650,10 @@ impl RootView {
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         let _ = (arg, ctx);
-        log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
+        log::info!(
+            "Ignoring create-environment action; {} does not expose cloud environments",
+            ChannelState::app_name_display()
+        );
         true
     }
 
@@ -2655,7 +2664,10 @@ impl RootView {
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         let _ = (arg, ctx);
-        log::info!("Ignoring create-environment action; Dwarf does not expose cloud environments");
+        log::info!(
+            "Ignoring create-environment action; {} does not expose cloud environments",
+            ChannelState::app_name_display()
+        );
         true
     }
 

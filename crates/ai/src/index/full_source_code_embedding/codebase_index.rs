@@ -66,7 +66,7 @@ const MERKLE_TREE_BUILD_TIME: &str = "merkle_tree_build_time";
 const SYNC_TIME: &str = "sync_time";
 
 const SUPPORTED_IGNORES: [&str; 4] = [
-    ".warpindexingignore",
+    ".labradorindexingignore",
     ".cursorignore",
     ".cursorindexingignore",
     ".codeiumignore",
@@ -1163,7 +1163,6 @@ impl CodebaseIndex {
                     (tree, sync_result)
                 },
                 move |me, (tree, server_sync_result), ctx| {
-
                     // We should only flush pending changes when we know the sync failed because of a read fragment error.
                     let should_flush_pending_changes = if let SyncOperationResult::Error(
                         SyncOperationError::ReadFragmentError(changed_files),
@@ -1219,8 +1218,7 @@ impl CodebaseIndex {
                 time_tracker,
             }) => {
                 // Emit telemetries for the initial sync result.
-                if let Some(_sync_time) = time_tracker.compute_duration_for_interval(SYNC_TIME) {
-                }
+                if let Some(_sync_time) = time_tracker.compute_duration_for_interval(SYNC_TIME) {}
 
                 if let Some((_file_traversal_duration, _merkle_tree_parse_duration)) = time_tracker
                     .compute_duration_for_interval(FILE_TRAVERSAL_TIME)

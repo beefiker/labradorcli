@@ -346,7 +346,6 @@ impl CLISubagentController {
             requested_command_action_id: action_id,
             agent_has_control,
         });
-
     }
 
     pub fn handoff_active_command_control_to_agent(&self, ctx: &mut ModelContext<Self>) {
@@ -417,7 +416,6 @@ impl CLISubagentController {
         if was_transfer_from_agent {
             ctx.emit(CLISubagentEvent::ControlHandedBackAfterTransfer);
         }
-
     }
 
     pub fn toggle_hide_responses(&self, ctx: &mut ModelContext<Self>) {
@@ -431,8 +429,7 @@ impl CLISubagentController {
 
             ctx.emit(CLISubagentEvent::ToggledHideResponses);
 
-            if let Some(_conversation_id) = conversation_id {
-            }
+            if let Some(_conversation_id) = conversation_id {}
         }
     }
 

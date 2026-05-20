@@ -1,6 +1,7 @@
 use url::Url;
 
-const DEFAULT_TITLE: &str = "Dwarf";
+use crate::channel::ChannelState;
+
 const BASE_APP_PATH: &str = "/app";
 
 pub fn update_browser_url(url: Option<Url>, force_redirect: bool) {
@@ -17,7 +18,7 @@ pub fn update_browser_url(url: Option<Url>, force_redirect: bool) {
             history
                 .replace_state_with_url(
                     &wasm_bindgen::JsValue::null(),
-                    DEFAULT_TITLE,
+                    ChannelState::app_name_display(),
                     Some(unwrapped_url.as_str()),
                 )
                 .unwrap_or_else(|_| {

@@ -20,7 +20,7 @@ pub(super) type HoverCallback =
     Box<dyn FnMut(bool, &mut EventContext, &AppContext, Vector2F) + 'static>;
 
 pub(super) struct ChipSpec {
-    pub label: &'static str,
+    pub label: String,
     pub is_enabled: bool,
     pub mouse_state: MouseStateHandle,
     pub on_click: ClickCallback,
@@ -68,7 +68,7 @@ fn collapsed_subtitle(
     let enabled_labels: Vec<&str> = chips
         .iter()
         .filter(|c| c.is_enabled)
-        .map(|c| c.label)
+        .map(|c| c.label.as_str())
         .collect();
     if enabled_labels.is_empty() {
         return left_label.to_string();
@@ -271,7 +271,7 @@ fn render_chip(appearance: &Appearance, mut chip: ChipSpec) -> Box<dyn Element> 
     let label = chip.label;
 
     let mut hoverable = Hoverable::new(chip.mouse_state, move |_| {
-        let label_el = FormattedTextElement::from_str(label, ui_font_family, 14.)
+        let label_el = FormattedTextElement::from_str(label.clone(), ui_font_family, 14.)
             .with_color(text_color)
             .with_weight(Weight::Normal)
             .with_alignment(TextAlignment::Center)

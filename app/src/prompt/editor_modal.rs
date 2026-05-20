@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use warp_core::ui::theme::Fill;
+use warp_core::{channel::ChannelState, ui::theme::Fill};
 
 use pathfinder_geometry::vector::vec2f;
 use serde::Serialize;
@@ -19,18 +19,18 @@ use crate::context_chips::{
     available_chips, ChipAvailability, ChipRuntimeCapabilities, ContextChipKind,
 };
 
-use crate::server::telemetry::{PromptChoice};
+use crate::server::telemetry::PromptChoice;
 use crate::settings::{FontSettings, WarpPromptSeparator};
 use crate::terminal::blockgrid_element::BlockGridElement;
 use crate::terminal::SizeInfo;
 use settings::Setting as _;
 
+use crate::report_if_error;
 use crate::terminal::model::blockgrid::BlockGrid;
 use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::session_settings::SessionSettings;
 use crate::view_components::{Dropdown, DropdownItem};
 use crate::Appearance;
-use crate::{report_if_error};
 use warpui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Empty, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
@@ -57,7 +57,6 @@ const MODAL_CONTENT_FONT_SIZE: f32 = 14.;
 const CHECKBOX_SIZE: f32 = 16.;
 
 const MODAL_TITLE: &str = "Edit prompt";
-const WARP_PROMPT_SECTION_HEADER: &str = "Dwarf terminal prompt";
 const SHELL_PROMPT_SECTION_HEADER: &str = "Shell prompt (PS1)";
 const RESTORE_DEFAULT_BUTTON: &str = "Restore default";
 
@@ -175,7 +174,7 @@ impl EditorModal {
 
         let warp_prompt_separator = match SessionSettings::as_ref(ctx).saved_prompt.value() {
             PromptSelection::CustomChipSelection(config) => config.separator(),
-            // If the "default Warp prompt" i.e. no context chips, is selected, then default to no Warp prompt separator.
+            // If the default app prompt, i.e. no context chips, is selected, then default to no prompt separator.
             _ => WarpPromptSeparator::None,
         };
         let warp_prompt_separator_label = warp_prompt_separator.dropdown_item_label().to_owned();
@@ -332,8 +331,7 @@ impl EditorModal {
                     let session_settings = SessionSettings::as_ref(ctx);
                     let current_same_line_prompt_enabled =
                         session_settings.saved_prompt.same_line_prompt_enabled();
-                    if self.same_line_prompt_enabled != current_same_line_prompt_enabled {
-                    }
+                    if self.same_line_prompt_enabled != current_same_line_prompt_enabled {}
 
                     // Updating the `Prompt` handles turning off PS1.
                     Prompt::handle(ctx).update(ctx, |prompt, ctx| {
@@ -662,7 +660,10 @@ impl EditorModal {
             .with_child(
                 appearance
                     .ui_builder()
-                    .span(WARP_PROMPT_SECTION_HEADER.to_string())
+                    .span(format!(
+                        "{} terminal prompt",
+                        ChannelState::app_name_display()
+                    ))
                     .with_style(UiComponentStyles {
                         font_size: Some(MODAL_CONTENT_FONT_SIZE),
                         font_weight: Some(warpui::fonts::Weight::Semibold),

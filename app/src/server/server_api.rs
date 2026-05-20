@@ -142,7 +142,10 @@ pub enum AIApiError {
     #[error("Request failed due to lack of AI quota.")]
     QuotaLimit,
 
-    #[error("Dwarf is currently overloaded. Please try again later.")]
+    #[error(
+        "{} is currently overloaded. Please try again later.",
+        ChannelState::app_name_display()
+    )]
     ServerOverloaded,
 
     #[error("Internal error occurred at transport layer.")]
@@ -312,7 +315,10 @@ pub enum TranscribeError {
     #[error("Request failed due to lack of Voice quota.")]
     QuotaLimit,
 
-    #[error("Dwarf is currently overloaded. Please try again later.")]
+    #[error(
+        "{} is currently overloaded. Please try again later.",
+        ChannelState::app_name_display()
+    )]
     ServerOverloaded,
 
     #[error("Internal error occurred at transport layer.")]
@@ -1194,9 +1200,15 @@ impl ServerApi {
             .append_pair("include_changelogs", &include_changelogs.to_string());
 
         if include_changelogs {
-            log::info!("Fetching channel versions and changelogs from Warp server");
+            log::info!(
+                "Fetching channel versions and changelogs from {} server",
+                ChannelState::app_name_display()
+            );
         } else {
-            log::info!("Fetching channel versions (without changelogs) from Warp server");
+            log::info!(
+                "Fetching channel versions (without changelogs) from {} server",
+                ChannelState::app_name_display()
+            );
         }
 
         let mut request_builder = self
@@ -1220,7 +1232,10 @@ impl ServerApi {
 
         let response = request_builder.send().await?;
         let versions: ChannelVersions = response.json().await?;
-        log::info!("Received channel versions from Warp server: {versions}");
+        log::info!(
+            "Received channel versions from {} server: {versions}",
+            ChannelState::app_name_display()
+        );
         Ok(versions)
     }
 }

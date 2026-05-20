@@ -19,17 +19,18 @@ use crate::ai::agent::{
     WebSearchStatus,
 };
 use crate::ai::artifact_download::sanitized_basename;
-use ai::document::{AIDocumentId, AIDocumentVersion};
 use ai::agent::action::LifecycleEventType as StartAgentLifecycleEventType;
 use ai::agent::action_result::StartAgentVersion;
 use ai::agent::convert::ToolToAIAgentActionError;
 use ai::agent::UnknownCitationTypeError;
+use ai::document::{AIDocumentId, AIDocumentVersion};
 use ai::skills::SkillReference;
 use api::ask_user_question::question::QuestionType;
+use serde::Deserialize;
 use warp_core::channel::ChannelState;
 use warp_multi_agent_api as api;
 
-use crate::ai::agent::{AIAgentAttachment, UserQueryMode};
+use crate::ai::agent::{AIAgentAttachment, LocalCLIToolOutput, UserQueryMode};
 
 impl TryFrom<api::Attachment> for AIAgentAttachment {
     type Error = anyhow::Error;
@@ -169,6 +170,35 @@ pub struct ConversionParams<'a> {
     pub active_code_review: Option<&'a CodeReview>,
 }
 
+const LOCAL_CLI_TOOL_OUTPUT_SERVER_DATA_TYPE: &str = "local_cli_tool_output";
+
+#[derive(Debug, Deserialize)]
+struct LocalCLIToolOutputServerData {
+    #[serde(rename = "type")]
+    kind: String,
+    title: String,
+    #[serde(default)]
+    is_complete: bool,
+    #[serde(default)]
+    is_error: bool,
+}
+
+fn local_cli_tool_output_from_message(
+    server_message_data: &str,
+    text: String,
+) -> Option<LocalCLIToolOutput> {
+    let metadata: LocalCLIToolOutputServerData = serde_json::from_str(server_message_data).ok()?;
+    if metadata.kind != LOCAL_CLI_TOOL_OUTPUT_SERVER_DATA_TYPE || metadata.title.trim().is_empty() {
+        return None;
+    }
+    Some(LocalCLIToolOutput {
+        title: metadata.title,
+        body: text,
+        is_complete: metadata.is_complete,
+        is_error: metadata.is_error,
+    })
+}
+
 /// Trait for converting an [`api::Message`] to an [`AIAgentOutputMessage`].
 pub trait ConvertAPIMessageToClientOutputMessage {
     fn to_client_output_message(
@@ -195,10 +225,25 @@ impl ConvertAPIMessageToClientOutputMessage for api::Message {
             .collect::<Result<Vec<AIAgentCitation>, UnknownCitationTypeError>>()?;
 
         match message {
-            api::message::Message::AgentOutput(output) => Ok(MaybeAIAgentOutputMessage::Message(
-                AIAgentOutputMessage::text(MessageId::new(self.id), output.into())
-                    .with_citations(citations),
-            )),
+            api::message::Message::AgentOutput(output) => {
+                if let Some(local_tool_output) = local_cli_tool_output_from_message(
+                    &self.server_message_data,
+                    output.text.clone(),
+                ) {
+                    Ok(MaybeAIAgentOutputMessage::Message(
+                        AIAgentOutputMessage::local_cli_tool_output(
+                            MessageId::new(self.id),
+                            local_tool_output,
+                        )
+                        .with_citations(citations),
+                    ))
+                } else {
+                    Ok(MaybeAIAgentOutputMessage::Message(
+                        AIAgentOutputMessage::text(MessageId::new(self.id), output.into())
+                            .with_citations(citations),
+                    ))
+                }
+            }
             api::message::Message::AgentReasoning(reasoning) => {
                 let duration = reasoning
                     .finished_duration

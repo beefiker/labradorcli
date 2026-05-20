@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use warp_core::{settings::Setting, ui::appearance::Appearance};
+use warp_core::{channel::ChannelState, settings::Setting, ui::appearance::Appearance};
 
 use warpui::{
     elements::{
@@ -20,7 +20,8 @@ use warpui::{
 use warpui::ui_components::radio_buttons::RadioButtonStateHandle;
 
 use crate::{
-    report_if_error,     settings::{
+    report_if_error,
+    settings::{
         import::{
             config::{Config, ParsedTerminalSetting, SettingType},
             model::{ImportedConfigModel, TerminalTypeAndProfile},
@@ -297,7 +298,10 @@ impl SettingsImportView {
                 background: Some(appearance.theme().outline().into()),
                 ..Default::default()
             })
-            .with_centered_text_label("Reset to Warp defaults".to_owned())
+            .with_centered_text_label(format!(
+                "Reset to {} defaults",
+                ChannelState::app_name_display()
+            ))
             .build()
             .on_click(move |ctx, _, _| {
                 ctx.dispatch_typed_action(SettingsImportAction::ResetButtonClicked);
@@ -890,7 +894,6 @@ impl SettingsImportView {
                 })
                 .collect_vec()
         });
-
     }
 }
 
@@ -1098,8 +1101,7 @@ impl TypedActionView for SettingsImportView {
                 // Set the current config to expand.
                 self.configs[*idx].expanded = true;
                 // Only send the telemetry event if the new selected item is different.
-                if old_selected_idx.is_none_or(|old_idx| old_idx != *idx) {
-                }
+                if old_selected_idx.is_none_or(|old_idx| old_idx != *idx) {}
                 // The radio button state already updates, since each element is a child of a RadioButtonItem.
                 ctx.notify();
             }

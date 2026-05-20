@@ -13,24 +13,22 @@ use std::{
     time::Duration,
 };
 
-use crate::ai::blocklist::task_status_sync_model::TaskStatusSyncModel;
 use crate::ai::agent_sdk::driver::harness::{
     task_env_vars, HarnessKind, HarnessRunner, ResumePayload, SavePoint, ThirdPartyHarness,
 };
+use crate::ai::agent_sdk::AmbientAgentTaskId;
+use crate::ai::blocklist::task_status_sync_model::TaskStatusSyncModel;
 use crate::terminal::cli_agent_sessions::plugin_manager::{
     plugin_manager_for, CliAgentPluginManager,
 };
 use crate::terminal::cli_agent_sessions::{
     CLIAgentSessionStatus, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
-use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::{
     auth::AuthStateProvider,
     server::server_api::{
         ai::AIClient,
-        harness_support::{
-            HarnessSupportClient, ResolvePromptAttachedSkill, ResolvePromptRequest,
-        },
+        harness_support::{HarnessSupportClient, ResolvePromptAttachedSkill, ResolvePromptRequest},
         ServerApiProvider,
     },
     terminal::view::ConversationRestorationInNewPaneType,
@@ -254,7 +252,7 @@ pub enum AgentDriverError {
         #[source]
         error: terminal::ShareSessionError,
     },
-    #[error("Error syncing Dwarf Drive")]
+    #[error("Error syncing {}", ChannelState::app_name_drive())]
     WarpDriveSyncFailed,
     #[error("Could not resolve working directory {}", path.display())]
     InvalidWorkingDirectory {
@@ -1000,4 +998,3 @@ fn write_session_joined(join_url: &str, output_format: OutputFormat) {
     })
     .context("Failed to write shared session event"));
 }
-

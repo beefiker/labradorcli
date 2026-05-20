@@ -10,14 +10,19 @@ use warpui::{AppContext, Element, SingletonEntity as _};
 
 use crate::ai::llms::LLMSpec;
 use crate::appearance::Appearance;
+use crate::channel::ChannelState;
 use crate::terminal::input::inline_menu::styles as inline_styles;
 
 const CORNER_RADIUS: f32 = 4.0;
 const ROW_SPACING: f32 = 12.0;
 
 pub const MODEL_SPECS_TITLE: &str = "Model Specs";
-pub const MODEL_SPECS_DESCRIPTION: &str =
-    "Dwarf's benchmarks for how well a model performs in our harness and task speed.";
+pub fn model_specs_description() -> String {
+    format!(
+        "{} benchmarks for how well a model performs in our harness and task speed.",
+        ChannelState::app_name_possessive()
+    )
+}
 
 pub const REASONING_LEVEL_TITLE: &str = "Reasoning level";
 pub const REASONING_LEVEL_DESCRIPTION: &str =
@@ -220,7 +225,7 @@ fn render_score_row(
 
 pub fn render_model_spec_header(
     title: &str,
-    description: &str,
+    description: impl Into<String>,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
@@ -239,7 +244,7 @@ pub fn render_model_spec_header(
     .finish();
 
     let description = Text::new(
-        description.to_string(),
+        description.into(),
         appearance.ui_font_family(),
         inline_styles::font_size(appearance),
     )

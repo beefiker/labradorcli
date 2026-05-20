@@ -22,14 +22,19 @@ use warpui::{
     ViewContext,
 };
 
-const LOCAL_AGENT_ITEMS: &[&str] = &[
-    "Uses local Codex or Claude Code auth",
-    "No Dwarf account or API key required",
-    "Local agent conversations in the terminal",
-    "Command and script execution",
-    "Codebase context",
-    "Model switching for each session",
-];
+fn local_agent_items() -> Vec<String> {
+    vec![
+        "Uses local Codex or Claude Code auth".to_string(),
+        format!(
+            "No {} account or API key required",
+            warp_core::channel::ChannelState::app_name_display()
+        ),
+        "Local agent conversations in the terminal".to_string(),
+        "Command and script execution".to_string(),
+        "Codebase context".to_string(),
+        "Model switching for each session".to_string(),
+    ]
+}
 
 #[derive(Debug, Clone)]
 pub enum FreeUserNoAiSlideAction {
@@ -108,8 +113,14 @@ impl FreeUserNoAiSlide {
             appearance,
             0,
             Icon::Code2,
-            "Agent driven development with Dwarf's built-in agent",
-            "Iterate, plan, and build with Dwarf's local agent, backed by your Codex or Claude Code authentication.",
+            format!(
+                "Agent driven development with {} built-in agent",
+                warp_core::channel::ChannelState::app_name_possessive()
+            ),
+            format!(
+                "Iterate, plan, and build with {} local agent, backed by your Codex or Claude Code authentication.",
+                warp_core::channel::ChannelState::app_name_possessive()
+            ),
             "Free".to_string(),
             true, // badge is green
             self.agent_mouse_state.clone(),
@@ -120,8 +131,8 @@ impl FreeUserNoAiSlide {
             appearance,
             1,
             Icon::Terminal,
-            "Classic terminal with third-party agents",
-            "A modern terminal that supports third-party agents (Claude Code, Codex, Gemini CLI) and classic terminal workflows.",
+            "Classic terminal with third-party agents".to_string(),
+            "A modern terminal that supports third-party agents (Claude Code, Codex, Gemini CLI) and classic terminal workflows.".to_string(),
             "Free".to_string(),
             false, // badge is gray
             self.classic_terminal_mouse_state.clone(),
@@ -177,8 +188,8 @@ impl FreeUserNoAiSlide {
         appearance: &Appearance,
         index: usize,
         icon: Icon,
-        label: &'static str,
-        description: &'static str,
+        label: String,
+        description: String,
         badge_text: String,
         badge_green: bool,
         mouse_state: MouseStateHandle,
@@ -234,7 +245,7 @@ impl FreeUserNoAiSlide {
 
             let label_el = appearance
                 .ui_builder()
-                .paragraph(label)
+                .paragraph(label.clone())
                 .with_style(UiComponentStyles {
                     font_size: Some(14.),
                     font_weight: Some(Weight::Normal),
@@ -244,12 +255,13 @@ impl FreeUserNoAiSlide {
                 .build()
                 .finish();
 
-            let description_el = FormattedTextElement::from_str(description, ui_font_family, 12.)
-                .with_color(text_color)
-                .with_weight(Weight::Normal)
-                .with_alignment(TextAlignment::Left)
-                .with_line_height_ratio(1.4)
-                .finish();
+            let description_el =
+                FormattedTextElement::from_str(description.clone(), ui_font_family, 12.)
+                    .with_color(text_color)
+                    .with_weight(Weight::Normal)
+                    .with_alignment(TextAlignment::Left)
+                    .with_line_height_ratio(1.4)
+                    .finish();
 
             let content = Flex::column()
                 .with_main_axis_size(MainAxisSize::Min)
@@ -303,7 +315,7 @@ impl FreeUserNoAiSlide {
             self.next_button.render(
                 appearance,
                 button::Params {
-                    content: button::Content::Label("Get Dwarfing".into()),
+                    content: button::Content::Label("Get started".into()),
                     theme: &button::themes::Primary,
                     options: button::Options {
                         keystroke: Some(enter),
@@ -342,7 +354,10 @@ impl FreeUserNoAiSlide {
         let text_sub = internal_colors::text_sub(theme, internal_colors::neutral_2(theme));
 
         let title = FormattedTextElement::from_str(
-            "Local agent mode is free in Dwarf.",
+            format!(
+                "Local agent mode is free in {}.",
+                warp_core::channel::ChannelState::app_name_display()
+            ),
             ui_font_family,
             24.,
         )
@@ -357,7 +372,7 @@ impl FreeUserNoAiSlide {
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(8.);
 
-        for item_text in LOCAL_AGENT_ITEMS {
+        for item_text in local_agent_items() {
             let bullet = appearance
                 .ui_builder()
                 .paragraph(format!("\u{2022} {item_text}"))

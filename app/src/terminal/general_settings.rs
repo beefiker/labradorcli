@@ -1,8 +1,11 @@
 use std::collections::HashSet;
 
 use crate::{banner::BannerState, resource_center::Tip};
-use warp_core::settings::{
-    macros::define_settings_group, RespectUserSyncSetting, SupportedPlatforms, SyncToCloud,
+use warp_core::{
+    channel::ChannelState,
+    settings::{
+        macros::define_settings_group, RespectUserSyncSetting, SupportedPlatforms, SyncToCloud,
+    },
 };
 
 define_settings_group!(GeneralSettings, settings: [
@@ -13,7 +16,7 @@ define_settings_group!(GeneralSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "general.show_warning_before_quitting",
-        description: "Whether to show a warning dialog before quitting Dwarf.",
+        description: format!("Whether to show a warning dialog before quitting {}.", ChannelState::app_name_display()),
     },
     quit_on_last_window_closed: QuitOnLastWindowClosed {
         type: bool,
@@ -22,7 +25,7 @@ define_settings_group!(GeneralSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "general.quit_on_last_window_closed",
-        description: "Whether to quit Dwarf when the last window is closed.",
+        description: format!("Whether to quit {} when the last window is closed.", ChannelState::app_name_display()),
     },
     restore_session: RestoreSession {
         type: bool,
@@ -31,7 +34,7 @@ define_settings_group!(GeneralSettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "general.restore_session",
-        description: "Whether to restore the previous session when Dwarf starts up.",
+        description: format!("Whether to restore the previous session when {} starts up.", ChannelState::app_name_display()),
     },
     add_app_as_login_item: LoginItem {
         type: bool,
@@ -43,7 +46,7 @@ define_settings_group!(GeneralSettings, settings: [
         sync_to_cloud: SyncToCloud::Never,
         private: false,
         toml_path: "general.login_item",
-        description: "Whether to launch Dwarf automatically when you log in.",
+        description: format!("Whether to launch {} automatically when you log in.", ChannelState::app_name_display()),
     },
     // Records whether the app has been added as a login item.
     // If it has, we don't try to add it again unless the user explicitly

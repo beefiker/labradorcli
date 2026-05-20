@@ -26,6 +26,7 @@ use crate::workspace::view::TOGGLE_RIGHT_PANEL_BINDING_NAME;
 use crate::workspace::WorkspaceAction;
 use crate::{
     appearance::Appearance,
+    channel::ChannelState,
     terminal::resizable_data::{ModalType, ResizableData},
 };
 
@@ -95,14 +96,19 @@ enum ReviewTerminalUnavailableReason {
 }
 
 impl ReviewTerminalUnavailableReason {
-    fn label(&self) -> &'static str {
+    fn label(&self) -> String {
         match self {
-            Self::NoSelectedRepo => "no repo is selected for code review",
-            Self::SessionPathUnavailable => "session cwd is unavailable or not local",
-            Self::SessionOutsideSelectedRepo => "session cwd is not inside selected repo",
-            Self::AIDisabled => "AI is disabled for Dwarf review destinations",
-            Self::TerminalExecuting => "terminal is currently executing a command",
-            Self::InputBoxNotVisible => "terminal input box is not visible",
+            Self::NoSelectedRepo => "no repo is selected for code review".to_string(),
+            Self::SessionPathUnavailable => "session cwd is unavailable or not local".to_string(),
+            Self::SessionOutsideSelectedRepo => {
+                "session cwd is not inside selected repo".to_string()
+            }
+            Self::AIDisabled => format!(
+                "AI is disabled for {} review destinations",
+                ChannelState::app_name_display()
+            ),
+            Self::TerminalExecuting => "terminal is currently executing a command".to_string(),
+            Self::InputBoxNotVisible => "terminal input box is not visible".to_string(),
         }
     }
 }

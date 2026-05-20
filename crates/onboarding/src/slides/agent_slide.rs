@@ -317,7 +317,10 @@ impl AgentSlide {
     fn render_header(&self, appearance: &Appearance) -> Box<dyn Element> {
         let title = appearance
             .ui_builder()
-            .paragraph("Customize your Dwarf Agent")
+            .paragraph(format!(
+                "Customize your {}",
+                warp_core::channel::ChannelState::app_name_with_suffix("Agent")
+            ))
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),
@@ -372,7 +375,7 @@ impl AgentSlide {
             );
 
         // Apply a semi-transparent overlay to visually disable the upper sections
-        // when the "Disable Dwarf Agent" checkbox is checked.
+        // when the disable-agent checkbox is checked.
         let upper_sections: Box<dyn Element> = if settings.disable_oz {
             let bg = appearance.theme().background().into_solid();
             let overlay_color = ColorU::new(bg.r, bg.g, bg.b, 128);
@@ -937,14 +940,21 @@ impl AgentSlide {
             .on_click(|ctx, _, _| ctx.dispatch_typed_action(AgentSlideAction::ToggleDisableOz))
             .finish();
 
-        let label = Text::new("Disable Dwarf Agent", appearance.ui_font_family(), 14.0)
-            .with_color(internal_colors::text_sub(theme, background_for_text))
-            .with_style(Properties {
-                weight: Weight::Normal,
-                ..Default::default()
-            })
-            .with_line_height_ratio(1.0)
-            .finish();
+        let label = Text::new(
+            format!(
+                "Disable {}",
+                warp_core::channel::ChannelState::app_name_with_suffix("Agent")
+            ),
+            appearance.ui_font_family(),
+            14.0,
+        )
+        .with_color(internal_colors::text_sub(theme, background_for_text))
+        .with_style(Properties {
+            weight: Weight::Normal,
+            ..Default::default()
+        })
+        .with_line_height_ratio(1.0)
+        .finish();
 
         Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -1035,7 +1045,11 @@ impl AgentSlide {
 
         // Secondary subtext: muted, normal weight.
         let subtitle = Text::new(
-            "Dwarf uses your local credentials instead of Dwarf plan gating.",
+            format!(
+                "{} uses your local credentials instead of {} plan gating.",
+                warp_core::channel::ChannelState::app_name_display(),
+                warp_core::channel::ChannelState::app_name_display()
+            ),
             ui_font_family,
             12.0,
         )

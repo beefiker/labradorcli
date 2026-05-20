@@ -3,7 +3,7 @@ use crate::ai::mcp::MCPServerUpdate;
 use crate::modal::Modal;
 use crate::modal::ModalEvent;
 use crate::modal::ModalViewState;
-use crate::server::telemetry::{MCPTemplateInstallationSource};
+use crate::server::telemetry::MCPTemplateInstallationSource;
 use crate::settings::{AISettings, AISettingsChangedEvent};
 use crate::settings_view::mcp_servers_page::InstallOrigin;
 use crate::settings_view::settings_page::{
@@ -30,6 +30,7 @@ use crate::{
         FileBasedMCPManager, MCPGalleryManager, MCPProvider, TemplatableMCPServerInstallation,
     },
     appearance::Appearance,
+    channel::ChannelState,
     editor::{EditorView, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions},
     pane_group::Direction,
     search_bar::SearchBar,
@@ -67,7 +68,12 @@ use warpui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
-const DESCRIPTION_TEXT: &str = "Add MCP servers to extend the Dwarf Agent's capabilities. MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers. You can also find team servers that have been shared with you here. ";
+fn description_text() -> String {
+    format!(
+        "Add MCP servers to extend {} capabilities. MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers. You can also find team servers that have been shared with you here. ",
+        ChannelState::app_name_possessive()
+    )
+}
 
 #[derive(Debug, Clone)]
 pub enum MCPServersListPageViewEvent {
@@ -955,7 +961,6 @@ impl MCPServersListPageView {
         }
     }
 
-
     pub fn get_modal_content(&self) -> Option<Box<dyn Element>> {
         if self.update_modal_state.is_open() {
             Some(self.update_modal_state.render())
@@ -1061,7 +1066,7 @@ impl MCPServersListPageView {
 
     fn render_page_body(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
         let description_fragments = vec![
-            FormattedTextFragment::plain_text(DESCRIPTION_TEXT),
+            FormattedTextFragment::plain_text(description_text()),
             FormattedTextFragment::hyperlink(
                 "Learn more.",
                 "https://docs.warp.dev/agent-platform/capabilities/mcp",
@@ -1159,8 +1164,13 @@ impl MCPServersListPageView {
                         .current_team()
                         .map(|team| team.name.clone());
                     let shared_by_text = match team_name {
-                        Some(name) => format!("Shared by Dwarf and {name}"),
-                        None => "Shared by Dwarf from other devices".to_string(),
+                        Some(name) => {
+                            format!("Shared by {} and {name}", ChannelState::app_name_display())
+                        }
+                        None => format!(
+                            "Shared by {} from other devices",
+                            ChannelState::app_name_display()
+                        ),
                     };
 
                     page.add_child(self.render_server_cards_section(
@@ -1171,7 +1181,7 @@ impl MCPServersListPageView {
                     ));
                 } else if !filtered_gallery_cards.is_empty() {
                     page.add_child(self.render_server_cards_section(
-                        "Shared from Dwarf",
+                        &format!("Shared from {}", ChannelState::app_name_display()),
                         &filtered_gallery_cards,
                         appearance,
                         app,

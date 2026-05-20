@@ -64,30 +64,30 @@ pub enum AppIcon {
     #[schemars(description = "Sticker")]
     Sticker,
     /// Previous default icon with solid blue background.
-    #[schemars(description = "Dwarf 1")]
+    #[schemars(description = "App 1")]
     WarpOne,
 }
 
 impl std::fmt::Display for AppIcon {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match &self {
-            AppIcon::Default => "Default",
-            AppIcon::Aurora => "Aurora",
-            AppIcon::Classic1 => "Classic 1",
-            AppIcon::Classic2 => "Classic 2",
-            AppIcon::Classic3 => "Classic 3",
-            AppIcon::Comets => "Comets",
-            AppIcon::GlassSky => "Glass Sky",
-            AppIcon::Glitch => "Glitch",
-            AppIcon::Cow => "Cow",
-            AppIcon::Glow => "Glow",
-            AppIcon::Holographic => "Holographic",
-            AppIcon::Mono => "Mono",
-            AppIcon::Neon => "Neon",
-            AppIcon::Original => "Original",
-            AppIcon::Starburst => "Starburst",
-            AppIcon::Sticker => "Sticker",
-            AppIcon::WarpOne => "Dwarf 1",
+            AppIcon::Default => "Default".to_string(),
+            AppIcon::Aurora => "Aurora".to_string(),
+            AppIcon::Classic1 => "Classic 1".to_string(),
+            AppIcon::Classic2 => "Classic 2".to_string(),
+            AppIcon::Classic3 => "Classic 3".to_string(),
+            AppIcon::Comets => "Comets".to_string(),
+            AppIcon::GlassSky => "Glass Sky".to_string(),
+            AppIcon::Glitch => "Glitch".to_string(),
+            AppIcon::Cow => "Cow".to_string(),
+            AppIcon::Glow => "Glow".to_string(),
+            AppIcon::Holographic => "Holographic".to_string(),
+            AppIcon::Mono => "Mono".to_string(),
+            AppIcon::Neon => "Neon".to_string(),
+            AppIcon::Original => "Original".to_string(),
+            AppIcon::Starburst => "Starburst".to_string(),
+            AppIcon::Sticker => "Sticker".to_string(),
+            AppIcon::WarpOne => format!("{} 1", ChannelState::app_name_display()),
         };
         write!(f, "{value}")
     }

@@ -18,7 +18,10 @@ mod single_instance_manager;
 pub enum StartupArgsForwardingError {
     #[error("should not forward arguments after an auto-update")]
     IgnoredAfterAutoUpdate,
-    #[error("there is no other instance of Warp")]
+    #[error(
+        "there is no other instance of {}",
+        ChannelState::app_name_display()
+    )]
     NoExistingInstance,
     #[error("failed to construct url")]
     CouldNotCreateUrl(#[from] url::ParseError),

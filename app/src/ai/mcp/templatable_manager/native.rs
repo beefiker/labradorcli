@@ -6,7 +6,7 @@ use crate::ai::mcp::templatable_manager::oauth::{
 use crate::ai::mcp::FileBasedMCPManager;
 use itertools::Itertools;
 use std::collections::HashSet;
-use std::{collections::HashMap, future::Future};
+use std::{borrow::Cow, collections::HashMap, future::Future};
 
 use crate::ai::mcp::http_client::build_client_with_headers;
 use crate::ai::mcp::templatable::GalleryData;
@@ -198,7 +198,11 @@ impl TemplatableMCPServerManager {
         me
     }
 
-    pub fn is_server_installation_shared(&self, _installation_uuid: Uuid, _app: &AppContext) -> bool {
+    pub fn is_server_installation_shared(
+        &self,
+        _installation_uuid: Uuid,
+        _app: &AppContext,
+    ) -> bool {
         false
     }
 
@@ -1275,9 +1279,15 @@ async fn spawn_server(
             .spawn()
             .map_err(|err| {
                 if err.kind() == std::io::ErrorKind::NotFound {
-                    let cwd_display = cwd_for_log
-                        .as_deref()
-                        .unwrap_or("<inherited from Dwarf's process cwd>");
+                    let cwd_display = cwd_for_log.as_deref().map_or_else(
+                        || {
+                            Cow::Owned(format!(
+                                "<inherited from {} process cwd>",
+                                warp_core::channel::ChannelState::app_name_possessive()
+                            ))
+                        },
+                        Cow::Borrowed,
+                    );
                     logger.log(format!(
                         "[error] MCP: Failed to spawn '{server_name}': command '{command_for_log}' \
                          not found (cwd: {cwd_display}). If your MCP server depends on a specific \

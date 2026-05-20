@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 
 use crate::features::FeatureFlag;
+use crate::channel::ChannelState;
 use crate::terminal::model::session::LocalCommandExecutor;
 use crate::terminal::shell::ShellType;
 use crate::terminal::CLIAgent;
@@ -42,8 +43,8 @@ pub(crate) struct PluginInstructionStep {
 
 /// All content needed to render the plugin instructions pane for a given agent.
 pub(crate) struct PluginInstructions {
-    pub title: &'static str,
-    pub subtitle: &'static str,
+    pub title: String,
+    pub subtitle: String,
     pub steps: &'static [PluginInstructionStep],
     /// Displayed after the steps in the same style as the subtitle, one per paragraph.
     pub post_install_notes: &'static [&'static str],
@@ -135,7 +136,7 @@ pub(crate) async fn run_cli_command_logged(
     }
 }
 
-/// Manages the Dwarf notification plugin for a specific CLI agent.
+/// Manages the app notification plugin for a specific CLI agent.
 ///
 /// Each supported CLI agent has its own implementation that knows how to
 /// check installation state and perform install/update operations.
@@ -148,7 +149,7 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
     /// When `false`, the footer always opens the manual instructions modal.
     fn can_auto_install(&self) -> bool;
 
-    /// Whether the Dwarf notification plugin is installed.
+    /// Whether the app notification plugin is installed.
     /// Default returns `false` (no filesystem check).
     fn is_installed(&self) -> bool {
         false
@@ -160,7 +161,7 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
         false
     }
 
-    /// Install the Dwarf notification plugin.
+    /// Install the app notification plugin.
     /// Default returns an error — only agents with `can_auto_install() == true` should override.
     async fn install(&self) -> Result<(), PluginInstallError> {
         Err(PluginInstallError {
@@ -169,7 +170,7 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
         })
     }
 
-    /// Update the Dwarf notification plugin to the latest version.
+    /// Update the app notification plugin to the latest version.
     /// Default returns an error — only agents with `can_auto_install() == true` should override.
     async fn update(&self) -> Result<(), PluginInstallError> {
         Err(PluginInstallError {
@@ -179,13 +180,19 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
     }
 
     /// Toast message shown after a successful auto-install.
-    fn install_success_message(&self) -> &'static str {
-        "Dwarf plugin installed. Please restart the session to activate."
+    fn install_success_message(&self) -> String {
+        format!(
+            "{} plugin installed. Please restart the session to activate.",
+            ChannelState::app_name_display()
+        )
     }
 
     /// Toast message shown after a successful auto-update.
-    fn update_success_message(&self) -> &'static str {
-        "Dwarf plugin updated. Please restart the session to activate."
+    fn update_success_message(&self) -> String {
+        format!(
+            "{} plugin updated. Please restart the session to activate.",
+            ChannelState::app_name_display()
+        )
     }
 
     /// Manual installation instructions for the modal UI.
@@ -238,13 +245,9 @@ pub(crate) fn plugin_manager_for_with_shell(
         CLIAgent::Codex if FeatureFlag::CodexNotifications.is_enabled() => {
             Some(Box::new(CodexPluginManager))
         }
-        CLIAgent::Gemini if FeatureFlag::GeminiNotifications.is_enabled() => {
-            Some(Box::new(GeminiPluginManager::new(
-                shell_path,
-                shell_type,
-                path_env_var,
-            )))
-        }
+        CLIAgent::Gemini if FeatureFlag::GeminiNotifications.is_enabled() => Some(Box::new(
+            GeminiPluginManager::new(shell_path, shell_type, path_env_var),
+        )),
         CLIAgent::OpenCode
         | CLIAgent::Codex
         | CLIAgent::Gemini

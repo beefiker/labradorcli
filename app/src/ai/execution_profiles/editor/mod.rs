@@ -19,6 +19,7 @@ use crate::view_components::{
 };
 use crate::workspace::WorkspaceAction;
 use crate::workspaces::user_workspaces::UserWorkspacesEvent;
+use crate::ChannelState;
 use crate::TemplatableMCPServerManager;
 use crate::UserWorkspaces;
 use crate::{
@@ -66,8 +67,12 @@ fn render_upgrade_footer(
     .with_height(16.)
     .finish();
 
-    let label = "All configured models are available in Dwarf.";
+    let label = format!(
+        "All configured models are available in {}.",
+        ChannelState::app_name_display()
+    );
     let upgrade_start = label.len();
+    let label_len = label.len();
     let info_text = Text::new(
         label,
         appearance.ui_font_family(),
@@ -78,15 +83,15 @@ fn render_upgrade_footer(
         Highlight::new()
             .with_properties(Properties::default())
             .with_foreground_color(internal_colors::accent_fg(theme).into()),
-        (upgrade_start..label.len()).collect(),
+        (upgrade_start..label_len).collect(),
     )
     .with_hoverable_char_range(
-        upgrade_start..label.len(),
+        upgrade_start..label_len,
         upgrade_mouse_state,
         Some(Cursor::PointingHand),
         |_is_hovered, _ctx, _app| {},
     )
-    .with_clickable_char_range(upgrade_start..label.len(), move |_modifiers, ctx, _app| {
+    .with_clickable_char_range(upgrade_start..label_len, move |_modifiers, ctx, _app| {
         ctx.dispatch_typed_action(WorkspaceAction::ShowUpgrade);
     })
     .finish();

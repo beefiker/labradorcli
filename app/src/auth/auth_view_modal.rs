@@ -5,9 +5,7 @@
 //! that consumer code that still references `AuthView` and `AuthViewVariant`
 //! compiles without needing a wholesale refactor of every login-gated feature.
 
-use warpui::{
-    elements::Empty, AppContext, Element, Entity, TypedActionView, View, ViewContext,
-};
+use warpui::{elements::Empty, AppContext, Element, Entity, TypedActionView, View, ViewContext};
 
 #[derive(Clone, Copy, Debug)]
 pub enum AuthViewVariant {

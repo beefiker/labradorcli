@@ -436,6 +436,7 @@ impl StepLite for RangeMapPoint {
 
 pub mod regexes {
     use crate::settings::RegexDisplayInfo;
+    use warp_core::channel::ChannelState;
 
     /// A default regex pattern with its descriptive name
     pub struct DefaultRegex {
@@ -610,7 +611,7 @@ pub mod regexes {
         },
         DefaultRegex {
             pattern: WARP_API_KEY,
-            name: "Dwarf API Key",
+            name: ChannelState::app_name_api_key(),
         },
     ];
 }

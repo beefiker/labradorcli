@@ -16,9 +16,10 @@ use futures::Stream;
 use futures_lite::{io::BufReader, stream, AsyncBufReadExt, StreamExt as _};
 use prost_types::FieldMask;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
+use warp_core::channel::ChannelState;
 use warp_multi_agent_api as api;
 
 use crate::ai::agent::AIAgentInput;
@@ -42,19 +43,7 @@ const TOOL_CALL_PREFIX: &str = "DWARF_TOOL_CALL";
 const CLAUDE_DEFAULT_MODEL_ID: &str = "claude-code";
 const LOCAL_AGENT_TIMEOUT_ENV_VAR: &str = "DWARF_LOCAL_AGENT_TIMEOUT_SECS";
 const DEFAULT_LOCAL_AGENT_TIMEOUT_SECS: u64 = 300;
-
-/// Static instructions every prompt includes. Kept as a `const &str` so we copy a
-/// pointer into the prompt buffer instead of rebuilding the prose every chat.
-const TOOL_CALL_CONTRACT_PROSE: &str = "Dwarf terminal tool-call contract:\n\
-     - Dwarf is a terminal. Prefer making progress with shell commands, scripts, repository inspection, tests, and concise analysis over conversational-only answers.\n\
-     - You cannot change Dwarf's live terminal by changing your own local agent subprocess working directory.\n\
-     - When the user asks to run, inspect, analyze, search, test, build, install, execute a script, or change directories, emit one tool-call marker per required shell command on its own line:\n\
-     DWARF_TOOL_CALL {\"type\":\"run_shell_command\",\"command\":\"pwd\",\"is_read_only\":true,\"uses_pager\":false,\"is_risky\":false,\"wait_until_complete\":true}\n\
-     - Emit one self-contained command when a later step depends on an earlier command's output. Do not emit dependent multi-step plans because Dwarf will not feed command results back to you automatically in this local bridge.\n\
-     - For directory changes, emit `cd <path>` as a Dwarf tool call. Do not say the cwd changed until Dwarf returns the command result.\n\
-     - For read-only inspection commands such as pwd, ls, find, rg, git status, cargo test --no-run, use `is_read_only:true`.\n\
-     - For scripts, builds, tests that execute project code, or commands that may modify files, set `is_read_only:false`. Set `is_risky:true` only for destructive, credential, network, sudo, or external side-effect commands.\n\
-     - Do not wrap DWARF_TOOL_CALL lines in markdown fences. Keep prose short and do not claim validation from commands that only ran in your local agent subprocess.\n\n";
+const LOCAL_CLI_TOOL_OUTPUT_SERVER_DATA_TYPE: &str = "local_cli_tool_output";
 
 const MODEL_IDENTITY_PROSE: &str = "If the user asks what model you are, report this configured model label and do not claim a separate runtime label you cannot inspect.\n\n";
 
@@ -197,10 +186,11 @@ pub(super) async fn generate_output(
     // unused on this branch (drops at end of scope).
     if let Some(tool_call) = direct_terminal_tool_call(&params.input, working_directory.as_deref())
     {
+        let app_name = ChannelState::app_name_display();
         let output_text = if tool_call.command.starts_with("target=$(mdfind ") {
-            "I'll find the matching directory and switch Dwarf to it.".to_string()
+            format!("I'll find the matching directory and switch {app_name} to it.")
         } else {
-            format!("I'll run `{}` in Dwarf.", tool_call.command)
+            format!("I'll run `{}` in {app_name}.", tool_call.command)
         };
         return Ok(Box::pin(stream::iter(non_streaming_events(
             conversation_id,
@@ -217,7 +207,6 @@ pub(super) async fn generate_output(
     // Streaming path: compute model + prompt, build the runtime-specific delta stream once,
     // then move everything (including the user input) into the response-event stream by value —
     // no `params.input.clone()` just to satisfy a borrow.
-    let message_id = format!("local-{}-message-{}", runtime.slug(), Uuid::new_v4());
     let (model, prompt) = match runtime {
         LocalAgentRuntime::Codex => {
             let m = model_for_codex(&params);
@@ -230,15 +219,20 @@ pub(super) async fn generate_output(
             (m, p)
         }
     };
-    let delta_stream: std::pin::Pin<Box<dyn Stream<Item = Result<String, String>> + Send>> =
-        match runtime {
-            LocalAgentRuntime::Codex => {
-                Box::pin(run_codex_streaming(prompt, working_directory.clone(), model))
-            }
-            LocalAgentRuntime::Claude => {
-                Box::pin(run_claude_streaming(prompt, working_directory.clone(), model))
-            }
-        };
+    let delta_stream: std::pin::Pin<
+        Box<dyn Stream<Item = Result<LocalAgentStreamDelta, String>> + Send>,
+    > = match runtime {
+        LocalAgentRuntime::Codex => Box::pin(run_codex_streaming(
+            prompt,
+            working_directory.clone(),
+            model,
+        )),
+        LocalAgentRuntime::Claude => Box::pin(run_claude_streaming(
+            prompt,
+            working_directory.clone(),
+            model,
+        )),
+    };
     let inputs = params.input;
     let stream = async_stream::stream! {
         let mut delta_stream = delta_stream;
@@ -260,66 +254,73 @@ pub(super) async fn generate_output(
             }]));
         }
 
-        let mut seed_messages = user_query_messages(&inputs, &task_id, &request_id);
-        seed_messages.push(api::Message {
-            id: message_id.clone(),
-            task_id: task_id.clone(),
-            request_id: request_id.clone(),
-            timestamp: None,
-            server_message_data: String::new(),
-            citations: vec![],
-            message: Some(api::message::Message::AgentOutput(
-                api::message::AgentOutput { text: String::new() },
-            )),
-        });
-        yield Ok(client_actions_event(vec![api::ClientAction {
-            action: Some(api::client_action::Action::AddMessagesToTask(
-                api::client_action::AddMessagesToTask {
-                    task_id: task_id.clone(),
-                    messages: seed_messages,
-                },
-            )),
-        }]));
+        let seed_messages = user_query_messages(&inputs, &task_id, &request_id);
+        if !seed_messages.is_empty() {
+            yield Ok(client_actions_event(vec![api::ClientAction {
+                action: Some(api::client_action::Action::AddMessagesToTask(
+                    api::client_action::AddMessagesToTask {
+                        task_id: task_id.clone(),
+                        messages: seed_messages,
+                    },
+                )),
+            }]));
+        }
 
         // Accumulated *cleaned* text — what the user sees, with markers already stripped.
         // Used by the post-stream cwd-override path.
         let mut full_text = String::new();
+        let mut current_text_message_id: Option<String> = None;
         let mut stream_filter = StreamingToolCallFilter::default();
         let mut streamed_tool_calls: Vec<LocalRunShellCommand> = Vec::new();
 
         let mut cancellation_rx = cancellation_rx;
         let mut was_cancelled = false;
+        let mut stream_error: Option<String> = None;
         loop {
             let next_fut = delta_stream.next();
             futures::pin_mut!(next_fut);
             match futures::future::select(next_fut, &mut cancellation_rx).await {
-                futures::future::Either::Left((Some(Ok(chunk)), _)) => {
-                    if chunk.is_empty() {
+                futures::future::Either::Left((Some(Ok(delta)), _)) => {
+                    if delta.is_empty() {
                         continue;
                     }
-                    let filtered = stream_filter.ingest(&chunk);
-                    for text in filtered.text_chunks {
-                        full_text.push_str(&text);
-                        yield Ok(append_agent_text_event(&task_id, &message_id, text));
-                    }
-                    for tc in filtered.tool_calls {
-                        streamed_tool_calls.push(tc.clone());
-                        yield Ok(client_actions_event(vec![api::ClientAction {
-                            action: Some(api::client_action::Action::AddMessagesToTask(
-                                api::client_action::AddMessagesToTask {
-                                    task_id: task_id.clone(),
-                                    messages: vec![run_shell_command_message(
-                                        &task_id, &request_id, tc,
-                                    )],
-                                },
-                            )),
-                        }]));
+                    match delta {
+                        LocalAgentStreamDelta::Text(chunk) => {
+                            let filtered = stream_filter.ingest(&chunk);
+                            for text in filtered.text_chunks {
+                                full_text.push_str(&text);
+                                yield Ok(add_or_append_agent_text_event(
+                                    &task_id,
+                                    &request_id,
+                                    runtime,
+                                    &mut current_text_message_id,
+                                    text,
+                                ));
+                            }
+                            for tc in filtered.tool_calls {
+                                streamed_tool_calls.push(tc.clone());
+                                yield Ok(client_actions_event(vec![api::ClientAction {
+                                    action: Some(api::client_action::Action::AddMessagesToTask(
+                                        api::client_action::AddMessagesToTask {
+                                            task_id: task_id.clone(),
+                                            messages: vec![run_shell_command_message(
+                                                &task_id, &request_id, tc,
+                                            )],
+                                        },
+                                    )),
+                                }]));
+                                current_text_message_id = None;
+                            }
+                        }
+                        LocalAgentStreamDelta::LocalToolOutput(output) => {
+                            yield Ok(local_tool_output_event(&task_id, &request_id, output));
+                            current_text_message_id = None;
+                        }
                     }
                 }
                 futures::future::Either::Left((Some(Err(error)), _)) => {
                     log::warn!("Local agent CLI error: {error}");
-                    full_text = error.clone();
-                    yield Ok(replace_agent_text_event(&task_id, &message_id, error));
+                    stream_error = Some(error);
                     break;
                 }
                 futures::future::Either::Left((None, _)) => break,
@@ -337,7 +338,13 @@ pub(super) async fn generate_output(
         let trailing = stream_filter.flush();
         for text in trailing.text_chunks {
             full_text.push_str(&text);
-            yield Ok(append_agent_text_event(&task_id, &message_id, text));
+            yield Ok(add_or_append_agent_text_event(
+                &task_id,
+                &request_id,
+                runtime,
+                &mut current_text_message_id,
+                text,
+            ));
         }
         for tc in trailing.tool_calls {
             streamed_tool_calls.push(tc.clone());
@@ -349,17 +356,42 @@ pub(super) async fn generate_output(
                     },
                 )),
             }]));
+            current_text_message_id = None;
+        }
+
+        if let Some(error) = stream_error {
+            let text = if current_text_message_id.is_some() && !full_text.trim().is_empty() {
+                format!("\n\n{error}")
+            } else {
+                error
+            };
+            yield Ok(add_or_append_agent_text_event(
+                &task_id,
+                &request_id,
+                runtime,
+                &mut current_text_message_id,
+                text,
+            ));
+            yield Ok(finished_event());
+            return;
         }
 
         if was_cancelled {
             // Surface cancellation as a replace so the user sees the partial response was
             // intentionally stopped (instead of just ending mid-token). Append the suffix
             // in-place to avoid cloning the (possibly long) `full_text` into a new String.
-            if !full_text.is_empty() {
-                full_text.push_str("\n\n");
-            }
-            full_text.push_str("_Request cancelled._");
-            yield Ok(replace_agent_text_event(&task_id, &message_id, full_text));
+            let text = if current_text_message_id.is_some() && !full_text.trim().is_empty() {
+                "\n\n_Request cancelled._".to_string()
+            } else {
+                "_Request cancelled._".to_string()
+            };
+            yield Ok(add_or_append_agent_text_event(
+                &task_id,
+                &request_id,
+                runtime,
+                &mut current_text_message_id,
+                text,
+            ));
             yield Ok(finished_event());
             return;
         }
@@ -380,7 +412,11 @@ pub(super) async fn generate_output(
             // When the synthesized cwd-change is the only action, simplify the prose
             // (matches behaviour of the previous post-process pass).
             if streamed_tool_calls.is_empty() && tool_calls.len() == 1 {
-                cleaned_text = format!("I'll run `{}` in Dwarf.", tool_calls[0].command);
+                cleaned_text = format!(
+                    "I'll run `{}` in {}.",
+                    tool_calls[0].command,
+                    ChannelState::app_name_display()
+                );
             }
         }
         log::info!(
@@ -391,7 +427,17 @@ pub(super) async fn generate_output(
         );
 
         if cleaned_text != full_text {
-            yield Ok(replace_agent_text_event(&task_id, &message_id, cleaned_text));
+            if let Some(message_id) = &current_text_message_id {
+                yield Ok(replace_agent_text_event(&task_id, message_id, cleaned_text));
+            } else {
+                yield Ok(add_or_append_agent_text_event(
+                    &task_id,
+                    &request_id,
+                    runtime,
+                    &mut current_text_message_id,
+                    cleaned_text,
+                ));
+            }
         }
 
         if !tool_calls.is_empty() {
@@ -551,8 +597,9 @@ fn standalone_claude_model() -> Option<String> {
 fn prompt_for_local_ai_input_suggestion(request: &GenerateAIInputSuggestionsRequest) -> String {
     let request_json = serde_json::to_string_pretty(request)
         .unwrap_or_else(|_| "Could not serialize suggestion context.".to_string());
+    let app_name = ChannelState::app_name_display();
     format!(
-        "You are generating a local Dwarf terminal autosuggestion.\n\
+        "You are generating a local {app_name} terminal autosuggestion.\n\
          Return exactly one JSON object and no prose: {{\"command\":\"...\"}}.\n\
          Suggest one safe shell command the user is likely to run next from the given terminal context.\n\
          Do not run anything. Do not include markdown. Do not include explanations.\n\
@@ -565,11 +612,12 @@ fn prompt_for_local_ai_input_suggestion(request: &GenerateAIInputSuggestionsRequ
 fn prompt_for_local_am_query_suggestion(request: &GenerateAMQuerySuggestionsRequest) -> String {
     let request_json = serde_json::to_string_pretty(request)
         .unwrap_or_else(|_| "Could not serialize suggestion context.".to_string());
+    let app_name = ChannelState::app_name_display();
     format!(
-        "You are generating a local Dwarf agent follow-up chip.\n\
+        "You are generating a local {app_name} agent follow-up chip.\n\
          Return exactly one JSON object and no prose: {{\"query\":\"...\"}}.\n\
-         Suggest one concise natural-language instruction for the local Dwarf agent based on the terminal context.\n\
-         Prefer instructions that ask Dwarf to inspect, run, test, debug, or summarize with local commands when useful.\n\
+         Suggest one concise natural-language instruction for the local {app_name} agent based on the terminal context.\n\
+         Prefer instructions that ask {app_name} to inspect, run, test, debug, or summarize with local commands when useful.\n\
          Do not mention Warp, Oz, credits, cloud agents, accounts, or premium features.\n\
          Do not run anything. Do not include markdown. Do not include explanations.\n\
          If there is no useful follow-up, return {{\"query\":\"\"}}.\n\n\
@@ -660,7 +708,7 @@ fn run_codex_streaming(
     prompt: String,
     working_directory: Option<String>,
     model: Option<String>,
-) -> impl Stream<Item = Result<String, String>> + Send {
+) -> impl Stream<Item = Result<LocalAgentStreamDelta, String>> + Send {
     async_stream::stream! {
         let codex_bin = codex_bin();
         let mut command = Command::new(codex_bin.clone());
@@ -747,9 +795,9 @@ fn run_codex_streaming(
                 // thinks but never emits a user-facing message.
                 if !accumulator.reasoning_summaries.is_empty() {
                     let summary = accumulator.reasoning_summaries.join("\n\n");
-                    yield Ok(format!(
+                    yield Ok(LocalAgentStreamDelta::Text(format!(
                         "_Codex finished without a final answer; surfacing reasoning summary instead._\n\n{summary}"
-                    ));
+                    )));
                 } else {
                     log::warn!(
                         "Codex finished without agent_message. Item types seen: {:?}. stderr: {}",
@@ -786,7 +834,10 @@ async fn run_codex(
     let mut full = String::new();
     while let Some(item) = stream.next().await {
         match item {
-            Ok(chunk) => full.push_str(&chunk),
+            Ok(LocalAgentStreamDelta::Text(chunk)) => full.push_str(&chunk),
+            Ok(LocalAgentStreamDelta::LocalToolOutput(output)) => {
+                append_local_tool_output_as_text(&mut full, &output);
+            }
             Err(error) => return Err(error),
         }
     }
@@ -851,7 +902,7 @@ fn run_claude_streaming(
     prompt: String,
     working_directory: Option<String>,
     model: Option<String>,
-) -> impl Stream<Item = Result<String, String>> + Send {
+) -> impl Stream<Item = Result<LocalAgentStreamDelta, String>> + Send {
     async_stream::stream! {
         let claude_bin = claude_bin();
         let mut command = Command::new(claude_bin.clone());
@@ -901,7 +952,7 @@ fn run_claude_streaming(
             futures::pin_mut!(next_fut);
             match futures::future::select(next_fut, &mut timeout).await {
                 futures::future::Either::Left((Some(MergedLine::Stdout(line)), _)) => {
-                    if let Some(delta) = accumulator.ingest_line(&line) {
+                    for delta in accumulator.ingest_line(&line) {
                         if !delta.is_empty() {
                             yield Ok(delta);
                         }
@@ -1063,6 +1114,42 @@ struct CodexItem<'a> {
     query: Cow<'a, str>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LocalAgentStreamDelta {
+    Text(String),
+    LocalToolOutput(LocalToolOutputDelta),
+}
+
+impl LocalAgentStreamDelta {
+    fn is_empty(&self) -> bool {
+        match self {
+            LocalAgentStreamDelta::Text(text) => text.is_empty(),
+            LocalAgentStreamDelta::LocalToolOutput(output) => {
+                output.title.is_empty() && output.body.is_empty()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LocalToolOutputDelta {
+    item_id: String,
+    title: String,
+    body: String,
+    is_complete: bool,
+    is_error: bool,
+    is_update: bool,
+}
+
+#[derive(Serialize)]
+struct LocalCLIToolOutputServerData<'a> {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    title: &'a str,
+    is_complete: bool,
+    is_error: bool,
+}
+
 /// Tracks Codex stream state. Holds:
 ///   - per-id assistant text (for the older monotonic-update shape — current
 ///     Codex 0.130+ only emits item.completed for agent_message, but the
@@ -1075,6 +1162,7 @@ struct CodexAccumulator {
     texts_by_id: HashMap<String, String>,
     last_message_id: Option<String>,
     has_emitted_any: bool,
+    has_emitted_text: bool,
     /// Tool-call ids whose `item.started` narration we've already emitted. Lets
     /// us suppress the duplicate if `item.started` fires multiple times for the
     /// same id (defensive — Codex shouldn't, but we don't want to risk it).
@@ -1088,7 +1176,7 @@ struct CodexAccumulator {
 }
 
 impl CodexAccumulator {
-    fn ingest_line(&mut self, line: &str) -> Option<String> {
+    fn ingest_line(&mut self, line: &str) -> Option<LocalAgentStreamDelta> {
         let parsed: CodexLine = serde_json::from_str(line).ok()?;
         let item = parsed.item?;
         // `item.started` for `command_execution` is the right moment to narrate
@@ -1104,7 +1192,7 @@ impl CodexAccumulator {
         self.handle_item_completed(item)
     }
 
-    fn handle_item_started(&mut self, item: CodexItem) -> Option<String> {
+    fn handle_item_started(&mut self, item: CodexItem) -> Option<LocalAgentStreamDelta> {
         let kind: &str = &item.kind;
         match kind {
             "command_execution" if !item.command.is_empty() => {
@@ -1112,8 +1200,14 @@ impl CodexAccumulator {
                     return None;
                 }
                 let cmd = strip_shell_wrapper(&item.command);
-                let narration = format!("*Running* `$ {}`", one_line(&cmd));
-                self.emit_narration(&narration)
+                self.emit_tool_output(LocalToolOutputDelta {
+                    item_id: item.id.into_owned(),
+                    title: format!("Running {}", one_line(&cmd)),
+                    body: String::new(),
+                    is_complete: false,
+                    is_error: false,
+                    is_update: false,
+                })
             }
             // Codex emits `item.started` for `web_search` with an empty query
             // (the query lands on `item.completed`), so there's nothing useful
@@ -1122,14 +1216,21 @@ impl CodexAccumulator {
         }
     }
 
-    fn handle_item_completed(&mut self, item: CodexItem) -> Option<String> {
+    fn handle_item_completed(&mut self, item: CodexItem) -> Option<LocalAgentStreamDelta> {
         let kind: &str = &item.kind;
         match kind {
             "agent_message" if !item.id.is_empty() => self.handle_agent_message(item),
             "command_execution" => self.handle_command_completed(item),
             "web_search" if !item.query.is_empty() => {
                 let q = one_line(&item.query);
-                self.emit_narration(&format!("*Searched the web for* `{q}`"))
+                self.emit_tool_output(LocalToolOutputDelta {
+                    item_id: item.id.into_owned(),
+                    title: format!("Searched web for {q}"),
+                    body: String::new(),
+                    is_complete: true,
+                    is_error: false,
+                    is_update: false,
+                })
             }
             "reasoning" => {
                 if !item.summary.is_empty() {
@@ -1153,48 +1254,35 @@ impl CodexAccumulator {
         }
     }
 
-    fn handle_command_completed(&mut self, item: CodexItem) -> Option<String> {
+    fn handle_command_completed(&mut self, item: CodexItem) -> Option<LocalAgentStreamDelta> {
         let output = item.aggregated_output.trim_end();
-        // Codex sometimes sends a completion without a prior started — make sure
-        // the user at least sees what ran in that case.
         let id_str: &str = &item.id;
-        let needs_command_line = !self.started_tool_ids.contains(id_str);
-        let mut narration = String::new();
-        if needs_command_line && !item.command.is_empty() {
-            let cmd = strip_shell_wrapper(&item.command);
-            narration.push_str(&format!("*Ran* `$ {}`", one_line(&cmd)));
-        }
+        let is_update = self.started_tool_ids.contains(id_str);
+        let cmd = strip_shell_wrapper(&item.command);
         let exit = item.exit_code.unwrap_or(0);
-        let body = if output.is_empty() {
-            if exit != 0 {
-                Some(format!("```\n(exit code {exit})\n```"))
-            } else {
-                None
-            }
-        } else {
-            let snippet = format_tool_result_snippet(output, exit != 0);
-            if exit != 0 {
-                Some(format!("{snippet}\n*(exit code {exit})*"))
-            } else {
-                Some(snippet)
-            }
-        };
-        if let Some(body) = body {
-            if !narration.is_empty() {
-                narration.push_str("\n\n");
-            }
-            narration.push_str(&body);
-        }
-        if narration.is_empty() {
+        if cmd.is_empty() && output.is_empty() && exit == 0 {
             return None;
         }
-        self.emit_narration(&narration)
+
+        let title = if cmd.is_empty() {
+            "Ran command".to_string()
+        } else {
+            format!("Ran {}", one_line(&cmd))
+        };
+        self.emit_tool_output(LocalToolOutputDelta {
+            item_id: item.id.into_owned(),
+            title,
+            body: format_tool_output_body(output, exit),
+            is_complete: true,
+            is_error: exit != 0,
+            is_update,
+        })
     }
 
     /// Handle assistant text. Codex 0.130 only emits item.completed for
     /// agent_message, but older streams emit growing item.started → updated →
     /// completed; the continuation logic handles both safely.
-    fn handle_agent_message(&mut self, item: CodexItem) -> Option<String> {
+    fn handle_agent_message(&mut self, item: CodexItem) -> Option<LocalAgentStreamDelta> {
         let id: &str = &item.id;
         let new_text: &str = &item.text;
 
@@ -1211,42 +1299,40 @@ impl CodexAccumulator {
             }
             if new_text.starts_with(prev) {
                 let delta = new_text[prev.len()..].to_string();
-                self.texts_by_id.insert(id.to_string(), new_text.to_string());
+                self.texts_by_id
+                    .insert(id.to_string(), new_text.to_string());
                 self.has_emitted_any = true;
-                return Some(delta);
+                self.has_emitted_text = true;
+                return Some(LocalAgentStreamDelta::Text(delta));
             }
             // Non-monotonic update (text replaced rather than extended) — fall
             // through and emit the new text as a fresh paragraph.
         }
 
         let already_seen = self.texts_by_id.contains_key(id);
-        self.texts_by_id.insert(id.to_string(), new_text.to_string());
+        self.texts_by_id
+            .insert(id.to_string(), new_text.to_string());
         self.last_message_id = Some(id.to_string());
 
         if already_seen && !is_continuation {
             return None;
         }
 
-        let sep = if self.has_emitted_any { "\n\n" } else { "" };
+        let sep = if self.has_emitted_text { "\n\n" } else { "" };
         let delta = format!("{sep}{new_text}");
         if delta.is_empty() {
             return None;
         }
         self.has_emitted_any = true;
-        Some(delta)
+        self.has_emitted_text = true;
+        Some(LocalAgentStreamDelta::Text(delta))
     }
 
-    fn emit_narration(&mut self, narration: &str) -> Option<String> {
-        if narration.is_empty() {
-            return None;
-        }
-        let sep = if self.has_emitted_any { "\n\n" } else { "" };
+    fn emit_tool_output(&mut self, output: LocalToolOutputDelta) -> Option<LocalAgentStreamDelta> {
         self.has_emitted_any = true;
-        // Crossing into a tool/result narration breaks the "last_message_id"
-        // continuation invariant — any subsequent agent_message with the same id
-        // should start a fresh paragraph rather than splicing into the narration.
+        self.has_emitted_text = false;
         self.last_message_id = None;
-        Some(format!("{sep}{narration}"))
+        Some(LocalAgentStreamDelta::LocalToolOutput(output))
     }
 }
 
@@ -1257,7 +1343,14 @@ impl CodexAccumulator {
 /// would type at a prompt.
 fn strip_shell_wrapper(command: &str) -> String {
     let trimmed = command.trim();
-    for prefix in ["/bin/zsh -lc ", "/bin/bash -lc ", "/bin/sh -c ", "zsh -lc ", "bash -lc ", "sh -c "] {
+    for prefix in [
+        "/bin/zsh -lc ",
+        "/bin/bash -lc ",
+        "/bin/sh -c ",
+        "zsh -lc ",
+        "bash -lc ",
+        "sh -c ",
+    ] {
         if let Some(rest) = trimmed.strip_prefix(prefix) {
             return unwrap_outer_quotes(rest.trim()).to_string();
         }
@@ -1283,7 +1376,8 @@ fn unwrap_outer_quotes(value: &str) -> &str {
 ///   - `assistant`: whole-turn finalization (used only when no `stream_event`
 ///     deltas arrived for this turn, e.g. older Claude Code versions).
 ///   - `user`: subsequent turn whose `content[]` may contain `tool_result` blocks
-///     paired to a prior `tool_use_id`. We render these inline.
+///     paired to a prior `tool_use_id`. We render these as structured local CLI
+///     output messages so arbitrary tool output cannot corrupt markdown parsing.
 ///   - `result`: last-resort fallback if nothing else ever produced text.
 #[derive(Debug, Deserialize)]
 struct ClaudeLine<'a> {
@@ -1318,6 +1412,8 @@ struct ClaudeContent {
     #[serde(default)]
     content: Option<Value>,
     #[serde(default)]
+    tool_use_id: Option<String>,
+    #[serde(default)]
     is_error: Option<bool>,
 }
 
@@ -1349,6 +1445,8 @@ struct ClaudeContentBlockStart {
     /// originating `tool_use`.
     #[serde(default)]
     id: Option<String>,
+    #[serde(default)]
+    input: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1369,9 +1467,23 @@ struct ClaudeStreamDelta {
 #[derive(Debug, Default)]
 struct ClaudeContentBlockState {
     kind: String,
+    id: Option<String>,
     tool_name: Option<String>,
     /// Accumulated `partial_json` fragments for `tool_use` blocks.
     tool_input_json: String,
+}
+
+#[derive(Debug)]
+struct ClaudeToolUseDisplay {
+    start_title: String,
+    complete_title: String,
+    body: String,
+    completes_on_stop: bool,
+}
+
+#[derive(Debug)]
+struct ClaudeToolUseRecord {
+    complete_title: String,
 }
 
 /// Tracks Claude streaming state. With `--include-partial-messages` we receive
@@ -1382,6 +1494,7 @@ struct ClaudeContentBlockState {
 #[derive(Default)]
 struct ClaudeAccumulator {
     has_emitted_any: bool,
+    has_emitted_text: bool,
     /// True once we've seen at least one `content_block_delta` token-level event.
     /// When true, suppress the subsequent whole-turn `assistant` event for the
     /// same content block — it would duplicate text we already emitted.
@@ -1389,73 +1502,128 @@ struct ClaudeAccumulator {
     /// Per-block-index state (text/thinking/tool_use). Populated on
     /// `content_block_start` and drained on `content_block_stop`.
     blocks: HashMap<usize, ClaudeContentBlockState>,
+    /// Tool-call metadata keyed by Claude's `tool_use_id`, used to update the
+    /// same local CLI output message when the matching `tool_result` arrives.
+    tool_uses_by_id: HashMap<String, ClaudeToolUseRecord>,
 }
 
 impl ClaudeAccumulator {
-    /// Ingest one JSONL line. Returns the cleaned text delta to forward to the
-    /// user, if any. Tool usage, thinking, and tool results are rendered as
-    /// inline markdown narration so the user sees what Claude is doing without
-    /// dwarf re-executing commands Claude already ran in its own sandbox.
-    fn ingest_line(&mut self, line: &str) -> Option<String> {
-        let parsed: ClaudeLine = serde_json::from_str(line).ok()?;
+    /// Ingest one JSONL line. Returns display deltas to forward to the user, if
+    /// any. Assistant text remains text; Claude tool usage/results are emitted
+    /// as structured local CLI output so raw command output is never interpreted
+    /// as assistant markdown.
+    fn ingest_line(&mut self, line: &str) -> Vec<LocalAgentStreamDelta> {
+        let Ok(parsed) = serde_json::from_str::<ClaudeLine>(line) else {
+            return vec![];
+        };
         match parsed.kind {
-            "stream_event" => self.handle_stream_event(parsed.event?),
+            "stream_event" => parsed
+                .event
+                .and_then(|event| self.handle_stream_event(event))
+                .into_iter()
+                .collect(),
             // Older Claude Code CLI versions emit only whole-turn `assistant`
             // events. Use them only if we never saw a content_block_delta.
             "assistant" if !self.has_streamed_partials => {
-                let message = parsed.message?;
+                let Some(message) = parsed.message else {
+                    return vec![];
+                };
                 let text: String = message
                     .content
                     .into_iter()
                     .filter_map(|c| (c.kind == "text").then_some(c.text).flatten())
                     .collect::<Vec<_>>()
                     .join("");
-                self.emit_text(text)
+                self.emit_text(text).into_iter().collect()
             }
             // User-role events carry `tool_result` content for prior tool_use blocks.
-            // Render each tool_result as a fenced code block under the originating tool.
+            // Render each tool_result through the local CLI output UI instead of markdown.
             "user" => {
-                let message = parsed.message?;
-                let mut out = String::new();
-                for c in message.content {
+                let Some(message) = parsed.message else {
+                    return vec![];
+                };
+                let mut out = Vec::new();
+                for (idx, c) in message.content.into_iter().enumerate() {
                     if c.kind != "tool_result" {
                         continue;
                     }
+                    let item_id = c
+                        .tool_use_id
+                        .clone()
+                        .filter(|id| !id.is_empty())
+                        .unwrap_or_else(|| format!("claude-tool-result-{idx}"));
                     let result_text = tool_result_to_text(&c);
-                    if result_text.trim().is_empty() {
+                    let has_result_body = !result_text.trim().is_empty();
+                    let Some(record) = self.tool_uses_by_id.get(&item_id) else {
+                        if !has_result_body {
+                            continue;
+                        }
+                        let is_error = c.is_error.unwrap_or(false);
+                        self.has_emitted_any = true;
+                        self.has_emitted_text = false;
+                        out.push(LocalAgentStreamDelta::LocalToolOutput(
+                            LocalToolOutputDelta {
+                                item_id,
+                                title: "Used tool".to_string(),
+                                body: format_claude_tool_result_body(&result_text),
+                                is_complete: true,
+                                is_error,
+                                is_update: false,
+                            },
+                        ));
                         continue;
-                    }
+                    };
                     let is_error = c.is_error.unwrap_or(false);
-                    let snippet = format_tool_result_snippet(&result_text, is_error);
-                    out.push_str(&snippet);
+                    self.has_emitted_any = true;
+                    self.has_emitted_text = false;
+                    out.push(LocalAgentStreamDelta::LocalToolOutput(
+                        LocalToolOutputDelta {
+                            item_id,
+                            title: record.complete_title.clone(),
+                            body: format_claude_tool_result_body(&result_text),
+                            is_complete: true,
+                            is_error,
+                            is_update: true,
+                        },
+                    ));
                 }
-                if out.is_empty() {
-                    None
-                } else {
-                    self.emit_inline_narration(&out)
-                }
+                out
             }
             // Final fallback when neither stream_event nor assistant text fired.
             "result" if !self.has_emitted_any => {
-                let text = parsed.result?.to_string();
-                self.emit_text(text)
+                let Some(text) = parsed.result else {
+                    return vec![];
+                };
+                self.emit_text(text.to_string()).into_iter().collect()
             }
-            _ => None,
+            _ => vec![],
         }
     }
 
-    fn handle_stream_event(&mut self, event: ClaudeStreamEvent) -> Option<String> {
+    fn handle_stream_event(&mut self, event: ClaudeStreamEvent) -> Option<LocalAgentStreamDelta> {
         match event.kind.as_str() {
             "content_block_start" => {
                 let idx = event.index?;
                 let block = event.content_block?;
-                let _ = block.id; // captured for forward-compat; not used yet
+                let input_json = block
+                    .input
+                    .as_ref()
+                    .filter(|input| !input.is_null())
+                    .and_then(|input| {
+                        if input.as_object().is_some_and(serde_json::Map::is_empty) {
+                            None
+                        } else {
+                            Some(input.to_string())
+                        }
+                    })
+                    .unwrap_or_default();
                 self.blocks.insert(
                     idx,
                     ClaudeContentBlockState {
                         kind: block.kind,
+                        id: block.id,
                         tool_name: block.name,
-                        tool_input_json: String::new(),
+                        tool_input_json: input_json,
                     },
                 );
                 None
@@ -1498,14 +1666,35 @@ impl ClaudeAccumulator {
                 if state.kind != "tool_use" {
                     return None;
                 }
-                let narration = narrate_tool_use(
-                    state.tool_name.as_deref().unwrap_or(""),
-                    &state.tool_input_json,
+                let tool_name = state.tool_name.as_deref().unwrap_or("");
+                let display = describe_claude_tool_use(tool_name, &state.tool_input_json);
+                let item_id = state.id.unwrap_or_else(|| format!("claude-tool-{idx}"));
+                self.tool_uses_by_id.insert(
+                    item_id.clone(),
+                    ClaudeToolUseRecord {
+                        complete_title: display.complete_title.clone(),
+                    },
                 );
-                if narration.is_empty() {
-                    return None;
-                }
-                self.emit_inline_narration(&narration)
+                self.has_emitted_any = true;
+                self.has_emitted_text = false;
+                Some(LocalAgentStreamDelta::LocalToolOutput(
+                    LocalToolOutputDelta {
+                        item_id,
+                        title: if display.completes_on_stop {
+                            display.complete_title
+                        } else {
+                            display.start_title
+                        },
+                        body: if display.completes_on_stop {
+                            display.body
+                        } else {
+                            String::new()
+                        },
+                        is_complete: display.completes_on_stop,
+                        is_error: false,
+                        is_update: false,
+                    },
+                ))
             }
             // message_start / message_delta / message_stop — no payload we render.
             _ => None,
@@ -1513,28 +1702,18 @@ impl ClaudeAccumulator {
     }
 
     /// Emit a primary text delta (assistant-authored text, not narration).
-    fn emit_text(&mut self, text: String) -> Option<String> {
+    fn emit_text(&mut self, text: String) -> Option<LocalAgentStreamDelta> {
         if text.is_empty() {
             return None;
         }
-        let sep = if !self.has_emitted_any || self.has_streamed_partials {
+        let sep = if !self.has_emitted_text || self.has_streamed_partials {
             ""
         } else {
             "\n\n"
         };
         self.has_emitted_any = true;
-        Some(format!("{sep}{text}"))
-    }
-
-    /// Emit inline narration (tool calls + tool results). Always separated from
-    /// surrounding text by a blank line so it renders as its own paragraph.
-    fn emit_inline_narration(&mut self, narration: &str) -> Option<String> {
-        if narration.is_empty() {
-            return None;
-        }
-        let sep = if self.has_emitted_any { "\n\n" } else { "" };
-        self.has_emitted_any = true;
-        Some(format!("{sep}{narration}"))
+        self.has_emitted_text = true;
+        Some(LocalAgentStreamDelta::Text(format!("{sep}{text}")))
     }
 }
 
@@ -1562,36 +1741,63 @@ fn tool_result_to_text(content: &ClaudeContent) -> String {
     }
 }
 
-/// Format a tool_result snippet for inline display. Long outputs are truncated
-/// to keep the chat readable; the user can still see the actual content of the
-/// most relevant lines.
-fn format_tool_result_snippet(result_text: &str, is_error: bool) -> String {
+fn format_claude_tool_result_body(result_text: &str) -> String {
+    let trimmed = result_text.trim_end();
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        truncate_tool_output_text(trimmed)
+    }
+}
+
+fn format_tool_output_body(result_text: &str, exit_code: i32) -> String {
+    let trimmed = result_text.trim_end();
+    let mut body = if trimmed.is_empty() {
+        String::new()
+    } else {
+        truncate_tool_output_text(trimmed)
+    };
+    if exit_code != 0 {
+        if !body.is_empty() {
+            body.push('\n');
+        }
+        body.push_str(&format!("(exit code {exit_code})"));
+    }
+    body
+}
+
+fn truncate_tool_output_text(result_text: &str) -> String {
     const MAX_LINES: usize = 12;
     const MAX_CHARS: usize = 1_200;
-    let trimmed = result_text.trim_end();
-    let truncated_by_chars = trimmed.len() > MAX_CHARS;
+    let truncated_by_chars = result_text.len() > MAX_CHARS;
     let head: String = if truncated_by_chars {
-        trimmed.chars().take(MAX_CHARS).collect()
+        result_text.chars().take(MAX_CHARS).collect()
     } else {
-        trimmed.to_string()
+        result_text.to_string()
     };
     let lines: Vec<&str> = head.lines().take(MAX_LINES).collect();
     let truncated_by_lines = head.lines().count() > MAX_LINES;
-    let body = lines.join("\n");
-    let suffix = if truncated_by_lines || truncated_by_chars {
-        "\n…"
-    } else {
-        ""
-    };
-    let label = if is_error { "error" } else { "" };
-    format!("```{label}\n{body}{suffix}\n```")
+    let mut body = lines.join("\n");
+    if truncated_by_lines || truncated_by_chars {
+        body.push_str("\n...");
+    }
+    body
 }
 
-/// Map a finished Claude tool_use to a single inline markdown line. Examples:
-///   Bash + `{"command": "ls -la"}`            → `*Ran* `$ ls -la``
-///   Read + `{"file_path": "src/foo.rs"}`     → `*Read* `src/foo.rs``
-///   TodoWrite + `{"todos": [...]}`            → multi-line checklist
-fn narrate_tool_use(tool_name: &str, input_json: &str) -> String {
+fn append_local_tool_output_as_text(text: &mut String, output: &LocalToolOutputDelta) {
+    if text.is_empty() {
+        text.push_str(&output.title);
+    } else {
+        text.push_str("\n\n");
+        text.push_str(&output.title);
+    }
+    if !output.body.is_empty() {
+        text.push('\n');
+        text.push_str(&output.body);
+    }
+}
+
+fn describe_claude_tool_use(tool_name: &str, input_json: &str) -> ClaudeToolUseDisplay {
     let parsed: Value = serde_json::from_str(input_json).unwrap_or(Value::Null);
     match tool_name {
         "Bash" => {
@@ -1601,66 +1807,124 @@ fn narrate_tool_use(tool_name: &str, input_json: &str) -> String {
                 .unwrap_or("")
                 .trim();
             if cmd.is_empty() {
-                String::new()
+                claude_tool_display("Running command", "Ran command")
             } else {
-                format!("*Ran* `$ {}`", one_line(cmd))
+                let cmd = one_line(cmd);
+                claude_tool_display(&format!("Running {cmd}"), &format!("Ran {cmd}"))
             }
         }
-        "Read" => narrate_path(&parsed, "Read"),
-        "Edit" | "MultiEdit" => narrate_path(&parsed, "Edited"),
-        "Write" => narrate_path(&parsed, "Wrote"),
-        "Glob" => narrate_pattern(&parsed, "Searched", "pattern"),
-        "Grep" => narrate_pattern(&parsed, "Grepped for", "pattern"),
+        "Read" => describe_path_tool(&parsed, "Reading file", "Read file", "Reading", "Read"),
+        "Edit" | "MultiEdit" => {
+            describe_path_tool(&parsed, "Editing file", "Edited file", "Editing", "Edited")
+        }
+        "Write" => describe_path_tool(&parsed, "Writing file", "Wrote file", "Writing", "Wrote"),
+        "Glob" => describe_pattern_tool(
+            &parsed,
+            "Searching files",
+            "Searched files",
+            "Searching",
+            "Searched",
+        ),
+        "Grep" => describe_pattern_tool(
+            &parsed,
+            "Grepping",
+            "Grepped",
+            "Grepping for",
+            "Grepped for",
+        ),
         "WebFetch" => parsed
             .get("url")
             .and_then(Value::as_str)
-            .map(|u| format!("*Fetched* `{}`", one_line(u)))
-            .unwrap_or_default(),
+            .map(|u| {
+                let url = one_line(u);
+                claude_tool_display(&format!("Fetching {url}"), &format!("Fetched {url}"))
+            })
+            .unwrap_or_else(|| claude_tool_display("Fetching URL", "Fetched URL")),
         "WebSearch" => parsed
             .get("query")
             .and_then(Value::as_str)
-            .map(|q| format!("*Searched the web for* `{}`", one_line(q)))
-            .unwrap_or_default(),
-        "TodoWrite" => narrate_todos(&parsed),
-        "" => String::new(),
-        other => format!("*Used* `{other}`"),
+            .map(|q| {
+                let query = one_line(q);
+                claude_tool_display(
+                    &format!("Searching web for {query}"),
+                    &format!("Searched web for {query}"),
+                )
+            })
+            .unwrap_or_else(|| claude_tool_display("Searching web", "Searched web")),
+        "TodoWrite" => ClaudeToolUseDisplay {
+            start_title: "Updating todos".to_string(),
+            complete_title: "Updated todos".to_string(),
+            body: format_todos_body(&parsed),
+            completes_on_stop: true,
+        },
+        "" => claude_tool_display("Using tool", "Used tool"),
+        other => claude_tool_display(&format!("Using {other}"), &format!("Used {other}")),
     }
 }
 
-fn narrate_path(parsed: &Value, verb: &str) -> String {
+fn claude_tool_display(start_title: &str, complete_title: &str) -> ClaudeToolUseDisplay {
+    ClaudeToolUseDisplay {
+        start_title: start_title.to_string(),
+        complete_title: complete_title.to_string(),
+        body: String::new(),
+        completes_on_stop: false,
+    }
+}
+
+fn describe_path_tool(
+    parsed: &Value,
+    default_start: &str,
+    default_complete: &str,
+    start_verb: &str,
+    complete_verb: &str,
+) -> ClaudeToolUseDisplay {
     let path = parsed
         .get("file_path")
         .or_else(|| parsed.get("path"))
         .and_then(Value::as_str)
         .unwrap_or("");
     if path.is_empty() {
-        String::new()
+        claude_tool_display(default_start, default_complete)
     } else {
-        format!("*{verb}* `{}`", one_line(path))
+        let path = one_line(path);
+        claude_tool_display(
+            &format!("{start_verb} {path}"),
+            &format!("{complete_verb} {path}"),
+        )
     }
 }
 
-fn narrate_pattern(parsed: &Value, verb: &str, key: &str) -> String {
+fn describe_pattern_tool(
+    parsed: &Value,
+    default_start: &str,
+    default_complete: &str,
+    start_verb: &str,
+    complete_verb: &str,
+) -> ClaudeToolUseDisplay {
     let pattern = parsed
-        .get(key)
+        .get("pattern")
         .or_else(|| parsed.get("query"))
         .and_then(Value::as_str)
         .unwrap_or("");
     if pattern.is_empty() {
-        String::new()
+        claude_tool_display(default_start, default_complete)
     } else {
-        format!("*{verb}* `{}`", one_line(pattern))
+        let pattern = one_line(pattern);
+        claude_tool_display(
+            &format!("{start_verb} {pattern}"),
+            &format!("{complete_verb} {pattern}"),
+        )
     }
 }
 
-fn narrate_todos(parsed: &Value) -> String {
+fn format_todos_body(parsed: &Value) -> String {
     let Some(todos) = parsed.get("todos").and_then(Value::as_array) else {
         return String::new();
     };
     if todos.is_empty() {
         return String::new();
     }
-    let mut out = String::from("**Todos**");
+    let mut out = String::new();
     for todo in todos {
         let content = todo.get("content").and_then(Value::as_str).unwrap_or("");
         let status = todo.get("status").and_then(Value::as_str).unwrap_or("");
@@ -1669,7 +1933,10 @@ fn narrate_todos(parsed: &Value) -> String {
             "in_progress" => "[~]",
             _ => "[ ]",
         };
-        out.push_str("\n- ");
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str("- ");
         out.push_str(marker);
         out.push(' ');
         out.push_str(content);
@@ -1896,7 +2163,10 @@ fn prompt_for_local_agent(
     model: Option<&str>,
 ) -> String {
     let mut prompt = String::new();
-    prompt.push_str("Dwarf local agent session context:\n");
+    prompt.push_str(&format!(
+        "{} local agent session context:\n",
+        ChannelState::app_name_display()
+    ));
     match model {
         Some(model) => {
             prompt.push_str("The ");
@@ -1914,7 +2184,7 @@ fn prompt_for_local_agent(
         }
     }
     prompt.push_str(MODEL_IDENTITY_PROSE);
-    prompt.push_str(TOOL_CALL_CONTRACT_PROSE);
+    prompt.push_str(&tool_call_contract_prose());
 
     let history = conversation_history(&params.tasks);
     if !history.is_empty() {
@@ -1926,6 +2196,22 @@ fn prompt_for_local_agent(
     prompt.push_str("User request:\n");
     prompt.push_str(&prompt_from_inputs(&params.input));
     prompt
+}
+
+fn tool_call_contract_prose() -> String {
+    let app_name = ChannelState::app_name_display();
+    format!(
+        "{app_name} terminal tool-call contract:\n\
+         - {app_name} is a terminal. Prefer making progress with shell commands, scripts, repository inspection, tests, and concise analysis over conversational-only answers.\n\
+         - You cannot change {app_name}'s live terminal by changing your own local agent subprocess working directory.\n\
+         - When the user asks to run, inspect, analyze, search, test, build, install, execute a script, or change directories, emit one tool-call marker per required shell command on its own line:\n\
+         DWARF_TOOL_CALL {{\"type\":\"run_shell_command\",\"command\":\"pwd\",\"is_read_only\":true,\"uses_pager\":false,\"is_risky\":false,\"wait_until_complete\":true}}\n\
+         - Emit one self-contained command when a later step depends on an earlier command's output. Do not emit dependent multi-step plans because {app_name} will not feed command results back to you automatically in this local bridge.\n\
+         - For directory changes, emit `cd <path>` as a {app_name} tool call. Do not say the cwd changed until {app_name} returns the command result.\n\
+         - For read-only inspection commands such as pwd, ls, find, rg, git status, cargo test --no-run, use `is_read_only:true`.\n\
+         - For scripts, builds, tests that execute project code, or commands that may modify files, set `is_read_only:false`. Set `is_risky:true` only for destructive, credential, network, sudo, or external side-effect commands.\n\
+         - Do not wrap DWARF_TOOL_CALL lines in markdown fences. Keep prose short and do not claim validation from commands that only ran in your local agent subprocess.\n\n"
+    )
 }
 
 fn conversation_history(tasks: &[api::Task]) -> String {
@@ -2069,6 +2355,88 @@ fn run_shell_command_message(
     }
 }
 
+fn local_tool_output_event(
+    task_id: &str,
+    request_id: &str,
+    output: LocalToolOutputDelta,
+) -> api::ResponseEvent {
+    if output.is_update {
+        update_local_tool_output_event(task_id, request_id, &output)
+    } else {
+        add_local_tool_output_event(task_id, request_id, &output)
+    }
+}
+
+fn add_local_tool_output_event(
+    task_id: &str,
+    request_id: &str,
+    output: &LocalToolOutputDelta,
+) -> api::ResponseEvent {
+    client_actions_event(vec![api::ClientAction {
+        action: Some(api::client_action::Action::AddMessagesToTask(
+            api::client_action::AddMessagesToTask {
+                task_id: task_id.to_string(),
+                messages: vec![local_tool_output_message(task_id, request_id, output)],
+            },
+        )),
+    }])
+}
+
+fn update_local_tool_output_event(
+    task_id: &str,
+    request_id: &str,
+    output: &LocalToolOutputDelta,
+) -> api::ResponseEvent {
+    client_actions_event(vec![api::ClientAction {
+        action: Some(api::client_action::Action::UpdateTaskMessage(
+            api::client_action::UpdateTaskMessage {
+                task_id: task_id.to_string(),
+                message: Some(local_tool_output_message(task_id, request_id, output)),
+                mask: Some(FieldMask {
+                    paths: vec![
+                        "agent_output.text".to_string(),
+                        "server_message_data".to_string(),
+                    ],
+                }),
+            },
+        )),
+    }])
+}
+
+fn local_tool_output_message(
+    task_id: &str,
+    request_id: &str,
+    output: &LocalToolOutputDelta,
+) -> api::Message {
+    let metadata = LocalCLIToolOutputServerData {
+        kind: LOCAL_CLI_TOOL_OUTPUT_SERVER_DATA_TYPE,
+        title: &output.title,
+        is_complete: output.is_complete,
+        is_error: output.is_error,
+    };
+    api::Message {
+        id: local_tool_output_message_id(&output.item_id),
+        task_id: task_id.to_string(),
+        request_id: request_id.to_string(),
+        timestamp: None,
+        server_message_data: serde_json::to_string(&metadata).unwrap_or_default(),
+        citations: vec![],
+        message: Some(api::message::Message::AgentOutput(
+            api::message::AgentOutput {
+                text: output.body.clone(),
+            },
+        )),
+    }
+}
+
+fn local_tool_output_message_id(item_id: &str) -> String {
+    if item_id.is_empty() {
+        format!("local-codex-tool-output-{}", Uuid::new_v4())
+    } else {
+        format!("local-codex-tool-output-{item_id}")
+    }
+}
+
 /// Per-stream line-buffered filter that separates `DWARF_TOOL_CALL` markers from
 /// prose deltas as they arrive on the wire. Lets the streaming loop emit clean
 /// text to the UI and hoist tool calls into their own blocks *during* streaming,
@@ -2095,12 +2463,21 @@ impl StreamingToolCallFilter {
         let mut result = FilteredDelta::default();
         self.pending_line.push_str(chunk);
 
-        // Drain complete lines from `pending_line`. A "line" here is everything up
-        // to and including the `\n`. Anything after the last `\n` stays buffered.
-        loop {
-            let Some(nl_pos) = self.pending_line.find('\n') else {
-                break;
-            };
+        self.drain_complete_lines(&mut result);
+        if !self.pending_line.is_empty() && !is_possible_marker_fragment(&self.pending_line) {
+            result
+                .text_chunks
+                .push(std::mem::take(&mut self.pending_line));
+        }
+
+        result
+    }
+
+    /// Drain complete lines from `pending_line`. A "line" here is everything up
+    /// to and including the `\n`. Anything after the last `\n` stays buffered
+    /// only long enough to decide whether it could be a tool-call marker.
+    fn drain_complete_lines(&mut self, result: &mut FilteredDelta) {
+        while let Some(nl_pos) = self.pending_line.find('\n') {
             let line_with_newline: String = self.pending_line.drain(..=nl_pos).collect();
             let line_without_newline = &line_with_newline[..line_with_newline.len() - 1];
 
@@ -2110,8 +2487,6 @@ impl StreamingToolCallFilter {
                 result.text_chunks.push(line_with_newline);
             }
         }
-
-        result
     }
 
     /// Drain whatever's left in the buffer at end-of-stream. If the trailing
@@ -2128,11 +2503,13 @@ impl StreamingToolCallFilter {
             result.tool_calls.push(marker);
             return result;
         }
-        if self.pending_line.contains(TOOL_CALL_PREFIX) {
+        if self.pending_line.trim_start().starts_with(TOOL_CALL_PREFIX) {
             // Partial/malformed marker — better to drop than expose JSON fragments.
             return result;
         }
-        result.text_chunks.push(std::mem::take(&mut self.pending_line));
+        result
+            .text_chunks
+            .push(std::mem::take(&mut self.pending_line));
         result
     }
 }
@@ -2154,6 +2531,20 @@ fn parse_dwarf_marker_line(line: &str) -> Option<LocalRunShellCommand> {
         is_risky: marker.is_risky.unwrap_or(false),
         wait_until_complete: marker.wait_until_complete.unwrap_or(true),
     })
+}
+
+fn is_possible_marker_fragment(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    !trimmed.is_empty()
+        && (TOOL_CALL_PREFIX.starts_with(trimmed) || trimmed.starts_with(TOOL_CALL_PREFIX))
+}
+
+fn local_agent_stream_error_text(existing_text: &str, error: &str) -> String {
+    if existing_text.trim().is_empty() {
+        error.to_string()
+    } else {
+        format!("{}\n\n{}", existing_text.trim_end(), error)
+    }
 }
 
 /// Whole-string variant of the tool-call extractor — used by tests and as a
@@ -2197,7 +2588,10 @@ fn extract_dwarf_tool_calls(output_text: &str) -> (String, Vec<LocalRunShellComm
 
     let cleaned = cleaned.trim().to_string();
     let cleaned = if cleaned.is_empty() && !tool_calls.is_empty() {
-        "I'll run the requested command in Dwarf.".to_string()
+        format!(
+            "I'll run the requested command in {}.",
+            ChannelState::app_name_display()
+        )
     } else {
         cleaned
     };
@@ -2433,11 +2827,49 @@ fn client_actions_event(actions: Vec<api::ClientAction>) -> api::ResponseEvent {
     }
 }
 
-fn append_agent_text_event(
+fn add_or_append_agent_text_event(
     task_id: &str,
-    message_id: &str,
+    request_id: &str,
+    runtime: LocalAgentRuntime,
+    current_message_id: &mut Option<String>,
     text: String,
 ) -> api::ResponseEvent {
+    if let Some(message_id) = current_message_id.as_deref() {
+        append_agent_text_event(task_id, message_id, text)
+    } else {
+        let message_id = format!("local-{}-message-{}", runtime.slug(), Uuid::new_v4());
+        *current_message_id = Some(message_id.clone());
+        add_agent_text_event(task_id, request_id, message_id, text)
+    }
+}
+
+fn add_agent_text_event(
+    task_id: &str,
+    request_id: &str,
+    message_id: String,
+    text: String,
+) -> api::ResponseEvent {
+    client_actions_event(vec![api::ClientAction {
+        action: Some(api::client_action::Action::AddMessagesToTask(
+            api::client_action::AddMessagesToTask {
+                task_id: task_id.to_string(),
+                messages: vec![api::Message {
+                    id: message_id,
+                    task_id: task_id.to_string(),
+                    request_id: request_id.to_string(),
+                    timestamp: None,
+                    server_message_data: String::new(),
+                    citations: vec![],
+                    message: Some(api::message::Message::AgentOutput(
+                        api::message::AgentOutput { text },
+                    )),
+                }],
+            },
+        )),
+    }])
+}
+
+fn append_agent_text_event(task_id: &str, message_id: &str, text: String) -> api::ResponseEvent {
     client_actions_event(vec![api::ClientAction {
         action: Some(api::client_action::Action::AppendToMessageContent(
             api::client_action::AppendToMessageContent {
@@ -2461,11 +2893,7 @@ fn append_agent_text_event(
     }])
 }
 
-fn replace_agent_text_event(
-    task_id: &str,
-    message_id: &str,
-    text: String,
-) -> api::ResponseEvent {
+fn replace_agent_text_event(task_id: &str, message_id: &str, text: String) -> api::ResponseEvent {
     // request_id on api::Message is metadata the conversation handler doesn't consult
     // for UpdateTaskMessage (lookup is by message_id), so leave it empty.
     client_actions_event(vec![api::ClientAction {
@@ -2650,24 +3078,143 @@ mod tests {
         assert_eq!(agent_output_text(&replaced), "replaced");
     }
 
+    #[test]
+    fn local_tool_output_events_update_metadata_and_body() {
+        let started = LocalToolOutputDelta {
+            item_id: "item_0".to_string(),
+            title: "Running pwd".to_string(),
+            body: String::new(),
+            is_complete: false,
+            is_error: false,
+            is_update: false,
+        };
+        let api::response_event::Type::ClientActions(actions) =
+            local_tool_output_event("task", "request", started)
+                .r#type
+                .expect("add event type")
+        else {
+            panic!("expected client actions");
+        };
+        let api::client_action::Action::AddMessagesToTask(add) = actions
+            .actions
+            .into_iter()
+            .next()
+            .expect("add action")
+            .action
+            .expect("add action type")
+        else {
+            panic!("expected add action");
+        };
+        let existing = add.messages.into_iter().next().expect("added message");
+        assert_eq!(existing.id, "local-codex-tool-output-item_0");
+        assert_eq!(agent_output_text(&existing), "");
+        let metadata: Value =
+            serde_json::from_str(&existing.server_message_data).expect("valid server data");
+        assert_eq!(metadata["title"], "Running pwd");
+        assert_eq!(metadata["is_complete"], false);
+
+        let completed = LocalToolOutputDelta {
+            item_id: "item_0".to_string(),
+            title: "Ran pwd".to_string(),
+            body: "/tmp".to_string(),
+            is_complete: true,
+            is_error: false,
+            is_update: true,
+        };
+        let api::response_event::Type::ClientActions(actions) =
+            local_tool_output_event("task", "request", completed)
+                .r#type
+                .expect("update event type")
+        else {
+            panic!("expected client actions");
+        };
+        let api::client_action::Action::UpdateTaskMessage(update) = actions
+            .actions
+            .into_iter()
+            .next()
+            .expect("update action")
+            .action
+            .expect("update action type")
+        else {
+            panic!("expected update action");
+        };
+        let updated = FieldMaskOperation::update(
+            &api::MESSAGE_DESCRIPTOR,
+            &existing,
+            update.message.as_ref().expect("update message"),
+            update.mask.expect("update mask"),
+        )
+        .apply()
+        .expect("update mask applies");
+        assert_eq!(agent_output_text(&updated), "/tmp");
+        let metadata: Value =
+            serde_json::from_str(&updated.server_message_data).expect("valid server data");
+        assert_eq!(metadata["title"], "Ran pwd");
+        assert_eq!(metadata["is_complete"], true);
+    }
+
     fn drive_codex(acc: &mut CodexAccumulator, lines: &[&str]) -> String {
         let mut total = String::new();
         for line in lines {
-            if let Some(delta) = acc.ingest_line(line) {
+            if let Some(LocalAgentStreamDelta::Text(delta)) = acc.ingest_line(line) {
                 total.push_str(&delta);
             }
         }
         total
     }
 
+    fn drive_codex_events(
+        acc: &mut CodexAccumulator,
+        lines: &[&str],
+    ) -> Vec<LocalAgentStreamDelta> {
+        lines
+            .iter()
+            .filter_map(|line| acc.ingest_line(line))
+            .collect()
+    }
+
+    fn codex_text_delta(text: &str) -> Option<LocalAgentStreamDelta> {
+        Some(LocalAgentStreamDelta::Text(text.to_string()))
+    }
+
+    fn local_tool_output_delta(
+        item_id: &str,
+        title: &str,
+        body: &str,
+        is_complete: bool,
+        is_error: bool,
+        is_update: bool,
+    ) -> LocalAgentStreamDelta {
+        LocalAgentStreamDelta::LocalToolOutput(LocalToolOutputDelta {
+            item_id: item_id.to_string(),
+            title: title.to_string(),
+            body: body.to_string(),
+            is_complete,
+            is_error,
+            is_update,
+        })
+    }
+
     fn drive_claude(acc: &mut ClaudeAccumulator, lines: &[&str]) -> String {
         let mut total = String::new();
         for line in lines {
-            if let Some(delta) = acc.ingest_line(line) {
-                total.push_str(&delta);
+            for delta in acc.ingest_line(line) {
+                if let LocalAgentStreamDelta::Text(text) = delta {
+                    total.push_str(&text);
+                }
             }
         }
         total
+    }
+
+    fn drive_claude_events(
+        acc: &mut ClaudeAccumulator,
+        lines: &[&str],
+    ) -> Vec<LocalAgentStreamDelta> {
+        lines
+            .iter()
+            .flat_map(|line| acc.ingest_line(line))
+            .collect()
     }
 
     #[test]
@@ -2681,19 +3228,19 @@ mod tests {
             acc.ingest_line(
                 r#"{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"hel"}}"#,
             ),
-            Some("hel".to_string())
+            codex_text_delta("hel")
         );
         assert_eq!(
             acc.ingest_line(
                 r#"{"type":"item.updated","item":{"id":"item_0","type":"agent_message","text":"hello"}}"#,
             ),
-            Some("lo".to_string())
+            codex_text_delta("lo")
         );
         assert_eq!(
             acc.ingest_line(
                 r#"{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"world"}}"#,
             ),
-            Some("\n\nworld".to_string())
+            codex_text_delta("\n\nworld")
         );
         assert!(acc.has_emitted_any);
     }
@@ -2770,34 +3317,46 @@ mod tests {
         let mut acc = CodexAccumulator::default();
         // Real Codex 0.130 sequence: item.started fires when the sandbox shell
         // launches; item.completed lands with the combined output + exit code.
-        let total = drive_codex(
+        let events = drive_codex_events(
             &mut acc,
             &[
                 r#"{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc pwd","aggregated_output":"","exit_code":null,"status":"in_progress"}}"#,
                 r#"{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc pwd","aggregated_output":"/tmp\n","exit_code":0,"status":"completed"}}"#,
             ],
         );
-        assert_eq!(total, "*Running* `$ pwd`\n\n```\n/tmp\n```");
+        assert_eq!(
+            events,
+            vec![
+                local_tool_output_delta("item_0", "Running pwd", "", false, false, false),
+                local_tool_output_delta("item_0", "Ran pwd", "/tmp", true, false, true),
+            ]
+        );
     }
 
     #[test]
     fn codex_accumulator_appends_exit_code_to_failures() {
         let mut acc = CodexAccumulator::default();
-        let total = drive_codex(
+        let events = drive_codex_events(
             &mut acc,
             &[
                 r#"{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'false'","aggregated_output":"","exit_code":null,"status":"in_progress"}}"#,
                 r#"{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'false'","aggregated_output":"","exit_code":1,"status":"completed"}}"#,
             ],
         );
-        assert_eq!(total, "*Running* `$ false`\n\n```\n(exit code 1)\n```");
+        assert_eq!(
+            events,
+            vec![
+                local_tool_output_delta("item_0", "Running false", "", false, false, false),
+                local_tool_output_delta("item_0", "Ran false", "(exit code 1)", true, true, true),
+            ]
+        );
     }
 
     #[test]
     fn codex_accumulator_interleaves_tool_calls_and_text() {
         // Real shape: command_execution → agent_message → command_execution → agent_message.
         let mut acc = CodexAccumulator::default();
-        let total = drive_codex(
+        let events = drive_codex_events(
             &mut acc,
             &[
                 r#"{"type":"item.started","item":{"id":"i0","type":"command_execution","command":"/bin/zsh -lc 'pwd'","aggregated_output":"","exit_code":null,"status":"in_progress"}}"#,
@@ -2809,15 +3368,22 @@ mod tests {
             ],
         );
         assert_eq!(
-            total,
-            "*Running* `$ pwd`\n\n```\n/tmp\n```\n\nYou are in /tmp.\n\n*Running* `$ ls`\n\n```\na.txt\nb.txt\n```\n\nTwo files."
+            events,
+            vec![
+                local_tool_output_delta("i0", "Running pwd", "", false, false, false),
+                local_tool_output_delta("i0", "Ran pwd", "/tmp", true, false, true),
+                LocalAgentStreamDelta::Text("You are in /tmp.".to_string()),
+                local_tool_output_delta("i2", "Running ls", "", false, false, false),
+                local_tool_output_delta("i2", "Ran ls", "a.txt\nb.txt", true, false, true),
+                LocalAgentStreamDelta::Text("Two files.".to_string()),
+            ]
         );
     }
 
     #[test]
     fn codex_accumulator_narrates_web_search_on_completion() {
         let mut acc = CodexAccumulator::default();
-        let total = drive_codex(
+        let events = drive_codex_events(
             &mut acc,
             &[
                 r#"{"type":"item.started","item":{"id":"ws_0","type":"web_search","query":"","action":{"type":"other"}}}"#,
@@ -2826,8 +3392,18 @@ mod tests {
             ],
         );
         assert_eq!(
-            total,
-            "*Searched the web for* `current date Seoul`\n\nIt's May 19."
+            events,
+            vec![
+                local_tool_output_delta(
+                    "ws_0",
+                    "Searched web for current date Seoul",
+                    "",
+                    true,
+                    false,
+                    false,
+                ),
+                LocalAgentStreamDelta::Text("It's May 19.".to_string()),
+            ]
         );
     }
 
@@ -2836,20 +3412,28 @@ mod tests {
         // Defensive: if we somehow miss the started event, the completion still
         // shows what ran so the chat isn't a mystery.
         let mut acc = CodexAccumulator::default();
-        let total = drive_codex(
+        let events = drive_codex_events(
             &mut acc,
             &[
                 r#"{"type":"item.completed","item":{"id":"i0","type":"command_execution","command":"/bin/zsh -lc 'pwd'","aggregated_output":"/tmp","exit_code":0,"status":"completed"}}"#,
             ],
         );
-        assert_eq!(total, "*Ran* `$ pwd`\n\n```\n/tmp\n```");
+        assert_eq!(
+            events,
+            vec![local_tool_output_delta(
+                "i0", "Ran pwd", "/tmp", true, false, false
+            )]
+        );
     }
 
     #[test]
     fn strip_shell_wrapper_unwraps_zsh_lc_and_quotes() {
         assert_eq!(strip_shell_wrapper("/bin/zsh -lc pwd"), "pwd");
         assert_eq!(strip_shell_wrapper("/bin/zsh -lc 'ls -la'"), "ls -la");
-        assert_eq!(strip_shell_wrapper("/bin/bash -lc \"cat /etc/hosts\""), "cat /etc/hosts");
+        assert_eq!(
+            strip_shell_wrapper("/bin/bash -lc \"cat /etc/hosts\""),
+            "cat /etc/hosts"
+        );
         assert_eq!(strip_shell_wrapper("/bin/sh -c 'echo hi'"), "echo hi");
         // No wrapper → pass through.
         assert_eq!(strip_shell_wrapper("git status"), "git status");
@@ -2925,7 +3509,7 @@ mod tests {
         // Real `--include-partial-messages` shape for a Bash tool call:
         // content_block_start (tool_use, name=Bash) → input_json_delta+ → stop.
         let mut acc = ClaudeAccumulator::default();
-        let total = drive_claude(
+        let events = drive_claude_events(
             &mut acc,
             &[
                 r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}"#,
@@ -2937,13 +3521,26 @@ mod tests {
                 r#"{"type":"stream_event","event":{"type":"content_block_stop","index":1}}"#,
             ],
         );
-        assert_eq!(total, "Listing files.\n\n*Ran* `$ ls -la /tmp`");
+        assert_eq!(
+            events,
+            vec![
+                LocalAgentStreamDelta::Text("Listing files.".to_string()),
+                local_tool_output_delta(
+                    "toolu_abc",
+                    "Running ls -la /tmp",
+                    "",
+                    false,
+                    false,
+                    false,
+                ),
+            ]
+        );
     }
 
     #[test]
     fn claude_accumulator_renders_read_and_edit_tools_inline() {
         let mut acc = ClaudeAccumulator::default();
-        let total = drive_claude(
+        let events = drive_claude_events(
             &mut acc,
             &[
                 r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"Read","input":{}}}}"#,
@@ -2954,13 +3551,19 @@ mod tests {
                 r#"{"type":"stream_event","event":{"type":"content_block_stop","index":1}}"#,
             ],
         );
-        assert_eq!(total, "*Read* `src/foo.rs`\n\n*Edited* `src/bar.rs`");
+        assert_eq!(
+            events,
+            vec![
+                local_tool_output_delta("toolu_1", "Reading src/foo.rs", "", false, false, false,),
+                local_tool_output_delta("toolu_2", "Editing src/bar.rs", "", false, false, false,),
+            ]
+        );
     }
 
     #[test]
     fn claude_accumulator_renders_tool_result_user_event() {
         let mut acc = ClaudeAccumulator::default();
-        let total = drive_claude(
+        let events = drive_claude_events(
             &mut acc,
             &[
                 r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_abc","name":"Bash","input":{}}}}"#,
@@ -2969,7 +3572,13 @@ mod tests {
                 r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_abc","content":"hi\n","is_error":false}]}}"#,
             ],
         );
-        assert_eq!(total, "*Ran* `$ echo hi`\n\n```\nhi\n```");
+        assert_eq!(
+            events,
+            vec![
+                local_tool_output_delta("toolu_abc", "Running echo hi", "", false, false, false,),
+                local_tool_output_delta("toolu_abc", "Ran echo hi", "hi", true, false, true),
+            ]
+        );
     }
 
     #[test]
@@ -2980,18 +3589,22 @@ mod tests {
         let user_event = format!(
             r#"{{"type":"user","message":{{"content":[{{"type":"tool_result","tool_use_id":"x","content":"{big}"}}]}}}}"#
         );
-        let total = drive_claude(&mut acc, &[user_event.as_str()]);
+        let events = drive_claude_events(&mut acc, &[user_event.as_str()]);
+        let [LocalAgentStreamDelta::LocalToolOutput(output)] = events.as_slice() else {
+            panic!("expected one local tool output event");
+        };
         // Truncated to MAX_LINES (12) with an ellipsis marker.
-        assert!(total.starts_with("```\nline 0\nline 1\n"));
-        assert!(total.contains("line 11"));
-        assert!(total.ends_with("…\n```"));
-        assert!(!total.contains("line 12"));
+        assert_eq!(output.title, "Used tool");
+        assert!(output.body.starts_with("line 0\nline 1\n"));
+        assert!(output.body.contains("line 11"));
+        assert!(output.body.ends_with("..."));
+        assert!(!output.body.contains("line 12"));
     }
 
     #[test]
     fn claude_accumulator_renders_todowrite_as_checklist() {
         let mut acc = ClaudeAccumulator::default();
-        let total = drive_claude(
+        let events = drive_claude_events(
             &mut acc,
             &[
                 r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_t","name":"TodoWrite","input":{}}}}"#,
@@ -3000,8 +3613,15 @@ mod tests {
             ],
         );
         assert_eq!(
-            total,
-            "**Todos**\n- [x] Read docs\n- [~] Run tests\n- [ ] Ship it"
+            events,
+            vec![local_tool_output_delta(
+                "toolu_t",
+                "Updated todos",
+                "- [x] Read docs\n- [~] Run tests\n- [ ] Ship it",
+                true,
+                false,
+                false,
+            )]
         );
     }
 
@@ -3009,13 +3629,77 @@ mod tests {
     fn claude_accumulator_handles_tool_result_array_content() {
         // Claude sometimes sends tool_result.content as an array of {type:"text",text:...} parts.
         let mut acc = ClaudeAccumulator::default();
-        let total = drive_claude(
+        let events = drive_claude_events(
             &mut acc,
             &[
                 r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"x","content":[{"type":"text","text":"part a"},{"type":"text","text":"part b"}]}]}}"#,
             ],
         );
-        assert_eq!(total, "```\npart a\npart b\n```");
+        assert_eq!(
+            events,
+            vec![local_tool_output_delta(
+                "x",
+                "Used tool",
+                "part a\npart b",
+                true,
+                false,
+                false,
+            )]
+        );
+    }
+
+    #[test]
+    fn claude_accumulator_does_not_prefix_text_after_structured_tool_output() {
+        let mut acc = ClaudeAccumulator::default();
+        let events = drive_claude_events(
+            &mut acc,
+            &[
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_abc","name":"Bash","input":{}}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"pwd\"}"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#,
+                r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_abc","content":"/tmp\n","is_error":false}]}}"#,
+                r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Done."}]}}"#,
+            ],
+        );
+        assert_eq!(
+            events,
+            vec![
+                local_tool_output_delta("toolu_abc", "Running pwd", "", false, false, false,),
+                local_tool_output_delta("toolu_abc", "Ran pwd", "/tmp", true, false, true),
+                LocalAgentStreamDelta::Text("Done.".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_accumulator_keeps_tool_result_markdown_out_of_text_stream() {
+        let mut acc = ClaudeAccumulator::default();
+        let events = drive_claude_events(
+            &mut acc,
+            &[
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_grep","name":"Grep","input":{}}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"pattern\":\"```\"}"}}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#,
+                r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_grep","content":"found ``` fence\n## heading\n","is_error":false}]}}"#,
+                r#"{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}}"#,
+                r###"{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"## Final answer"}}}"###,
+            ],
+        );
+        assert_eq!(
+            events,
+            vec![
+                local_tool_output_delta("toolu_grep", "Grepping for ```", "", false, false, false,),
+                local_tool_output_delta(
+                    "toolu_grep",
+                    "Grepped for ```",
+                    "found ``` fence\n## heading",
+                    true,
+                    false,
+                    true,
+                ),
+                LocalAgentStreamDelta::Text("## Final answer".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -3065,18 +3749,38 @@ mod tests {
 
         // Chunk 3: trailing prose with no markers.
         let r3 = filter.ingest("Now I'll summarize what I found.");
-        assert!(
-            r3.text_chunks.is_empty(),
-            "no newline yet — incomplete line stays buffered"
-        );
-
-        // Flush — incomplete prose line emits as text.
-        let flushed = filter.flush();
         assert_eq!(
-            flushed.text_chunks,
+            r3.text_chunks,
             vec!["Now I'll summarize what I found.".to_string()]
         );
+
+        // Flush — nothing remains buffered after normal prose was streamed.
+        let flushed = filter.flush();
+        assert!(flushed.text_chunks.is_empty());
         assert!(flushed.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn streaming_filter_emits_prose_without_waiting_for_newline() {
+        let mut filter = StreamingToolCallFilter::default();
+
+        let result = filter.ingest("Codex is still working");
+
+        assert_eq!(result.text_chunks, vec!["Codex is still working"]);
+        assert!(result.tool_calls.is_empty());
+        assert!(filter.flush().text_chunks.is_empty());
+    }
+
+    #[test]
+    fn local_agent_stream_error_preserves_existing_text() {
+        assert_eq!(
+            local_agent_stream_error_text("Partial answer", "Local Agent timed out"),
+            "Partial answer\n\nLocal Agent timed out"
+        );
+        assert_eq!(
+            local_agent_stream_error_text("", "Local Agent timed out"),
+            "Local Agent timed out"
+        );
     }
 
     #[test]
@@ -3098,13 +3802,17 @@ mod tests {
         );
         assert_eq!(
             r.text_chunks,
-            vec!["First line.\n".to_string(), "Second line.\n".to_string()]
+            vec![
+                "First line.\n".to_string(),
+                "Second line.\n".to_string(),
+                "Trailing.".to_string()
+            ]
         );
         assert_eq!(r.tool_calls.len(), 1);
         assert_eq!(r.tool_calls[0].command, "pwd");
 
         let flushed = filter.flush();
-        assert_eq!(flushed.text_chunks, vec!["Trailing.".to_string()]);
+        assert!(flushed.text_chunks.is_empty());
     }
 
     #[test]
@@ -3273,7 +3981,11 @@ mod tests {
 
     #[test]
     fn detects_cwd_change_target_from_codex_output() {
-        let target_dir = std::env::temp_dir().join(format!("dwarf-local-codex-{}", Uuid::new_v4()));
+        let target_dir = std::env::temp_dir().join(format!(
+            "{}-local-codex-{}",
+            ChannelState::app_name(),
+            Uuid::new_v4()
+        ));
         std::fs::create_dir(&target_dir).unwrap();
         let output = format!(
             "Found it and moved context to:\n\n{}\n",
@@ -3291,7 +4003,11 @@ mod tests {
 
     #[test]
     fn detects_move_me_to_directory_request() {
-        let target_dir = std::env::temp_dir().join(format!("dwarf-local-codex-{}", Uuid::new_v4()));
+        let target_dir = std::env::temp_dir().join(format!(
+            "{}-local-codex-{}",
+            ChannelState::app_name(),
+            Uuid::new_v4()
+        ));
         std::fs::create_dir(&target_dir).unwrap();
         let output = format!(
             "Now using {} for subsequent commands.\n\nValidated with pwd: {}.",
@@ -3310,7 +4026,11 @@ mod tests {
 
     #[test]
     fn detects_directory_target_from_user_prompt() {
-        let target_dir = std::env::temp_dir().join(format!("dwarf-local-codex-{}", Uuid::new_v4()));
+        let target_dir = std::env::temp_dir().join(format!(
+            "{}-local-codex-{}",
+            ChannelState::app_name(),
+            Uuid::new_v4()
+        ));
         std::fs::create_dir(&target_dir).unwrap();
         let inputs = vec![user_query(&format!("move me to {}", target_dir.display()))];
 
@@ -3324,7 +4044,11 @@ mod tests {
 
     #[test]
     fn detects_bring_me_into_directory_request() {
-        let target_dir = std::env::temp_dir().join(format!("dwarf-local-codex-{}", Uuid::new_v4()));
+        let target_dir = std::env::temp_dir().join(format!(
+            "{}-local-codex-{}",
+            ChannelState::app_name(),
+            Uuid::new_v4()
+        ));
         std::fs::create_dir(&target_dir).unwrap();
         let inputs = vec![user_query(&format!(
             "bring me into {}",
@@ -3365,7 +4089,11 @@ mod tests {
 
     #[test]
     fn creates_direct_cd_tool_call_for_existing_prompt_path() {
-        let target_dir = std::env::temp_dir().join(format!("dwarf-local-codex-{}", Uuid::new_v4()));
+        let target_dir = std::env::temp_dir().join(format!(
+            "{}-local-codex-{}",
+            ChannelState::app_name(),
+            Uuid::new_v4()
+        ));
         std::fs::create_dir(&target_dir).unwrap();
         let inputs = vec![user_query(&format!(
             "bring me into {}",
@@ -3416,7 +4144,13 @@ mod tests {
 
         let (cleaned, tool_calls) = extract_dwarf_tool_calls(output);
 
-        assert_eq!(cleaned, "I'll run the requested command in Dwarf.");
+        assert_eq!(
+            cleaned,
+            format!(
+                "I'll run the requested command in {}.",
+                ChannelState::app_name_display()
+            )
+        );
         assert_eq!(
             tool_calls,
             vec![LocalRunShellCommand {

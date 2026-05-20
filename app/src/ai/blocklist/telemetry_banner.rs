@@ -17,10 +17,9 @@ use warpui::{
     },
     AppContext, Element, Entity, SingletonEntity, View, ViewContext,
 };
+use warp_core::channel::ChannelState;
 
 const TITLE_EXISTING_USERS: &str = "We've updated our telemetry policy.";
-const TITLE_NEW_USERS: &str = "Help improve Dwarf.";
-const DESCRIPTION: &str = "We may collect certain console interactions to improve Dwarf's AI capabilities. You can opt out any time.";
 const PRIVACY_URL: &str = "https://warp.dev/privacy";
 
 #[derive(Default, Debug, Clone)]
@@ -53,10 +52,14 @@ impl View for TelemetryBanner {
         let ui_builder = appearance.ui_builder();
 
         let title = if self.is_onboarded {
-            TITLE_EXISTING_USERS
+            TITLE_EXISTING_USERS.to_string()
         } else {
-            TITLE_NEW_USERS
+            format!("Help improve {}.", ChannelState::app_name_display())
         };
+        let description = format!(
+            "We may collect certain console interactions to improve {} AI capabilities. You can opt out any time.",
+            ChannelState::app_name_possessive()
+        );
 
         let left = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
@@ -85,7 +88,7 @@ impl View for TelemetryBanner {
                                 .finish(),
                         )
                         .with_child(
-                            Text::new(DESCRIPTION, ui_builder.ui_font_family(), 12.)
+                            Text::new(description, ui_builder.ui_font_family(), 12.)
                                 .with_color(theme.nonactive_ui_text_color().into_solid())
                                 .soft_wrap(true)
                                 .finish(),

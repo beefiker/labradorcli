@@ -6,6 +6,7 @@ use crate::code::editor_management::CodeSource;
 use crate::search::files::icon::icon_from_file_path;
 use crate::search::ItemHighlightState;
 use std::iter;
+use warp_core::channel::ChannelState;
 use warp_core::ui::theme::Fill;
 use warpui::elements::{ChildView, HighlightedRange, MouseStateHandle};
 use warpui::{
@@ -63,7 +64,7 @@ fn render_file_icon(path: &Path, appearance: &Appearance, app: &AppContext) -> B
 fn render_button<F>(
     appearance: &Appearance,
     icon: Icon,
-    tooltip_text: &str,
+    tooltip_text: impl Into<String>,
     mouse_handle: MouseStateHandle,
     formatted_text: String,
     on_click: F,
@@ -73,7 +74,7 @@ where
     F: FnMut(String, &mut EventContext) + 'static,
 {
     let ui_builder = appearance.ui_builder().clone();
-    let tooltip_text = tooltip_text.to_owned();
+    let tooltip_text = tooltip_text.into();
     let mut on_click = on_click;
     let button_element = if let Some(color) = color {
         icon_button_with_color(appearance, icon, false, mouse_handle, color)
@@ -256,7 +257,7 @@ fn render_linked_code_block_internal(
             let open_button = render_button(
                 appearance,
                 Icon::LinkExternal,
-                "Open in Dwarf",
+                format!("Open in {}", ChannelState::app_name_display()),
                 mouse_handles.open_button,
                 code_clone.clone(),
                 on_open,

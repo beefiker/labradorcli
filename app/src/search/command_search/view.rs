@@ -5,6 +5,7 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
 
 use crate::search::mixer::AddAsyncSourceOptions;
+use crate::ChannelState;
 use lazy_static::lazy_static;
 use std::{collections::HashSet, ops::Range, sync::Arc, time::Duration};
 use warpui::{
@@ -503,8 +504,10 @@ impl CommandSearchView {
         if is_ratelimit_error {
             let _ = app;
             self.render_error_header_text(
-                "The hosted assistant reported a usage limit. Local Dwarf does not sell credits."
-                    .to_string(),
+                format!(
+                    "The hosted assistant reported a usage limit. Local {} does not sell credits.",
+                    ChannelState::app_name_display()
+                ),
                 appearance,
             )
         } else {
@@ -1039,4 +1042,3 @@ pub mod styles {
         appearance.line_height_ratio() * appearance.monospace_font_size() * 1.5
     }
 }
-

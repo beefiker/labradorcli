@@ -132,7 +132,10 @@ impl ProjectSlide {
 
         let subtitle = appearance
             .ui_builder()
-            .paragraph("Set up a project to optimize it for coding in Dwarf.")
+            .paragraph(format!(
+                "Set up a project to optimize it for coding in {}.",
+                warp_core::channel::ChannelState::app_name_display()
+            ))
             .with_style(UiComponentStyles {
                 font_size: Some(20.),
                 font_weight: Some(Weight::Normal),
@@ -296,7 +299,7 @@ impl ProjectSlide {
                 if theme_picker_last {
                     "Next"
                 } else {
-                    "Get Dwarfing"
+                    "Get started"
                 },
                 Keystroke::parse("enter").unwrap_or_default(),
                 ProjectSlideAction::NextClicked,

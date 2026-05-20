@@ -266,7 +266,7 @@ impl ThemePickerSlide {
 
         let theme_picker_last = FeatureFlag::OpenWarpNewSettingsModes.is_enabled();
         let next_label = if theme_picker_last {
-            "Get Dwarfing"
+            "Get started"
         } else {
             "Next"
         };
@@ -595,7 +595,10 @@ impl ThemePickerSlide {
         let tos_line = Flex::row()
             .with_child(
                 ui_builder
-                    .span("By continuing, you agree to Dwarf's ")
+                    .span(format!(
+                        "By continuing, you agree to {} ",
+                        warp_core::channel::ChannelState::app_name_possessive()
+                    ))
                     .with_style(disclaimer_styles)
                     .build()
                     .finish(),

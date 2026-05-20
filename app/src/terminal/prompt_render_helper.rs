@@ -12,7 +12,7 @@ use settings::Setting as _;
 
 use std::fmt;
 use std::num::NonZeroUsize;
-use warp_core::semantic_selection::SemanticSelection;
+use warp_core::{channel::ChannelState, semantic_selection::SemanticSelection};
 use warpui::elements::{DispatchEventResult, SelectionHandle};
 use warpui::ModelAsRef;
 use warpui::{
@@ -256,10 +256,16 @@ impl PromptRenderHelper {
                     RemoteServerSetupState::Checking => "Starting shell...".to_string(),
                     RemoteServerSetupState::Installing {
                         progress_percent: Some(p),
-                    } => format!("Installing Dwarf SSH tools... ({p}%)"),
+                    } => format!(
+                        "Installing {} SSH tools... ({p}%)",
+                        ChannelState::app_name_display()
+                    ),
                     RemoteServerSetupState::Installing {
                         progress_percent: None,
-                    } => "Installing Warp SSH tools...".to_string(),
+                    } => format!(
+                        "Installing {} SSH tools...",
+                        ChannelState::app_name_display()
+                    ),
                     RemoteServerSetupState::Initializing => "Initializing...".to_string(),
                     RemoteServerSetupState::Ready => "Starting shell...".to_string(),
                     RemoteServerSetupState::Failed { .. } => "Starting shell...".to_string(),

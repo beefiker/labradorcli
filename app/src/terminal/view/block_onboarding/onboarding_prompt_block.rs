@@ -10,6 +10,7 @@ use crate::terminal::view::block_onboarding::util;
 use crate::terminal::SizeInfo;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use settings::Setting as _;
+use warp_core::channel::ChannelState;
 use warpui::{
     elements::{
         Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, Flex,
@@ -61,9 +62,14 @@ impl OnboardingPromptBlock {
         let font_color = current_theme.main_text_color(current_theme.background());
 
         // Copy - https://docs.google.com/document/d/1zttBLI5Mw07kUupvrMQoC5aTwTXSHIUOIFFnxZ8GQEU/edit
-        const LINE_ONE: &str = "Next, let’s set up your prompt. Dwarf has a custom prompt builder or you can select PS1 to honor your pre-existing prompt configuration.";
-        const LINE_TWO: &str =
-            "Dwarf works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ";
+        let line_one = format!(
+            "Next, let’s set up your prompt. {} has a custom prompt builder or you can select PS1 to honor your pre-existing prompt configuration.",
+            ChannelState::app_name_display()
+        );
+        let line_two = format!(
+            "{} works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ",
+            ChannelState::app_name_display()
+        );
         const LINK_TEXT: &str = "Learn more";
         const LINK_DESTINATION: &str =
             "https://docs.warp.dev/terminal/appearance/prompt#custom-prompt-compatibility-table";
@@ -71,7 +77,7 @@ impl OnboardingPromptBlock {
         Flex::column()
             .with_children([
                 Container::new(
-                    Text::new(LINE_ONE, font_family, font_size)
+                    Text::new(line_one, font_family, font_size)
                         .with_color(font_color.into_solid())
                         .finish(),
                 )
@@ -80,7 +86,7 @@ impl OnboardingPromptBlock {
                 Container::new(
                     FormattedTextElement::new(
                         FormattedText::new([FormattedTextLine::Line(vec![
-                            FormattedTextFragment::plain_text(LINE_TWO),
+                            FormattedTextFragment::plain_text(line_two),
                             FormattedTextFragment::hyperlink(LINK_TEXT, LINK_DESTINATION),
                         ])]),
                         font_size,
@@ -324,7 +330,6 @@ impl OnboardingPromptBlock {
     fn render_warp_prompt_button_interior(&self, appearance: &Appearance) -> Box<dyn Element> {
         // Pixel values pulled from Figma mocks
         // https://www.figma.com/file/y888viqzWBoMpFTxQqkQEN/Activation?node-id=568:1595&mode=dev
-        const HEADER_TEXT: &str = "Dwarf prompt";
         const HEADER_MARGIN_LEFT: f32 = 4.;
         const SECTION_MARGIN_TOP: f32 = 8.;
         const OUTER_CORNER_RADIUS: f32 = 4.;
@@ -375,9 +380,13 @@ impl OnboardingPromptBlock {
         Flex::column()
             .with_child(
                 Container::new(
-                    Text::new_inline(HEADER_TEXT, font_family, appearance.ui_font_size())
-                        .with_color(font_color.into_solid())
-                        .finish(),
+                    Text::new_inline(
+                        format!("{} prompt", ChannelState::app_name_display()),
+                        font_family,
+                        appearance.ui_font_size(),
+                    )
+                    .with_color(font_color.into_solid())
+                    .finish(),
                 )
                 .with_margin_left(HEADER_MARGIN_LEFT)
                 .finish(),

@@ -7,6 +7,7 @@ use warpui::{
 };
 
 use crate::{
+    channel::ChannelState,
     code::editor_management::{CodeEditorStatus, CodeEditorSummary},
     pane_group::{CodePane, PaneGroup, PaneId, TerminalPane},
     report_if_error,
@@ -420,12 +421,12 @@ impl<'a> QuitWarningDialog<'a> {
         }
 
         let title = match &state.scope {
-            QuitScope::Pane { .. } => "Close pane?",
-            QuitScope::Tabs(tabs) if tabs.len() == 1 => "Close tab?",
-            QuitScope::Tabs(_) => "Close tabs?",
-            QuitScope::Window(_) => "Close window?",
-            QuitScope::App => "Quit Dwarf?",
-            QuitScope::EditorTab { .. } => "Save changes?",
+            QuitScope::Pane { .. } => "Close pane?".to_string(),
+            QuitScope::Tabs(tabs) if tabs.len() == 1 => "Close tab?".to_string(),
+            QuitScope::Tabs(_) => "Close tabs?".to_string(),
+            QuitScope::Window(_) => "Close window?".to_string(),
+            QuitScope::App => format!("Quit {}?", ChannelState::app_name_display()),
+            QuitScope::EditorTab { .. } => "Save changes?".to_string(),
         };
 
         AlertDialogWithCallbacks::for_app(

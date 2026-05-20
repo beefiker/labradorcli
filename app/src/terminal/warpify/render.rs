@@ -1,4 +1,5 @@
 use crate::ai::blocklist::inline_action::inline_action_icons;
+use crate::channel::ChannelState;
 use crate::ui_components::blended_colors;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
@@ -39,7 +40,7 @@ pub const SUBSHELL_DOCS_URL: &str = "https://docs.warp.dev/terminal/warpify/subs
 pub const LEFT_STRIPE_WIDTH: f32 = 5.;
 
 pub fn build_header_row(
-    text: &'static str,
+    text: impl Into<String>,
     icon: Icon,
     theme: &WarpTheme,
     appearance: &Appearance,
@@ -55,7 +56,7 @@ pub fn build_header_row(
     row.add_child(
         Container::new(
             Text::new(
-                text,
+                text.into(),
                 appearance.monospace_font_family(),
                 appearance.monospace_font_size(),
             )
@@ -78,7 +79,7 @@ pub fn apply_spacing_styles(header_row: Container) -> Container {
 
 /// UI helper to render the header of an SSH rich content block.
 pub fn header_row(
-    text: &'static str,
+    text: impl Into<String>,
     icon: Icon,
     theme: &WarpTheme,
     appearance: &Appearance,
@@ -161,7 +162,7 @@ pub fn description_row(text: &str, theme: &WarpTheme, appearance: &Appearance) -
     .finish()
 }
 
-/// Renders a "Never Dwarfify this host" link or nothing.
+/// Renders a never-enable-for-this-host link or nothing.
 pub fn render_never_warpify_ssh_link(
     ssh_host: &Option<String>,
     app: &AppContext,
@@ -182,7 +183,7 @@ pub fn render_never_warpify_ssh_link(
     let link = appearance
         .ui_builder()
         .link(
-            "Never Dwarfify this host".into(),
+            format!("Never {} this host", ChannelState::app_name_verbify()),
             None,
             Some(Box::new({
                 let ssh_host = ssh_host.clone();

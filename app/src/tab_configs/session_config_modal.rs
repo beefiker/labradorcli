@@ -17,6 +17,7 @@ use warpui::{
 };
 
 use crate::appearance::Appearance;
+use crate::channel::ChannelState;
 use crate::ui_components::blended_colors;
 use crate::view_components::action_button::{
     ActionButton, ButtonSize, KeystrokeSource, NakedTheme, PrimaryTheme,
@@ -88,7 +89,7 @@ impl SessionConfigModal {
         });
 
         let submit_button = ctx.add_view(|ctx| {
-            ActionButton::new("Get Dwarfing", PrimaryTheme)
+            ActionButton::new(format!("Get {}", ChannelState::app_name_gerund()), PrimaryTheme)
                 .with_full_width(true)
                 .with_keybinding(
                     KeystrokeSource::Fixed(Keystroke::parse("enter").unwrap_or_default()),

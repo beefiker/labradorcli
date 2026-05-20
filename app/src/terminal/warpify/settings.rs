@@ -6,6 +6,7 @@ use settings::{
     ChangeEventReason, RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud,
 };
 use strum_macros::EnumIter;
+use warp_core::channel::ChannelState;
 use warp_util::path::ShellFamily;
 use warpui::{AppContext, ModelContext};
 use warpui::{Entity, SingletonEntity};
@@ -50,7 +51,7 @@ maybe_define_setting!(EnableSshWarpification, group: WarpifySettings, {
     sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
     private: false,
     toml_path: "warpify.ssh.enable_ssh_warpification",
-    description: "Whether to enable Dwarf features in SSH sessions.",
+    description: format!("Whether to enable {} features in SSH sessions.", ChannelState::app_name_display()),
 });
 
 maybe_define_setting!(UseSshTmuxWrapper, group: WarpifySettings, {

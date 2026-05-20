@@ -6,7 +6,7 @@ use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use regex::Regex;
 use settings::{Setting, ToggleableSetting};
 use strum::IntoEnumIterator;
-use warp_core::features::FeatureFlag;
+use warp_core::{channel::ChannelState, features::FeatureFlag};
 use warpui::elements::{FormattedTextElement, HighlightedHyperlink};
 use warpui::keymap::ContextPredicate;
 use warpui::{
@@ -56,8 +56,12 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     let mut toggle_binding_pairs = vec![];
 
     if FeatureFlag::SSHTmuxWrapper.is_enabled() {
+        let label = format!(
+            "SSH session detection for {}",
+            ChannelState::app_name_verbification()
+        );
         toggle_binding_pairs.push(ToggleSettingActionPair::new(
-            "SSH session detection for Dwarfification",
+            &label,
             builder(SettingsAction::WarpifyPageToggle(
                 WarpifyPageAction::ToggleTmuxWarpification,
             )),
@@ -77,8 +81,12 @@ const SPACE_AFTER_TEXT_INPUT: f32 = ITEM_VERTICAL_SPACING - BUILT_IN_TEXT_INPUT_
 
 const SSH_TMUX_WARPIFICATION_DESCRIPTION: &str = "The tmux ssh wrapper works in many situations where the default one does not, but may require you to hit a button to warpify. Takes effect in new tabs.";
 
-const SSH_EXTENSION_INSTALL_MODE_DESCRIPTION: &str =
-    "Controls the installation behavior for Dwarf's SSH extension when a remote host doesn't have it installed.";
+fn ssh_extension_install_mode_description() -> String {
+    format!(
+        "Controls the installation behavior for {} SSH extension when a remote host doesn't have it installed.",
+        ChannelState::app_name_possessive()
+    )
+}
 
 /// This page lets users configure when they get asked to warpify a session. Some shell commands
 /// are recognized by default. Users can add new shell commands, or prevent the default ones from
@@ -184,8 +192,10 @@ impl WarpifyPageView {
                 .is_supported_on_current_platform()
         {
             categories.push(
-                Category::new("SSH", vec![Box::new(SSHWidget::default())])
-                    .with_subtitle("Dwarfify your interactive SSH sessions."),
+                Category::new("SSH", vec![Box::new(SSHWidget::default())]).with_subtitle(format!(
+                    "{} your interactive SSH sessions.",
+                    ChannelState::app_name_verbify()
+                )),
             );
         }
         PageType::new_categorized(categories, None)
@@ -244,7 +254,6 @@ impl WarpifyPageView {
                 WarpifySettings::handle(ctx).update(ctx, |warpify_settings, ctx| {
                     warpify_settings.add_subshell_command(new_command, ctx);
                 });
-
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
         }
@@ -261,7 +270,6 @@ impl WarpifyPageView {
                 WarpifySettings::handle(ctx).update(ctx, |warpify_settings, ctx| {
                     warpify_settings.denylist_subshell_command(new_command, ctx);
                 });
-
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
         }
@@ -278,7 +286,6 @@ impl WarpifyPageView {
                 WarpifySettings::handle(ctx).update(ctx, |warpify_settings, ctx| {
                     warpify_settings.denylist_ssh_host(new_command, ctx);
                 });
-
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
         }
@@ -507,10 +514,12 @@ struct TitleWidget {
 impl TitleWidget {
     fn render_top_of_page(&self, appearance: &Appearance, _app: &AppContext) -> Box<dyn Element> {
         let warpify_description = vec![
-            FormattedTextFragment::plain_text(
-                "Configure whether Dwarf attempts to “Dwarfify” (add support for blocks, \
+            FormattedTextFragment::plain_text(format!(
+                "Configure whether {} attempts to “{}” (add support for blocks, \
                     input modes, etc) certain shells. ",
-            ),
+                ChannelState::app_name_display(),
+                ChannelState::app_name_verbify()
+            )),
             FormattedTextFragment::hyperlink(
                 "Learn more",
                 "https://docs.warp.dev/terminal/warpify/subshells",
@@ -532,7 +541,11 @@ impl TitleWidget {
         .finish();
 
         Flex::column()
-            .with_child(render_page_title("Dwarfify", HEADER_FONT_SIZE, appearance))
+            .with_child(render_page_title(
+                &ChannelState::app_name_verbify(),
+                HEADER_FONT_SIZE,
+                appearance,
+            ))
             .with_child(warpify_description)
             .finish()
     }
@@ -658,7 +671,7 @@ impl SettingsWidget for SSHWidget {
             &WarpifySettings::as_ref(app).enable_ssh_warpification,
             move || {
                 render_body_item::<WarpifyPageAction>(
-                    "Dwarfify SSH Sessions".into(),
+                    format!("{} SSH Sessions", ChannelState::app_name_verbify()),
                     None,
                     LocalOnlyIconState::for_setting(
                         EnableSshWarpification::storage_key(),
@@ -691,10 +704,11 @@ impl SettingsWidget for SSHWidget {
                 &mut column,
                 &WarpifySettings::as_ref(app).ssh_extension_install_mode,
                 move || {
+                    let description = ssh_extension_install_mode_description();
                     Container::new(render_dropdown_item(
                         appearance,
                         "Install SSH extension",
-                        Some(SSH_EXTENSION_INSTALL_MODE_DESCRIPTION),
+                        Some(&description),
                         None,
                         LocalOnlyIconState::for_setting(
                             SshExtensionInstallModeSetting::storage_key(),
@@ -718,7 +732,7 @@ impl SettingsWidget for SSHWidget {
                 let mut column = Flex::column();
 
                 column.add_child(render_body_item::<WarpifyPageAction>(
-                    "Use Tmux Dwarfification".into(),
+                    format!("Use Tmux {}", ChannelState::app_name_verbification()),
                     Some(AdditionalInfo {
                         mouse_state: self.additional_info_mouse_state.clone(),
                         on_click_action: Some(WarpifyPageAction::OpenUrl(

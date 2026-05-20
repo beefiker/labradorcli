@@ -54,6 +54,7 @@ use crate::ai::blocklist::block::view_impl::header::{
 use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
 use crate::ai::blocklist::model::AIBlockModelHelper;
 use crate::appearance::Appearance;
+use crate::channel::ChannelState;
 use crate::settings::{AISettings, InputModeSettings, InputSettings};
 use crate::terminal::model::blocks::{BlockHeightItem, RemovableBlocklistItem, RichContentItem};
 use crate::terminal::model::rich_content::RichContentType;
@@ -688,7 +689,7 @@ pub fn render_citation(
         }
         AIAgentCitation::WarpDocumentation { .. } => {
             let icon = render_dwarf_icon(font_size, 2.);
-            let name = String::from("Dwarf Docs");
+            let name = format!("{} Docs", ChannelState::app_name_display());
             (Some(icon), name)
         }
         AIAgentCitation::WebPage { url } => {
@@ -745,7 +746,7 @@ pub fn render_citation(
 /// This function is needed both above (i.e. `block.rs`) and below (i.e. `output.rs`), and as such
 /// cannot reside in `output.rs` because we don't want to make `mod output` public.
 pub fn render_autonomy_checkbox_setting_speedbump_footer(
-    description: &'static str,
+    description: impl Into<std::borrow::Cow<'static, str>>,
     checked: bool,
     on_toggled_action: AIBlockAction,
     checkbox_handle: MouseStateHandle,
@@ -754,6 +755,7 @@ pub fn render_autonomy_checkbox_setting_speedbump_footer(
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
+    let description = description.into();
     Flex::row()
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
         .with_main_axis_size(MainAxisSize::Max)

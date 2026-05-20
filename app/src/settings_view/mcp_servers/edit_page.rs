@@ -8,9 +8,7 @@ use diesel::SqliteConnection;
 use parking_lot::Mutex;
 use pathfinder_geometry::vector::vec2f;
 use uuid::Uuid;
-use warp_core::{
-        ui::{appearance::Appearance, theme::color::internal_colors},
-};
+use warp_core::ui::{appearance::Appearance, theme::color::internal_colors};
 use warp_editor::{
     content::buffer::InitialBufferState, render::element::VerticalExpansionBehavior,
 };

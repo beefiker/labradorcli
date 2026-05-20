@@ -6,7 +6,7 @@ use std::{fmt, path::PathBuf};
 pub enum SkillReference {
     /// A skill identified by the path to its SKILL.md file.
     Path(PathBuf),
-    /// A bundled skill distributed with Warp.
+    /// A bundled skill distributed with the app.
     BundledSkillId(String),
 }
 
@@ -14,7 +14,7 @@ impl fmt::Display for SkillReference {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             SkillReference::Path(path) => path.display().fmt(f),
-            SkillReference::BundledSkillId(id) => write!(f, "@warp-skill:{id}"),
+            SkillReference::BundledSkillId(id) => write!(f, "@labrador-skill:{id}"),
         }
     }
 }

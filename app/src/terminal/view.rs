@@ -86,7 +86,6 @@ use crate::ai::blocklist::usage::conversation_usage_view::{
     ConversationUsageInfo, ConversationUsageView, TimingInfo,
 };
 use crate::ai::blocklist::{block_context_from_terminal_model, SlashCommandRequest};
-use ai::document::{AIDocumentId, AIDocumentVersion};
 use crate::ai::loading::shimmering_warp_loading_text;
 #[cfg(feature = "local_fs")]
 use crate::code_review::context::{
@@ -99,6 +98,7 @@ use crate::terminal::model::blocks::RemovableBlocklistItem;
 #[cfg(feature = "local_fs")]
 use crate::util::file::external_editor::{settings::EditorLayout, EditorSettings};
 use crate::util::truncation::truncate_from_end;
+use ai::document::{AIDocumentId, AIDocumentVersion};
 
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::redaction::redact_secrets;
@@ -126,9 +126,7 @@ use crate::code_review::git_status_update::{
 };
 use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::projects::ProjectManagementModel;
-use crate::remote_server::manager::{
-    RemoteServerManager, RemoteServerManagerEvent,
-};
+use crate::remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
 use crate::settings::ai::FocusedTerminalInfo;
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
 use crate::terminal::cli_agent_sessions::event::{
@@ -233,7 +231,6 @@ use crate::root_view::{DwarfConfettiPreset, RootViewAction};
 use crate::safe_warn;
 use crate::server::ids::{ObjectUid, SyncId};
 
-use crate::terminal::bootstrap::EnvVar;
 use crate::server::telemetry::SharingDialogSource;
 #[cfg(feature = "local_fs")]
 use crate::settings::import::model::ImportedConfigModel;
@@ -258,6 +255,7 @@ use crate::terminal::block_filter::{
 use crate::terminal::block_list_viewport::OverhangingBlock;
 use crate::terminal::block_list_viewport::ScrollPositionUpdate;
 use crate::terminal::block_list_viewport::ScrollState;
+use crate::terminal::bootstrap::EnvVar;
 use crate::terminal::command_corrections_denylist::COMMAND_CORRECTIONS_PREFERRED_DENYLIST;
 use crate::terminal::event::RemoteServerSetupState;
 use crate::terminal::general_settings::GeneralSettings;
@@ -284,9 +282,7 @@ use crate::terminal::settings::{TerminalSettings, TerminalSettingsChangedEvent};
 use crate::terminal::shared_session::role_change_modal::{
     RoleChangeCloseSource, RoleChangeOpenSource,
 };
-use crate::terminal::shared_session::{
-    SharedSessionActionSource, SharedSessionScrollbackType,
-};
+use crate::terminal::shared_session::{SharedSessionActionSource, SharedSessionScrollbackType};
 use crate::terminal::ssh::ssh_detection::SshInteractiveSessionDetected;
 use crate::terminal::view::block_onboarding::onboarding_prompt_block::OnboardingPromptBlock;
 use crate::terminal::warpify::{
@@ -399,7 +395,7 @@ use warpui::{
 
 use warpui::{windowing, CursorInfo, EntityId, EventContext, ModelAsRef, SingletonEntity, Tracked};
 
-use crate::ai_assistant::{AskAIType, ASK_AI_ASSISTANT_TEXT};
+use crate::ai_assistant::{ask_ai_assistant_text, AskAIType};
 use crate::appearance::{Appearance, AppearanceEvent};
 use crate::banner::{
     Banner, BannerAction, BannerEvent, BannerState, BannerTextButton, BannerTextContent,
@@ -417,14 +413,11 @@ use crate::resource_center::{
     mark_feature_used_and_write_to_user_defaults, Tip, TipHint, TipsCompleted,
 };
 use crate::server::telemetry::{
-    self, AgentModeRewindEntrypoint,
-    AnonymousUserSignupEntrypoint, InteractionSource, LinkOpenMethod, NotificationAgentVariant,
-    PaletteSource, PromptSuggestionViewType,
+    self, AgentModeRewindEntrypoint, AnonymousUserSignupEntrypoint, InteractionSource,
+    LinkOpenMethod, NotificationAgentVariant, PaletteSource, PromptSuggestionViewType,
     ToggleBlockFilterSource,
 };
-use crate::server::telemetry::{
-        SaveAsWorkflowModalSource, TelemetryEvent,
-    };
+use crate::server::telemetry::{SaveAsWorkflowModalSource, TelemetryEvent};
 use crate::session_management::{CommandContext, SessionNavigationPromptElements};
 use crate::settings::{PrivacySettings, PrivacySettingsChangedEvent, PrivacySettingsSnapshot};
 use crate::terminal::alt_screen::alt_screen_element::AltScreenElement;
@@ -496,9 +489,7 @@ use super::block_list_viewport::FindMatchScrollLocation;
 use super::event::SshLoginStatus;
 use super::find::FindOptions;
 use super::model::ansi::{SystemDetails, WarpificationUnavailableReason};
-use super::model::block::{
-    BlockSection, LONG_RUNNING_COMMAND_DURATION_MS,
-};
+use super::model::block::{BlockSection, LONG_RUNNING_COMMAND_DURATION_MS};
 use super::model::blocks::RichContentItem;
 use super::model::completions::ShellCompletion;
 use super::model::rich_content::RichContentType;
@@ -539,8 +530,8 @@ use inline_banner::{
     render_inline_shared_session_started_banner, render_inline_ssh_wrapper_banner,
     render_open_in_warp_banner, render_shell_process_terminated_banner, render_vim_mode_banner,
     AliasExpansionBanner, AliasExpansionBannerAction, AnonymousUserAISignUpBannerState,
-    AnonymousUserLoginBannerAction,
-    OpenInWarpBannerState, SSHBannerAction, SSHBannerState, VimModeBannerAction,
+    AnonymousUserLoginBannerAction, OpenInWarpBannerState, SSHBannerAction, SSHBannerState,
+    VimModeBannerAction,
 };
 use warp_core::command::ExitCode;
 
@@ -835,19 +826,20 @@ pub enum NotificationsTrigger {
 }
 
 impl NotificationsTrigger {
-    pub fn discovery_banner_copy(&self) -> &'static str {
+    pub fn discovery_banner_copy(&self) -> String {
+        let app_name = ChannelState::app_name_display();
         match self {
             NotificationsTrigger::LongRunningCommand(..) => {
-                "Warp can notify you when long-running commands finish."
+                format!("{app_name} can notify you when long-running commands finish.")
             }
             NotificationsTrigger::AgentTaskCompleted(..) => {
-                "Warp can notify you when an agent finishes responding."
+                format!("{app_name} can notify you when an agent finishes responding.")
             }
             NotificationsTrigger::NeedsAttention => {
-                "Warp can notify you when a command or agent needs your attention."
+                format!("{app_name} can notify you when a command or agent needs your attention.")
             }
             NotificationsTrigger::PasswordPrompt => {
-                "Warp can notify you when you're prompted to enter a password."
+                format!("{app_name} can notify you when you're prompted to enter a password.")
             }
         }
     }
@@ -2524,7 +2516,6 @@ pub struct TerminalView {
 
     block_text_selection_start_position: Option<Vector2F>,
 
-
     inline_banners_state: InlineBannersState,
 
     /// Most recent command correction encountered, if any, used for the keyboard shortcut action.
@@ -3682,9 +3673,10 @@ impl TerminalView {
 
         let incompatible_configuration_banner = ctx.add_typed_action_view(|_| {
             Banner::new(BannerTextContent::formatted_text(vec![
-                FormattedTextFragment::plain_text(
-                    "Your shell configuration is incompatible with Warp...  ",
-                ),
+                FormattedTextFragment::plain_text(format!(
+                    "Your shell configuration is incompatible with {}...  ",
+                    ChannelState::app_name_display()
+                )),
                 FormattedTextFragment::hyperlink("More info", KNOWN_ISSUES_URL),
             ]))
         });
@@ -6146,24 +6138,46 @@ impl TerminalView {
                 .get_pending_action(app)
                 .map(|action| match &action.action {
                     AIAgentActionType::RequestCommandOutput { command, .. } => {
-                        format!("Dwarf needs your permission to run `{command}`")
+                        format!(
+                            "{} needs your permission to run `{command}`",
+                            ChannelState::app_name_display()
+                        )
                     }
                     AIAgentActionType::ReadFiles(..) => {
-                        "Dwarf needs your permission to read files".to_string()
+                        format!(
+                            "{} needs your permission to read files",
+                            ChannelState::app_name_display()
+                        )
                     }
                     AIAgentActionType::SearchCodebase(..) => {
-                        "Dwarf needs your permission to search your codebase".to_string()
+                        format!(
+                            "{} needs your permission to search your codebase",
+                            ChannelState::app_name_display()
+                        )
                     }
                     AIAgentActionType::RequestFileEdits { .. } => {
-                        "Dwarf needs your permission to edit a file".to_string()
+                        format!(
+                            "{} needs your permission to edit a file",
+                            ChannelState::app_name_display()
+                        )
                     }
                     AIAgentActionType::WriteToLongRunningShellCommand { .. } => {
-                        "Dwarf needs your permission to interact with a running shell command"
-                            .to_string()
+                        format!(
+                            "{} needs your permission to interact with a running shell command",
+                            ChannelState::app_name_display()
+                        )
                     }
-                    _ => "Dwarf needs your confirmation to continue".to_string(),
+                    _ => format!(
+                        "{} needs your confirmation to continue",
+                        ChannelState::app_name_display()
+                    ),
                 })
-                .unwrap_or("Dwarf needs your confirmation to continue".to_string());
+                .unwrap_or_else(|| {
+                    format!(
+                        "{} needs your confirmation to continue",
+                        ChannelState::app_name_display()
+                    )
+                });
             return Some(AIBlockNotificationSummary {
                 success: false,
                 title,
@@ -6404,10 +6418,7 @@ impl TerminalView {
     ) -> Option<()> {
         None
     }
-    pub fn ambient_agent_task_id_for_details_panel(
-        &self,
-        _app: &AppContext,
-    ) -> Option<()> {
+    pub fn ambient_agent_task_id_for_details_panel(&self, _app: &AppContext) -> Option<()> {
         None
     }
 
@@ -7664,7 +7675,6 @@ impl TerminalView {
             };
 
             ctx.notify();
-
         }
     }
 
@@ -7721,7 +7731,6 @@ impl TerminalView {
         } else {
             self.start_bootstrap_timer(BOOTSTRAP_FAILED_DURATION, ctx);
         }
-
     }
 
     /// Util method to update the ssh block, with a lock
@@ -8271,11 +8280,17 @@ impl TerminalView {
 
         let a11y_message = match &warpify_keybinding {
             Some(keystroke) => format!(
-                "You can press {} to Warpify this {} for more Warp features.",
+                "You can press {} to {} this {} for more {} features.",
                 keystroke.displayed(),
-                lowercase_title
+                ChannelState::app_name_verbify(),
+                lowercase_title,
+                ChannelState::app_name_display()
             ),
-            None => format!("You can Dwarfify this {lowercase_title} for more Dwarf features."),
+            None => format!(
+                "You can {} this {lowercase_title} for more {} features.",
+                ChannelState::app_name_verbify(),
+                ChannelState::app_name_display()
+            ),
         };
 
         model
@@ -8300,7 +8315,6 @@ impl TerminalView {
                 input.replace_buffer_content(most_recent_command_correction.command.as_str(), ctx);
                 ctx.notify()
             });
-
         }
     }
 
@@ -8419,12 +8433,15 @@ impl TerminalView {
             .notifications_error_banner
             .error
             .as_ref()
-            .map(|e| e.notifications_error_banner_title())
-            .unwrap_or("Error sending notification");
+            .map(|e| e.notifications_error_banner_title(ChannelState::app_name_display()))
+            .unwrap_or_else(|| "Error sending notification".to_string());
 
         let a11y_content = AccessibilityContent::new(
-            banner_title,
-            "Make sure you have enabled access for Dwarf notifications in System Preferences.",
+            banner_title.as_str(),
+            format!(
+                "Make sure you have enabled access for {} notifications in System Preferences.",
+                ChannelState::app_name_display()
+            ),
             WarpA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
@@ -8437,7 +8454,6 @@ impl TerminalView {
             input.replace_buffer_content(correction.command.as_str(), ctx);
             ctx.notify()
         });
-
     }
 
     /// Returns the view type for prompt suggestion telemetry based on whether agent view is active.
@@ -8687,8 +8703,7 @@ impl TerminalView {
 
     fn enable_vim_keybindings(&mut self, ctx: &mut ViewContext<Self>) {
         AppEditorSettings::handle(ctx).update(ctx, |editor_settings, ctx| {
-            if editor_settings.vim_mode.set_value(true, ctx).is_ok() {
-            }
+            if editor_settings.vim_mode.set_value(true, ctx).is_ok() {}
         });
     }
 
@@ -9869,8 +9884,7 @@ impl TerminalView {
 
                         // On dogfood only, we're interested in the block commands, durations,
                         // and exit codes to trial Warp Analytics.
-                        if ChannelState::channel().is_dogfood() {
-                        }
+                        if ChannelState::channel().is_dogfood() {}
                     }
                 }
                 let active_session_id = self.active_block_session_id();
@@ -11262,7 +11276,7 @@ impl TerminalView {
 
         // Now that the session is bootstrapped, update any restored AI blocks that were
         // created before bootstrapping with the shell launch data. This enables file link
-        // detection and the "Open in Dwarf" button on code blocks in restored conversations.
+        // detection and the open-in-app button on code blocks in restored conversations.
         if let Some(shell_launch_data) = self.active_session.as_ref(ctx).shell_launch_data(ctx) {
             let ai_block_handles: Vec<_> = self
                 .rich_content_views
@@ -11519,7 +11533,6 @@ impl TerminalView {
                         ctx,
                     )
                 });
-
             }
         }
     }
@@ -11856,7 +11869,10 @@ impl TerminalView {
 
     fn show_cloud_environments_disabled_toast(&self, ctx: &mut ViewContext<Self>) {
         ctx.emit(Event::ShowToast {
-            message: "Cloud environments are not available in local-only Dwarf.".to_string(),
+            message: format!(
+                "Cloud environments are not available in local-only {}.",
+                ChannelState::app_name_display()
+            ),
             flavor: ToastFlavor::Default,
         });
     }
@@ -12592,7 +12608,6 @@ impl TerminalView {
             self.most_recent_command_correction = Some(correction);
 
             ctx.notify();
-
         }
     }
 
@@ -14000,9 +14015,12 @@ impl TerminalView {
 
                             if is_markdown_file(&path) {
                                 items.push(
-                                    MenuItemFields::new("Open in Dwarf")
-                                        .with_on_select_action(TerminalAction::OpenFileInWarp(path))
-                                        .into_item(),
+                                    MenuItemFields::new(format!(
+                                        "Open in {}",
+                                        ChannelState::app_name_display()
+                                    ))
+                                    .with_on_select_action(TerminalAction::OpenFileInWarp(path))
+                                    .into_item(),
                                 );
                                 // Because the default for cmd-click is to open in Warp, we also
                                 // have an open-in-editor option.
@@ -14047,9 +14065,9 @@ impl TerminalView {
                     fields.extend([
                         MenuItem::Separator,
                         MenuItemFields::new(if FeatureFlag::AgentMode.is_enabled() {
-                            *ATTACH_AS_AGENT_MODE_CONTEXT_TEXT
+                            (*ATTACH_AS_AGENT_MODE_CONTEXT_TEXT).to_string()
                         } else {
-                            ASK_AI_ASSISTANT_TEXT
+                            ask_ai_assistant_text()
                         })
                         .with_on_select_action(TerminalAction::ContextMenu(
                             ContextMenuAction::AskAI(if FeatureFlag::AgentMode.is_enabled() {
@@ -14172,7 +14190,7 @@ impl TerminalView {
                     } else {
                         items.extend([
                             MenuItem::Separator,
-                            MenuItemFields::new("Ask Dwarf AI")
+                            MenuItemFields::new(ask_ai_assistant_text())
                                 .with_on_select_action(TerminalAction::ContextMenu(
                                     ContextMenuAction::AskAI(AskAISource::SelectedBlockOrText),
                                 ))
@@ -14795,7 +14813,7 @@ impl TerminalView {
 
             if !selected_input_text.is_empty() && !FeatureFlag::AgentMode.is_enabled() {
                 items.push(
-                    MenuItemFields::new("Ask Dwarf AI")
+                    MenuItemFields::new(ask_ai_assistant_text())
                         .with_on_select_action(TerminalAction::InputContextMenuItem(
                             InputContextMenuAction::AskWarpAI,
                         ))
@@ -14842,7 +14860,6 @@ impl TerminalView {
             items,
             ctx,
         );
-
     }
 
     fn open_workflow_modal(&mut self, ctx: &mut ViewContext<Self>) {
@@ -14884,8 +14901,7 @@ impl TerminalView {
                 });
         }
         self.focus_block_filter_editor(ctx);
-        if matches!(opened_from_click, OpenedFromClick::Yes) {
-        }
+        if matches!(opened_from_click, OpenedFromClick::Yes) {}
     }
 
     fn close_block_filter_editor(&mut self, ctx: &mut ViewContext<Self>) {
@@ -14929,9 +14945,9 @@ impl TerminalView {
                 menu_items.extend([
                     MenuItem::Separator,
                     MenuItemFields::new(if FeatureFlag::AgentMode.is_enabled() {
-                        *ATTACH_AS_AGENT_MODE_CONTEXT_TEXT
+                        (*ATTACH_AS_AGENT_MODE_CONTEXT_TEXT).to_string()
                     } else {
-                        ASK_AI_ASSISTANT_TEXT
+                        ask_ai_assistant_text()
                     })
                     .with_on_select_action(TerminalAction::ContextMenu(ContextMenuAction::AskAI(
                         AskAISource::SelectedTerminalText,
@@ -16648,7 +16664,6 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         ctx.emit(Event::OpenWorkflowModalWithCommand(command));
-
     }
 
     fn copy_prompt(
@@ -17947,10 +17962,7 @@ impl TerminalView {
         })
     }
 
-    fn active_env_var_collection_block(
-        &self,
-        _ctx: &AppContext,
-    ) -> Option<&ViewHandle<()>> {
+    fn active_env_var_collection_block(&self, _ctx: &AppContext) -> Option<&ViewHandle<()>> {
         None
     }
 
@@ -18392,13 +18404,11 @@ impl TerminalView {
             InputEvent::ClearSelectedBlock => self.clear_selected_blocks(ctx),
             InputEvent::SelectRecentBlocks { count } => {
                 let is_first_selection = self.selected_blocks.is_empty();
-                if is_first_selection && self.ai_input_model.as_ref(ctx).is_ai_input_enabled() {
-                }
+                if is_first_selection && self.ai_input_model.as_ref(ctx).is_ai_input_enabled() {}
                 self.select_most_recent_blocks(*count, ctx)
             }
             InputEvent::Copy => self.copy(ctx),
-            InputEvent::UnhandledModifierKeyOnEditor(_keystroke) => {
-            }
+            InputEvent::UnhandledModifierKeyOnEditor(_keystroke) => {}
             InputEvent::ClearSelectionsWhenShellMode => self.clear_selections_when_shell_mode(ctx),
             InputEvent::AutosuggestionAccepted => {
                 // TODO(suraj): maybe pass down the autosuggestion type and send
@@ -18407,8 +18417,7 @@ impl TerminalView {
                     self.most_recent_command_correction.as_ref()
                 {
                     let buffer_text = self.input.as_ref(ctx).buffer_text(ctx);
-                    if buffer_text == most_recent_command_correction.command {
-                    }
+                    if buffer_text == most_recent_command_correction.command {}
                 }
                 // When an AI query autosuggestion is accepted, there might be attached context
                 // blocks we need to render the border for.
@@ -18907,8 +18916,7 @@ impl TerminalView {
             || previous_filter
                 .is_some_and(|previous_filter| !previous_filter.is_active_and_nonempty()))
             && block_filter_query.is_active_and_nonempty()
-        {
-        }
+        {}
         drop(model);
 
         self.update_block_filter_for_block(
@@ -19151,7 +19159,10 @@ impl TerminalView {
         let show_banner = if honor_ps1 {
             let banner_content = if shell_plugins.contains("p10k_unsupported") {
                 Some(BannerTextContent::formatted_text(vec![
-                    FormattedTextFragment::bold("Powerlevel10k now supports Warp!  "),
+                    FormattedTextFragment::bold(format!(
+                        "Powerlevel10k now supports {}!  ",
+                        ChannelState::app_name_display()
+                    )),
                     FormattedTextFragment::plain_text(
                         "You seem to be running an older (unsupported) version, please follow ",
                     ),
@@ -20365,13 +20376,13 @@ impl TerminalView {
                 .notifications_error_banner
                 .error
                 .as_ref()
-                .map(|e| e.notifications_error_banner_title())
-                .unwrap_or("Error sending notification");
+                .map(|e| e.notifications_error_banner_title(ChannelState::app_name_display()))
+                .unwrap_or_else(|| "Error sending notification".to_string());
 
             inline_banners.insert(
                 state.banner_id,
                 render_inline_notifications_error_banner(
-                    banner_title,
+                    banner_title.as_str(),
                     state,
                     &self.inline_banners_state.notifications_error_banner.error,
                     appearance,
@@ -21328,8 +21339,7 @@ impl TerminalView {
                 }
             }
             AskAI(ask_source) => {
-                if FeatureFlag::AgentMode.is_enabled() {
-                }
+                if FeatureFlag::AgentMode.is_enabled() {}
 
                 self.ask_ai(ask_source, ctx);
             }
@@ -21625,7 +21635,6 @@ impl TerminalView {
         self.ai_controller.update(ctx, |controller, ctx| {
             controller.clear_finished_action_results(conversation_id, ctx);
         });
-
     }
 
     fn handle_input_context_menu_action(
@@ -21696,7 +21705,6 @@ impl TerminalView {
                 });
             }
         }
-
     }
 
     fn close_notification_error_banner(&mut self, ctx: &mut ViewContext<Self>) {
@@ -21801,7 +21809,6 @@ impl TerminalView {
                 ctx.notify();
             }
         }
-
     }
 
     fn ssh_banner_action(&self, action: SSHBannerAction, ctx: &mut ViewContext<Self>) {
@@ -22229,7 +22236,6 @@ impl TerminalView {
                         self.add_ssh_warpify_prompt(command, host.to_owned(), ctx)
                     }
                 }
-
             }
         }
     }
@@ -22280,7 +22286,6 @@ impl TerminalView {
             footer.set_warpify_mode(mode, ctx);
         });
         self.maybe_show_use_agent_footer_in_blocklist(ctx);
-
     }
 
     fn show_initialization_block(&mut self) {
@@ -22341,8 +22346,6 @@ impl TerminalView {
         _cli_agent: Option<crate::server::telemetry::CLIAgentType>,
         ctx: &mut ViewContext<Self>,
     ) {
-        
-
         self.toggle_left_panel_file_tree(false, ctx);
     }
 }
@@ -22851,8 +22854,7 @@ impl TypedActionView for TerminalView {
                     }
                 }
 
-                if is_first_selection && self.ai_input_model.as_ref(ctx).is_ai_input_enabled() {
-                }
+                if is_first_selection && self.ai_input_model.as_ref(ctx).is_ai_input_enabled() {}
             }
             SelectNextBlock => {
                 match input_mode {
@@ -22973,7 +22975,6 @@ impl TypedActionView for TerminalView {
                 self.open_rich_content_link(link, ctx);
             }
             ShowInFileExplorer(path) => {
-
                 ctx.open_file_path_in_explorer(path);
             }
             OpenFileInWarp(path) => {
@@ -22997,8 +22998,7 @@ impl TypedActionView for TerminalView {
             }
             OpenBlockListContextMenu => self.open_block_list_context_menu_via_keybinding(ctx),
             AskAIAssistant { block_index } => {
-                if FeatureFlag::AgentMode.is_enabled() {
-                }
+                if FeatureFlag::AgentMode.is_enabled() {}
 
                 self.ask_ai(&AskAISource::Block(*block_index), ctx)
             }

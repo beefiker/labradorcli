@@ -1,6 +1,6 @@
 use warpui::{elements::Text, Element};
 
-use crate::appearance::Appearance;
+use crate::{appearance::Appearance, channel::ChannelState};
 
 use super::{
     render_inline_block_list_banner, InlineBannerContent, InlineBannerIcon, InlineBannerStyle,
@@ -22,7 +22,10 @@ pub fn render_shell_process_terminated_banner(
                     color_override: Some(appearance.theme().foreground().into_solid()),
                 }),
                 content: Some(vec![Text::new(
-                    "The output from Dwarf's initialization script is visible above to assist with debugging.",
+                    format!(
+                        "The output from {} initialization script is visible above to assist with debugging.",
+                        ChannelState::app_name_possessive()
+                    ),
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )]),

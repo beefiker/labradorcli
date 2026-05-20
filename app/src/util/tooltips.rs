@@ -12,8 +12,8 @@ use warpui::{
 };
 
 use crate::{
-    appearance::Appearance, settings::PrivacySettings, terminal::model::secrets::SecretLevel,
-    ui_components::blended_colors,
+    appearance::Appearance, channel::ChannelState, settings::PrivacySettings,
+    terminal::model::secrets::SecretLevel, ui_components::blended_colors,
 };
 
 /// A link to be shown in a tooltip
@@ -203,7 +203,10 @@ where
             .with_child(
                 appearance
                     .ui_builder()
-                    .span("*Secrets are not sent to Dwarf's server.")
+                    .span(format!(
+                        "*Secrets are not sent to {} server.",
+                        ChannelState::app_name_possessive()
+                    ))
                     .with_style(UiComponentStyles {
                         font_size: Some(12.),
                         margin: Some(Coords::default().top(4.)),
@@ -236,7 +239,7 @@ where
         .finish()
 }
 
-/// Returns whether "Open in Dwarf" should be offered for the given file path.
+/// Returns whether the open-in-app action should be offered for the given file path.
 ///
 /// This checks:
 /// - Whether Warp is already the default editor (skip if so)

@@ -24,6 +24,7 @@ use crate::ai::agent_conversations_model::ConversationOrTask;
 use crate::ai::agent_management::notifications::NotificationFilter;
 use crate::ai::agent_management::view::{AgentManagementView, AgentManagementViewEvent};
 use crate::ai::agent_management::AgentManagementEvent;
+use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::AgentToolbarEditorMode;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::history_model::load_conversation_from_server;
@@ -32,7 +33,6 @@ use crate::ai::blocklist::suggested_rule_modal::{
     SuggestedRuleAndId, SuggestedRuleModal, SuggestedRuleModalEvent,
 };
 use crate::ai::conversation_utils;
-use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::llms::LLMPreferences;
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::ai::{
@@ -213,8 +213,8 @@ use crate::server::telemetry::{
 use crate::session_management::{SessionNavigationData, SessionSource};
 use crate::settings::{
     active_theme_kind, respect_system_theme, AccessibilitySettings, AliasExpansionSettings,
-    AppEditorSettings, BlockVisibilitySettings, CursorBlink, DebugSettings,
-    FontSettings, GPUSettings, InputSettings, MonospaceFontSize, PaneSettings, PrivacySettings,
+    AppEditorSettings, BlockVisibilitySettings, CursorBlink, DebugSettings, FontSettings,
+    GPUSettings, InputSettings, MonospaceFontSize, PaneSettings, PrivacySettings,
     SelectionSettings, SshSettings, ThemeSettings,
 };
 use crate::settings_view::flags;
@@ -286,15 +286,16 @@ use crate::workspace::sync_inputs::SyncedInputState;
 use crate::workspace::toast_stack::{
     ToastStack as WorkspaceToastStack, ToastStackEvent as WorkspaceToastStackEvent,
 };
+use crate::GlobalResourceHandles;
 use crate::{
     ai_assistant::{
+        ai_assistant_feature_name,
         panel::{AIAssistantPanelEvent, AIAssistantPanelView},
-        AskAIType, AI_ASSISTANT_FEATURE_NAME, AI_ASSISTANT_LOGO_COLOR,
+        AskAIType, AI_ASSISTANT_LOGO_COLOR,
     },
     settings,
     ui_components::blended_colors,
 };
-use crate::{GlobalResourceHandles};
 
 use itertools::Itertools;
 use parking_lot::FairMutex;
@@ -461,10 +462,6 @@ const TAB_BAR_ICON_PADDING: f32 = 4.;
 
 const TAB_BAR_PILL_WIDTH: f32 = 100.;
 const PILL_FONT_SIZE: f32 = 12.;
-// We use the word "Warp" in the Update Ready button to make it obvious that the terminal is Warp.
-// This can lead to free advertising when users screen-share Warp when an update is available.
-const UPDATE_READY_TEXT: &str = "Update Dwarf";
-
 const TAB_BAR_OVERFLOW_MENU_WIDTH: f32 = 300.;
 
 #[cfg(not(target_family = "wasm"))]
@@ -492,7 +489,12 @@ const AI_ASSISTANT_BUTTON_ID: &str = "workspace_view:ai_assistant_button";
 
 const VERSION_DEPRECATION_BANNER_TEXT: &str = "Your app is out of date and some features may not work as expected. Please update immediately.";
 
-const VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT: &str = "Some Dwarf features may not work as expected without updating immediately, but Dwarf is unable to perform the update.";
+fn version_deprecation_without_permissions_banner_text() -> String {
+    let app_name = ChannelState::app_name_display();
+    format!(
+        "Some {app_name} features may not work as expected without updating immediately, but {app_name} is unable to perform the update."
+    )
+}
 
 const ASK_AI_ASSISTANT_KEYBINDING_NAME: &str = "workspace:toggle_ai_assistant";
 const TOGGLE_RESOURCE_CENTER_KEYBINDING_NAME: &str = "workspace:toggle_resource_center";
@@ -543,7 +545,6 @@ const KEYBINDINGS_TO_CACHE: [&str; 4] = [
     SHOW_SETTINGS_KEYBINDING_NAME,
     TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME,
 ];
-
 
 #[cfg(target_family = "wasm")]
 const MOBILE_OVERLAY_PANEL_WIDTH_RATIO: f32 = 0.9;
@@ -711,7 +712,7 @@ pub enum BannerSeverity {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum BannerButtonVariant {
     /// No fill, no border, just text (and optional icon). Used for the primary
-    /// action in the Figma design (e.g. "Fix with Dwarf").
+    /// action in the Figma design (e.g. the AI fix action).
     Naked,
     /// Border-only, no fill (e.g. "Open file").
     Outlined,
@@ -1322,9 +1323,8 @@ impl Workspace {
         ctx: &mut ViewContext<Self>,
         tips_completed: ModelHandle<TipsCompleted>,
     ) -> ViewHandle<ResourceCenterView> {
-        let resource_center_view = ctx.add_typed_action_view(|ctx| {
-            ResourceCenterView::new(ctx, tips_completed.clone())
-        });
+        let resource_center_view =
+            ctx.add_typed_action_view(|ctx| ResourceCenterView::new(ctx, tips_completed.clone()));
 
         ctx.subscribe_to_view(&resource_center_view, |me, _, event, ctx| {
             me.handle_resource_center_event(event, ctx);
@@ -2264,8 +2264,7 @@ impl Workspace {
         let (settings_pane, theme_chooser_view) =
             Self::build_settings_views(tips_completed.clone(), ctx);
 
-        let resource_center_view =
-            Self::build_resource_center_view(ctx, tips_completed.clone());
+        let resource_center_view = Self::build_resource_center_view(ctx, tips_completed.clone());
 
         let enable_auto_reload_modal = ctx.add_typed_action_view(EnableAutoReloadModal::new);
         ctx.subscribe_to_view(&enable_auto_reload_modal, |me, _, event, ctx| {
@@ -2764,8 +2763,7 @@ impl Workspace {
                     });
                 ctx.notify();
             }
-            AgentManagementEvent::NotificationAdded
-            | AgentManagementEvent::NotificationUpdated => {
+            AgentManagementEvent::NotificationAdded | AgentManagementEvent::NotificationUpdated => {
                 // Re-render so the vertical tabs panel can update unread-activity dots.
                 ctx.notify();
             }
@@ -3471,11 +3469,7 @@ impl Workspace {
                         .as_ref(ctx)
                         .active_session_view(ctx)
                         .map(|view| view.id());
-                    me.notify_terminal_focus_change(
-                        focused_terminal_view_id,
-                        None,
-                        ctx,
-                    );
+                    me.notify_terminal_focus_change(focused_terminal_view_id, None, ctx);
                 }
             },
         );
@@ -5739,7 +5733,7 @@ impl Workspace {
     }
 
     /// The tab bar overflow menu is the context menu that appears when
-    /// a user clicks "Update Dwarf" in the top right of the tab bar.
+    /// a user clicks the update-app button in the top right of the tab bar.
     pub fn toggle_tab_bar_overflow_menu(&mut self, ctx: &mut ViewContext<Self>) {
         if self.show_tab_bar_overflow_menu {
             self.close_tab_bar_overflow_menu(ctx);
@@ -5767,9 +5761,12 @@ impl Workspace {
                             .into_item(),
                     ),
                     AutoupdateStage::UnableToUpdateToNewVersion { .. } => menu_items.push(
-                        MenuItemFields::new("Update Dwarf manually")
-                            .with_on_select_action(WorkspaceAction::DownloadNewVersion)
-                            .into_item(),
+                        MenuItemFields::new(format!(
+                            "Update {} manually",
+                            ChannelState::app_name_display()
+                        ))
+                        .with_on_select_action(WorkspaceAction::DownloadNewVersion)
+                        .into_item(),
                     ),
                     AutoupdateStage::NoUpdateAvailable
                     | AutoupdateStage::CheckingForUpdate
@@ -6084,7 +6081,6 @@ impl Workspace {
         additional_paths: &[PathBuf],
         ctx: &mut ViewContext<Self>,
     ) {
-
         let grouping_on = FeatureFlag::TabbedEditorView.is_enabled()
             && *EditorSettings::as_ref(ctx)
                 .prefer_tabbed_editor_view
@@ -6322,7 +6318,6 @@ impl Workspace {
             self.welcome_tips_view.update(ctx, |tips_view, ctx| {
                 tips_view.set_action_target(ctx.window_id(), input_id, ctx)
             });
-
         }
         ctx.focus(&self.welcome_tips_view);
         ctx.notify();
@@ -6379,7 +6374,10 @@ impl Workspace {
             match result {
                 Ok(_) => {
                     let command_name = ChannelState::channel().cli_command_name();
-                    let message = format!("Successfully installed the Dwarf CLI! You can now run '{command_name}' from the command line.");
+                    let message = format!(
+                        "Successfully installed the {} CLI! You can now run '{command_name}' from the command line.",
+                        ChannelState::app_name_display()
+                    );
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::success(message.to_string())
                             .with_link(
@@ -6391,7 +6389,10 @@ impl Workspace {
                     });
                 }
                 Err(error) => {
-                    let error_message = format!("Failed to install Dwarf command: {error}");
+                    let error_message = format!(
+                        "Failed to install {} command: {error}",
+                        ChannelState::app_name_display()
+                    );
                     log::error!("{error_message}");
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::error(error_message);
@@ -6409,14 +6410,20 @@ impl Workspace {
             async { cli_install::uninstall_cli() },
             |view, result, ctx| match result {
                 Ok(_) => {
-                    let message = "Successfully uninstalled the Dwarf command.";
+                    let message = format!(
+                        "Successfully uninstalled the {} command.",
+                        ChannelState::app_name_display()
+                    );
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::success(message.to_string());
                         toast_stack.add_ephemeral_toast(toast, ctx);
                     });
                 }
                 Err(error) => {
-                    let error_message = format!("Failed to uninstall Dwarf command: {error}");
+                    let error_message = format!(
+                        "Failed to uninstall {} command: {error}",
+                        ChannelState::app_name_display()
+                    );
                     log::error!("{error_message}");
                     view.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::error(error_message);
@@ -7009,10 +7016,13 @@ impl Workspace {
                     ) =>
                 {
                     items.push(
-                        MenuItemFields::new("Update and relaunch Dwarf")
-                            .with_on_select_action(WorkspaceAction::ApplyUpdate)
-                            .with_override_text_color(appearance.theme().ansi_fg_red())
-                            .into_item(),
+                        MenuItemFields::new(format!(
+                            "Update and relaunch {}",
+                            ChannelState::app_name_display()
+                        ))
+                        .with_on_select_action(WorkspaceAction::ApplyUpdate)
+                        .with_override_text_color(appearance.theme().ansi_fg_red())
+                        .into_item(),
                     )
                 }
                 AutoupdateStage::Updating { new_version, .. }
@@ -7032,10 +7042,13 @@ impl Workspace {
                     ) =>
                 {
                     items.push(
-                        MenuItemFields::new("Update Dwarf manually")
-                            .with_on_select_action(WorkspaceAction::DownloadNewVersion)
-                            .with_override_text_color(appearance.theme().ansi_fg_red())
-                            .into_item(),
+                        MenuItemFields::new(format!(
+                            "Update {} manually",
+                            ChannelState::app_name_display()
+                        ))
+                        .with_on_select_action(WorkspaceAction::DownloadNewVersion)
+                        .with_override_text_color(appearance.theme().ansi_fg_red())
+                        .into_item(),
                     )
                 }
                 _ => {}
@@ -7072,7 +7085,7 @@ impl Workspace {
 
         #[cfg(not(target_family = "wasm"))]
         items.push(
-            MenuItemFields::new("View Dwarf logs")
+            MenuItemFields::new(format!("View {} logs", ChannelState::app_name_display()))
                 .with_on_select_action(WorkspaceAction::ViewLogs)
                 .into_item(),
         );
@@ -7677,8 +7690,7 @@ impl Workspace {
                     worktree_name.as_deref(),
                     ctx,
                 );
-                if should_track_existing_config_open {
-                }
+                if should_track_existing_config_open {}
                 self.close_tab_config_params_modal(ctx);
                 self.complete_pending_session_config_replacement(ctx);
 
@@ -8954,8 +8966,7 @@ impl Workspace {
         );
 
         // Telemetry whenever tabs actually closed, not when confirmation dialog comes up.
-        if tabs_closed {
-        }
+        if tabs_closed {}
     }
 
     /// Opens a confirmation dialog if necessary, or closes immediately if not.
@@ -8985,8 +8996,7 @@ impl Workspace {
         // Telemetry whenever tabs actually closed, not when confirmation dialog comes up.
         if tabs_closed {
             match direction {
-                TabMovement::Right if self.active_tab_index > index => {
-                }
+                TabMovement::Right if self.active_tab_index > index => {}
                 _ => (),
             }
         }
@@ -10014,7 +10024,10 @@ impl Workspace {
 
         ctx.spawn(future, move |workspace, source_conversation, ctx| {
             let Some(CloudConversationData::Oz(source_conversation)) = source_conversation else {
-                log::error!("Failed to load Dwarf conversation {conversation_id} for forking.");
+                log::error!(
+                    "Failed to load {} conversation {conversation_id} for forking.",
+                    ChannelState::app_name_display()
+                );
                 WorkspaceToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     let toast = DismissibleToast::error(
                         "Failed to load conversation for forking.".to_owned(),
@@ -10561,7 +10574,10 @@ impl Workspace {
                         let url = NOTIFICATIONS_TROUBLESHOOT_URL.to_string();
                         view.toast_stack.update(ctx, |toast_stack, ctx| {
                             let toast = DismissibleToast::error(
-                                "Dwarf doesn't have permission to send desktop notifications.".to_string(),
+                                format!(
+                                    "{} doesn't have permission to send desktop notifications.",
+                                    ChannelState::app_name_display()
+                                ),
                             )
                             .with_link(ToastLink::new("Troubleshoot notifications".to_string()).with_href(url));
                             toast_stack.add_persistent_toast(toast, ctx);
@@ -10574,7 +10590,6 @@ impl Workspace {
                     }
                 }
             });
-
         }
     }
 
@@ -11021,7 +11036,6 @@ impl Workspace {
             }
             SettingsViewEvent::OpenMCPServerCollection => {
                 self.show_settings_with_section(Some(SettingsSection::MCPServers), ctx);
-
             }
             SettingsViewEvent::OpenExecutionProfileEditor(profile_id) => {
                 self.open_execution_profile_editor_pane(None, *profile_id, ctx);
@@ -12128,8 +12142,7 @@ impl Workspace {
                     input_handle.read(ctx, |input, ctx| input.menu_positioning(ctx))
                 });
 
-            if !self.current_workspace_state.is_command_search_open {
-            }
+            if !self.current_workspace_state.is_command_search_open {}
 
             // Make sure we close any already-open input suggestions panel.
             if let Some(input_handle) = &active_input_handle {
@@ -13318,7 +13331,6 @@ impl Workspace {
         args: &crate::linear::LinearIssueWork,
         ctx: &mut ViewContext<Self>,
     ) {
-
         self.add_new_session_tab_internal_with_default_session_mode_behavior(
             NewSessionSource::Tab,
             Some(ctx.window_id()),
@@ -13434,7 +13446,6 @@ impl Workspace {
         self.close_all_overlays(ctx);
         self.current_workspace_state.is_prompt_editor_open = true;
         ctx.focus(&self.prompt_editor_modal);
-
     }
 
     fn open_agent_toolbar_editor(
@@ -13490,12 +13501,16 @@ impl Workspace {
                 .finish(),
             )
             .with_child(
-                Text::new_inline(AI_ASSISTANT_FEATURE_NAME, appearance.ui_font_family(), 14.)
-                    .with_style(Properties {
-                        weight: warpui::fonts::Weight::Bold,
-                        ..Default::default()
-                    })
-                    .finish(),
+                Text::new_inline(
+                    ai_assistant_feature_name(),
+                    appearance.ui_font_family(),
+                    14.,
+                )
+                .with_style(Properties {
+                    weight: warpui::fonts::Weight::Bold,
+                    ..Default::default()
+                })
+                .finish(),
             )
             .with_child(
                 Shrinkable::new(
@@ -13526,7 +13541,10 @@ impl Workspace {
         let body = appearance
             .ui_builder()
             .wrappable_text(
-                "Ask Dwarf AI to explain errors, suggest commands or write scripts.".to_owned(),
+                format!(
+                    "Ask {} to explain errors, suggest commands or write scripts.",
+                    ai_assistant_feature_name()
+                ),
                 true,
             )
             .with_style(UiComponentStyles {
@@ -14001,7 +14019,7 @@ impl Workspace {
             .finish();
             tab_bar.add_child(dwarf_logo);
 
-            // Right: Info button + "View all cloud runs" button (for ambient agent sessions) + "Open in Dwarf" button
+            // Right: Info button + cloud runs button + open-in-app button.
             let mut right_row = Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_main_axis_size(MainAxisSize::Min);
@@ -14025,7 +14043,7 @@ impl Workspace {
                 );
             }
 
-            // Hide "Open in Dwarf" button on mobile devices
+            // Hide the open-in-app button on mobile devices.
             if !warpui::platform::wasm::is_mobile_device() {
                 right_row.add_child(ChildView::new(&self.open_in_warp_button).finish());
             }
@@ -14783,7 +14801,7 @@ impl Workspace {
                 icons::Icon::Lightbulb,
                 &self.mouse_states.resource_center_icon,
                 WorkspaceAction::ToggleResourceCenter,
-                "Dwarf Essentials".to_string(),
+                format!("{} Essentials", ChannelState::app_name_display()),
                 self.cached_keybindings[TOGGLE_RESOURCE_CENTER_KEYBINDING_NAME].clone(),
                 false,
                 false,
@@ -14962,7 +14980,7 @@ impl Workspace {
         let (icon, action, label) = (
             icons::Icon::AiAssistant,
             WorkspaceAction::ClickedAIAssistantIcon,
-            AI_ASSISTANT_FEATURE_NAME.to_owned(),
+            ai_assistant_feature_name(),
         );
 
         Align::new(
@@ -15088,7 +15106,7 @@ impl Workspace {
                     Flex::row()
                         .with_child(
                             Text::new_inline(
-                                UPDATE_READY_TEXT,
+                                format!("Update {}", ChannelState::app_name_display()),
                                 appearance.ui_font_family(),
                                 PILL_FONT_SIZE,
                             )
@@ -15269,7 +15287,7 @@ impl Workspace {
             AISettings::as_ref(app)
                 .is_any_ai_enabled(app)
                 .then(|| WorkspaceBannerButtonDetails {
-                    text: "Fix with Dwarf".to_owned(),
+                    text: format!("Fix with {}", ChannelState::app_name_display()),
                     action: WorkspaceAction::FixSettingsWithOz {
                         error_description: error.to_string(),
                     },
@@ -15329,13 +15347,16 @@ impl Workspace {
                 AutoupdateStage::UnableToUpdateToNewVersion { new_version }
                     if !self.autoupdate_unable_to_update_banner_dismissed =>
                 {
-                    let description =
-                        if is_incoming_version_past_current(new_version.soft_cutoff.as_deref()) {
-                            VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
-                        } else {
-                            "A new version is available but Dwarf is unable to perform the update."
-                                .to_owned()
-                        };
+                    let description = if is_incoming_version_past_current(
+                        new_version.soft_cutoff.as_deref(),
+                    ) {
+                        version_deprecation_without_permissions_banner_text()
+                    } else {
+                        format!(
+                            "A new version is available but {} is unable to perform the update.",
+                            ChannelState::app_name_display()
+                        )
+                    };
 
                     Some(WorkspaceBannerFields {
                         banner_type: WorkspaceBanner::UnableToUpdateToNewVersion,
@@ -15344,7 +15365,7 @@ impl Workspace {
                         description,
                         secondary_button: None,
                         button: Some(WorkspaceBannerButtonDetails {
-                            text: "Update Dwarf manually".to_string(),
+                            text: format!("Update {} manually", ChannelState::app_name_display()),
                             action: WorkspaceAction::DownloadNewVersion,
                             variant: BannerButtonVariant::Outlined,
                             icon: None,
@@ -15357,9 +15378,12 @@ impl Workspace {
                 {
                     let description =
                         if is_incoming_version_past_current(new_version.soft_cutoff.as_deref()) {
-                            VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
+                            version_deprecation_without_permissions_banner_text()
                         } else {
-                            "Dwarf was unable to launch the new installed version.".to_owned()
+                            format!(
+                                "{} was unable to launch the new installed version.",
+                                ChannelState::app_name_display()
+                            )
                         };
 
                     Some(WorkspaceBannerFields {
@@ -15369,7 +15393,7 @@ impl Workspace {
                         description,
                         secondary_button: None,
                         button: Some(WorkspaceBannerButtonDetails {
-                            text: "Update Dwarf manually".to_string(),
+                            text: format!("Update {} manually", ChannelState::app_name_display()),
                             action: WorkspaceAction::DownloadNewVersion,
                             variant: BannerButtonVariant::Outlined,
                             icon: None,
@@ -16573,7 +16597,8 @@ impl Workspace {
             // Many users' browser settings will block Local Network Access so this will end up redirecting to download page,
             // even if they have the app installed.
             let toast_message = format!(
-                "Have Dwarf installed but redirecting to download page?\nEnable Local Network Access for {} in your browser.",
+                "Have {} installed but redirecting to download page?\nEnable Local Network Access for {} in your browser.",
+                ChannelState::app_name_display(),
                 ChannelState::server_root_url()
             );
             self.toast_stack.update(ctx, |toast_stack, ctx| {
@@ -17044,8 +17069,7 @@ impl TypedActionView for Workspace {
                         left_panel.focus_active_view_on_entry(ctx);
                     });
 
-                    if file_tree_active {
-                    }
+                    if file_tree_active {}
                 }
             }
             ToggleRightPanel => {
@@ -17209,14 +17233,12 @@ impl TypedActionView for Workspace {
                 entrypoint: _,
                 zero_state_prompt_suggestion_type,
             } => {
-
                 self.add_terminal_tab_in_ai_mode(*zero_state_prompt_suggestion_type, ctx);
             }
             NewPaneInAgentMode {
                 entrypoint: _,
                 zero_state_prompt_suggestion_type,
             } => {
-
                 self.add_terminal_pane_in_ai_mode(*zero_state_prompt_suggestion_type, ctx);
             }
             OpenCloudAgentSetupGuide => {
@@ -17228,8 +17250,7 @@ impl TypedActionView for Workspace {
             ClickedAIAssistantIcon => {
                 if !FeatureFlag::AgentMode.is_enabled() {
                     self.toggle_ai_assistant_panel(ctx);
-                    if self.current_workspace_state.is_ai_assistant_panel_open {
-                    }
+                    if self.current_workspace_state.is_ai_assistant_panel_open {}
                 }
             }
             ShowAIAssistantWarmWelcome => {
@@ -17464,7 +17485,6 @@ impl TypedActionView for Workspace {
             }
             OpenMCPServerCollection => {
                 self.show_settings_with_section(Some(SettingsSection::MCPServers), ctx);
-
             }
             ToggleAIDocumentPane { .. } | HideAIDocumentPanes | OpenAIDocumentPane { .. } => {}
             TabHoverWidthStart { width } => {
@@ -19085,4 +19105,3 @@ fn compute_default_panel_widths(
         (DEFAULT_LEFT_PANEL_WIDTH, DEFAULT_RIGHT_PANEL_WIDTH)
     }
 }
-

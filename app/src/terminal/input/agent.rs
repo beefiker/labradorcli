@@ -1,6 +1,7 @@
 use super::{
     common::{
-        add_command_xray_overlay, add_input_suggestions_overlays, wrap_input_with_terminal_padding_and_focus_handler,
+        add_command_xray_overlay, add_input_suggestions_overlays,
+        wrap_input_with_terminal_padding_and_focus_handler,
     },
     Input, InputAction, InputDropTargetData,
 };
@@ -27,8 +28,8 @@ use warpui::elements::Expanded;
 use warpui::{
     elements::{
         Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-        DispatchEventResult, DropTarget, Element, EventHandler, Flex, Hoverable,
-        MainAxisSize, OffsetPositioning, OffsetType, ParentElement, PositionedElementOffsetBounds,
+        DispatchEventResult, DropTarget, Element, EventHandler, Flex, Hoverable, MainAxisSize,
+        OffsetPositioning, OffsetType, ParentElement, PositionedElementOffsetBounds,
         PositioningAxis, Radius, SavePosition, Stack, XAxisAnchor, YAxisAnchor,
     },
     presenter::ChildView,
@@ -505,7 +506,6 @@ impl Input {
             )))
             .finish()
     }
-
 }
 
 pub mod styles {

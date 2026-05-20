@@ -8,6 +8,7 @@ pub use data_source::*;
 pub use view::{CloseReason, InlineSlashCommandView, SlashCommandsEvent};
 
 use ai::skills::SkillReference;
+use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::AnsiColorIdentifier;
@@ -465,7 +466,10 @@ impl Input {
             }
             create_env if command.name == commands::CREATE_ENVIRONMENT.name => {
                 show_error_toast(
-                    "Cloud environments are not available in local-only Dwarf.".to_owned(),
+                    format!(
+                        "Cloud environments are not available in local-only {}.",
+                        ChannelState::app_name_display()
+                    ),
                     ctx,
                 );
             }
@@ -793,8 +797,10 @@ impl Input {
 
                 if !conversation_is_cloud_oz_for_slash_command(conversation_id, ctx) {
                     show_error_toast(
-                        "/continue-locally is only available for Dwarf cloud conversations"
-                            .to_owned(),
+                        format!(
+                            "/continue-locally is only available for {} cloud conversations",
+                            ChannelState::app_name_display()
+                        ),
                         ctx,
                     );
                     return true;
