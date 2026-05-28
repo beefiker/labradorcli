@@ -17,7 +17,7 @@
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://labradorcli.com/">
-    <meta property="og:image" content="https://labradorcli.com/assets/labrador-icon.png">
+    <meta property="og:image" content="https://labradorcli.com/assets/labrador-agent-conversation.png">
     <link rel="icon" href="/assets/labrador-icon.png">
     <link rel="apple-touch-icon" href="/assets/labrador-icon.png">
     <link rel="stylesheet" href="/styles.css">
@@ -43,9 +43,9 @@
           <p class="eyebrow">Early public terminal build</p>
           <h1 id="hero-title">Labrador CLI</h1>
           <p class="lede">
-            A Warp-based terminal app published as source and platform release
-            bundles. Start with the GitHub release for your machine and treat
-            the current build as early testing software.
+            A Warp-based terminal app with a local agent workspace. Download the
+            desktop bundle for your machine, open Labrador, and treat the
+            current build as early testing software.
           </p>
           <div class="hero-actions" aria-label="Primary actions">
             <a
@@ -63,39 +63,25 @@
           </p>
         </div>
 
-        <div class="release-showcase" aria-label="Labrador CLI release preview">
-          <div class="window-bar" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-          <div class="release-preview">
-            <div>
-              <p class="preview-kicker">GitHub release assets</p>
-              <strong class="preview-title">Pick the bundle for your platform.</strong>
-            </div>
-            <div class="artifact-preview-grid" aria-label="Published bundle formats">
-              <div class="artifact-preview">
-                <span>macOS</span>
-                <strong>DMG</strong>
-                <small>Drag Labrador.app into Applications from the disk image.</small>
-              </div>
-              <div class="artifact-preview">
-                <span>Linux</span>
-                <strong>AppImage + deb</strong>
-                <small>Run the AppImage directly or install the Debian package.</small>
-              </div>
-              <div class="artifact-preview">
-                <span>Windows</span>
-                <strong>Setup exe</strong>
-                <small>Use the installer for Start Menu, PATH, and app registration.</small>
-              </div>
-            </div>
-            <p class="release-note">
-              The first public builds are intentionally minimal: download the
-              asset, inspect the included notices, and test it locally.
-            </p>
-          </div>
+        <div class="screenshot-stack" aria-label="Labrador app screenshots">
+          <figure class="screenshot-card screenshot-card-welcome">
+            <img
+              src="/assets/labrador-welcome.png"
+              alt="Labrador welcome screen with a Start Labrador button"
+              width="1390"
+              height="900"
+              decoding="async"
+            >
+          </figure>
+          <figure class="screenshot-card screenshot-card-agent">
+            <img
+              src="/assets/labrador-agent-conversation.png"
+              alt="Labrador agent conversation view with a prompt input"
+              width="1240"
+              height="768"
+              decoding="async"
+            >
+          </figure>
         </div>
       </section>
 
