@@ -48,7 +48,7 @@ jobs:
           cat > "$notes" <<'EOF'
           Portable Labrador CLI release bundles.
 
-          These assets are unsigned CLI builds for local development workflows. Desktop app installers will be published separately after platform signing and notarization are configured.
+          macOS is distributed as an unsigned DMG. Linux is distributed as a tar.gz archive. Windows is distributed as a zip archive.
           EOF
 
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -148,13 +148,15 @@ jobs:
       - name: Build CLI
         run: cargo build -p labrador --bin labrador --release --features standalone
 
-      - name: Package Unix bundle
-        if: matrix.shell == 'bash'
+      - name: Package Linux bundle
+        if: runner.os == 'Linux'
         shell: bash
         run: |
+          set -euo pipefail
+
           version="${RELEASE_TAG#v}"
           arch="$(uname -m)"
-          asset="labradorcli-${version}-${{ matrix.platform }}-${arch}.tar.gz"
+          asset="labradorcli-${version}-linux-${arch}.tar.gz"
 
           mkdir -p package dist
           cp target/release/labrador package/labrador
@@ -162,6 +164,49 @@ jobs:
           cp README.md NOTICE LICENSE-AGPL LICENSE-MIT package/
 
           tar -czf "dist/$asset" -C package .
+          gh release upload "$RELEASE_TAG" "dist/$asset" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Package macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${RELEASE_TAG#v}"
+          arch="$(uname -m)"
+          volume_name="Labrador CLI ${version}"
+          asset="labradorcli-${version}-macos-${arch}.dmg"
+          package_dir="package/${volume_name}"
+
+          mkdir -p "$package_dir" dist
+          cp target/release/labrador "$package_dir/labrador"
+          chmod +x "$package_dir/labrador"
+          cp README.md NOTICE LICENSE-AGPL LICENSE-MIT "$package_dir/"
+
+          cat > "$package_dir/install.sh" <<'EOF'
+          #!/bin/sh
+          set -eu
+
+          install_dir="${1:-/usr/local/bin}"
+          script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+          mkdir -p "$install_dir"
+          cp "$script_dir/labrador" "$install_dir/labrador"
+          chmod +x "$install_dir/labrador"
+
+          echo "Installed labrador to $install_dir/labrador"
+          EOF
+          chmod +x "$package_dir/install.sh"
+
+          hdiutil create \
+            -volname "$volume_name" \
+            -srcfolder "$package_dir" \
+            -ov \
+            -format UDZO \
+            "dist/$asset"
+
           gh release upload "$RELEASE_TAG" "dist/$asset" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber

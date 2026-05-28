@@ -9,6 +9,12 @@ const platformRules = {
   linux: ["linux", "appimage", ".deb", ".rpm", "x86_64", "aarch64"],
 };
 
+const preferredFormats = {
+  mac: [".dmg"],
+  windows: [".exe", ".msi", ".zip"],
+  linux: [".appimage", ".deb", ".rpm", ".tar.gz", ".tgz"],
+};
+
 function getPlatform() {
   const platform =
     navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || "";
@@ -47,7 +53,19 @@ function scoreAsset(asset, platformId) {
     }
   }
 
-  if (name.endsWith(".zip") || name.endsWith(".tar.gz") || name.endsWith(".tgz")) {
+  for (const extension of preferredFormats[platformId] || []) {
+    if (name.endsWith(extension)) {
+      score += 10;
+      break;
+    }
+  }
+
+  if (
+    name.endsWith(".dmg") ||
+    name.endsWith(".zip") ||
+    name.endsWith(".tar.gz") ||
+    name.endsWith(".tgz")
+  ) {
     score += 2;
   }
 

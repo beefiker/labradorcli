@@ -45,8 +45,8 @@ Cloudflare Pages settings:
 ## Releases
 
 Release bundles are built by the `Release Bundles` GitHub Actions workflow. It
-can be run manually for a tag such as `v0.1.0`, and it uploads portable CLI
-archives for macOS, Linux, and Windows to the matching GitHub Release.
+can be run manually for a tag such as `v0.1.0`, and it uploads a macOS DMG,
+Linux tar.gz archive, and Windows zip archive to the matching GitHub Release.
 
 ## Licensing
 
