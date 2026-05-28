@@ -163,35 +163,12 @@ async function hydrateRelease() {
   } catch (_error) {
     setDownloadTarget(LATEST_RELEASE_URL, "Open GitHub Releases");
     if (releaseStatus) {
-      releaseStatus.textContent = "Release assets are not published yet. Opening GitHub Releases.";
+      releaseStatus.textContent = "Could not load release metadata. Opening GitHub Releases.";
     }
     if (releaseMeta) {
-      releaseMeta.textContent = "No public release metadata is available yet.";
+      releaseMeta.textContent = "Release metadata could not be loaded in this browser session.";
     }
-  }
-}
-
-function wireCopyButtons() {
-  for (const button of document.querySelectorAll("[data-copy]")) {
-    button.addEventListener("click", async () => {
-      const value = button.getAttribute("data-copy");
-      if (!value) {
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(value);
-        button.textContent = "Copied";
-      } catch (_error) {
-        button.textContent = "Copy failed";
-      }
-
-      window.setTimeout(() => {
-        button.textContent = "Copy command";
-      }, 1600);
-    });
   }
 }
 
 hydrateRelease();
-wireCopyButtons();

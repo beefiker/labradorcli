@@ -6,14 +6,14 @@
     <title>Labrador CLI</title>
     <meta
       name="description"
-      content="Labrador CLI is a Warp-based terminal app with local development workflows and downloadable release bundles from GitHub."
+      content="Labrador CLI is an early public Warp-based terminal build with downloadable release bundles from GitHub."
     >
     <meta name="theme-color" content="#10100f">
     <link rel="canonical" href="https://labradorcli.com/">
     <meta property="og:title" content="Labrador CLI">
     <meta
       property="og:description"
-      content="A Warp-based terminal app for local development workflows."
+      content="An early public Warp-based terminal build with downloadable release bundles from GitHub."
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://labradorcli.com/">
@@ -40,11 +40,12 @@
     <main>
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">Warp-based terminal app</p>
+          <p class="eyebrow">Early public terminal build</p>
           <h1 id="hero-title">Labrador CLI</h1>
           <p class="lede">
-            A fast terminal experience for local development, packaged as
-            downloadable app and CLI bundles from GitHub Releases.
+            A Warp-based terminal app published as source and platform release
+            bundles. Start with the GitHub release for your machine and treat
+            the current build as early testing software.
           </p>
           <div class="hero-actions" aria-label="Primary actions">
             <a
@@ -55,76 +56,92 @@
             >
               Download latest
             </a>
-            <a class="button button-secondary" href="#quickstart">View quickstart</a>
+            <a class="button button-secondary" href="#downloads">View downloads</a>
           </div>
           <p id="releaseStatus" class="release-status" aria-live="polite">
             Checking GitHub Releases...
           </p>
         </div>
 
-        <div class="terminal-showcase" aria-label="Labrador CLI terminal preview">
+        <div class="release-showcase" aria-label="Labrador CLI release preview">
           <div class="window-bar" aria-hidden="true">
             <span></span>
             <span></span>
             <span></span>
           </div>
-          <pre><code><span class="muted">$</span> labrador --help
-Usage: labrador [COMMAND]
-
-<span class="muted">$</span> git status --short
-M app/src/root_view.rs
-
-<span class="muted">$</span> labrador completions zsh
-# shell integration ready
-
-<span class="muted">$</span> cargo test -p labrador_cli
-<span class="green">ok</span> terminal workflow stays local</code></pre>
+          <div class="release-preview">
+            <div>
+              <p class="preview-kicker">GitHub release assets</p>
+              <strong class="preview-title">Pick the bundle for your platform.</strong>
+            </div>
+            <div class="artifact-preview-grid" aria-label="Published bundle formats">
+              <div class="artifact-preview">
+                <span>macOS</span>
+                <strong>DMG</strong>
+                <small>Unsigned early build with binary, install script, and licenses.</small>
+              </div>
+              <div class="artifact-preview">
+                <span>Linux</span>
+                <strong>tar.gz</strong>
+                <small>Portable archive with binary, README, NOTICE, and licenses.</small>
+              </div>
+              <div class="artifact-preview">
+                <span>Windows</span>
+                <strong>zip</strong>
+                <small>Portable archive with labrador.exe, README, NOTICE, and licenses.</small>
+              </div>
+            </div>
+            <p class="release-note">
+              The first public builds are intentionally minimal: download the
+              asset, inspect the included notices, and test it locally.
+            </p>
+          </div>
         </div>
       </section>
 
       <section class="signal-strip" aria-label="Product signals">
         <div>
-          <strong>GitHub-native releases</strong>
-          <span>Download bundles straight from repository artifacts.</span>
+          <strong>Release artifacts</strong>
+          <span>macOS DMG, Linux tar.gz, and Windows zip bundles.</span>
         </div>
         <div>
-          <strong>Terminal-first</strong>
-          <span>Built around the shell workflows developers already use.</span>
+          <strong>Warp-based source</strong>
+          <span>Built from a public terminal codebase with visible source.</span>
         </div>
         <div>
-          <strong>Local by default</strong>
-          <span>Keep command execution and project work on your machine.</span>
+          <strong>Early build</strong>
+          <span>Unsigned artifacts while packaging and app behavior stabilize.</span>
         </div>
       </section>
 
       <section id="features" class="section-band">
         <div class="section-heading">
-          <p class="eyebrow">Terminal experience</p>
-          <h2>A familiar terminal with Labrador workflows built in.</h2>
+          <p class="eyebrow">What this is</p>
+          <h2>A public Warp-based terminal build for testers.</h2>
         </div>
         <div class="feature-grid">
           <article>
             <span class="feature-mark">01</span>
-            <h3>Warp-based foundation</h3>
+            <h3>Warp-based terminal source</h3>
             <p>
-              Start from a modern terminal baseline with native app packaging,
-              fast command interaction, and developer-focused defaults.
+              Labrador starts from Warp's open terminal codebase, with source
+              kept public so the project can be inspected as it changes.
             </p>
           </article>
           <article>
             <span class="feature-mark">02</span>
-            <h3>App and CLI together</h3>
+            <h3>Platform release bundles</h3>
             <p>
-              Use Labrador as a desktop terminal, then drop into the CLI for
-              completions, scripted workflows, and release-channel builds.
+              GitHub Releases publish a macOS DMG, Linux tar.gz archive, and
+              Windows zip archive from the same tagged source.
             </p>
           </article>
           <article>
             <span class="feature-mark">03</span>
-            <h3>Local coding workflows</h3>
+            <h3>Source and license visibility</h3>
             <p>
-              Run project-aware development tasks from the same environment
-              where you build, test, and inspect your repository.
+              Release bundles include the repository notices and preserve the
+              Warp license split documented in the source tree.
             </p>
           </article>
         </div>
@@ -132,27 +149,39 @@ M app/src/root_view.rs
 
       <section id="quickstart" class="quickstart-section">
         <div class="section-heading">
-          <p class="eyebrow">Quickstart</p>
-          <h2>Download a bundle, then open Labrador.</h2>
+          <p class="eyebrow">Install notes</p>
+          <h2>Start from the latest GitHub release.</h2>
+          <p>
+            These bundles are for early testing. Download the asset for your
+            platform, inspect the included source notices, and expect normal
+            unsigned-app prompts on desktop operating systems.
+          </p>
         </div>
-        <div class="quickstart-grid">
-          <div class="command-panel">
-            <div class="panel-title">After install</div>
-            <pre><code>labrador --help
-labrador completions zsh</code></pre>
-            <button class="copy-button" type="button" data-copy="labrador --help">
-              Copy command
-            </button>
-          </div>
-          <div class="checklist">
-            <h3>Good for</h3>
-            <ul>
-              <li>Daily shell and project navigation</li>
-              <li>Local development in a Warp-based terminal</li>
-              <li>macOS DMG, Linux tar.gz, and Windows zip downloads</li>
-              <li>Optional AI-assisted coding workflows</li>
-            </ul>
-          </div>
+        <div class="quickstart-grid install-grid">
+          <article class="install-card">
+            <span>macOS</span>
+            <h3>Download the DMG.</h3>
+            <p>
+              Open the disk image and use the included binary or install script.
+              The build is unsigned, so macOS may ask you to approve it.
+            </p>
+          </article>
+          <article class="install-card">
+            <span>Linux</span>
+            <h3>Extract the archive.</h3>
+            <p>
+              The tar.gz bundle contains the Labrador binary alongside README,
+              NOTICE, and license files from the tagged release.
+            </p>
+          </article>
+          <article class="install-card">
+            <span>Windows</span>
+            <h3>Extract the zip.</h3>
+            <p>
+              The Windows bundle contains labrador.exe and the same release
+              documentation included with the other platform artifacts.
+            </p>
+          </article>
         </div>
       </section>
 
