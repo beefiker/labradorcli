@@ -1,0 +1,10 @@
+Labrador CLI is based on the open-source Warp repository:
+
+https://github.com/warpdotdev/warp
+
+The repository preserves Warp's license split:
+
+- crates/labrador_ui and crates/labrador_ui_core are licensed under MIT.
+- The rest of the repository is licensed under AGPL-3.0-only.
+
+See LICENSE-MIT and LICENSE-AGPL for the full license texts.

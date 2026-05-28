@@ -1,0 +1,13 @@
+pub(crate) mod ask_user_question_view;
+pub(crate) mod code_diff_view;
+pub(crate) mod inline_action_header;
+pub(crate) mod inline_action_icons;
+pub(crate) mod requested_action;
+pub(crate) mod requested_command;
+pub(crate) mod requested_command_attribution;
+pub(crate) mod requested_script;
+pub(super) mod search_codebase;
+pub(crate) mod search_results_common;
+pub(crate) mod suggested_unit_tests;
+pub(super) mod web_fetch;
+pub(super) mod web_search;

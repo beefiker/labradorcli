@@ -1,0 +1,64 @@
+use crate::{auth::auth_state::AuthState, server::telemetry::DownloadSource};
+use std::sync::Arc;
+use labrador_ui::r#async::executor::Background;
+
+/// Determine the Labrador download method (if possible) and send a telemetry event reporting that
+/// method
+pub fn determine_and_report(_auth_state: Arc<AuthState>, executor: Arc<Background>) {
+    let _telemetry_executor = executor.clone();
+    executor
+        .spawn(async move {
+            let _download_source = check_download_source().await;
+        })
+        .detach();
+}
+
+/// Try to determine what method was used to download Labrador. Currently, on macOS, we only support
+/// two download methods:
+///
+/// 1. The default download from our website.
+/// 2. Via `homebrew`
+///
+/// To determine if Labrador was installed with Homebrew, we run `brew list --cask labrador`. That command
+/// will return an failure error code if Labrador was not installed with Homebrew. It will also fail
+/// to launch entirely if Homebrew isn't installed. In either of those cases, we treat the download
+/// as being from the Labrador website.
+#[cfg(target_os = "macos")]
+async fn check_download_source() -> DownloadSource {
+    use std::{env, process::Stdio};
+
+    // By default when launching an app, the PATH is very limited and doesn't include the locations
+    // into which Homebrew installs itself. To make sure we can accurately call `brew`, we need to
+    // update the PATH to include the possible Homebrew locations. Currently, the Homebrew
+    // installer can install into two paths, depending on the architecture (see
+    // https://github.com/Homebrew/install/blob/5e7f30635a945f475a557240f006973c81c71324/install.sh#L153-L158
+    // for details):
+    //
+    // * /opt/homebrew/bin
+    // * /usr/local/bin
+    let mut new_path = String::from("/opt/homebrew/bin:/usr/local/bin:");
+
+    if let Ok(existing) = env::var("PATH") {
+        new_path.push_str(&existing);
+    }
+
+    let result = command::r#async::Command::new("brew")
+        .args(["list", "--cask", "labrador"])
+        .env("HOMEBREW_NO_AUTO_UPDATE", "1")
+        .env("PATH", new_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await;
+
+    match result {
+        Ok(status) if status.success() => DownloadSource::Homebrew,
+        _ => DownloadSource::Website,
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn check_download_source() -> DownloadSource {
+    DownloadSource::Website
+}

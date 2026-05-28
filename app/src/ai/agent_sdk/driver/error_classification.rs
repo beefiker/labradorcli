@@ -1,0 +1,209 @@
+use crate::server::server_api::ai::TaskStatusUpdate;
+use crate::ChannelState;
+use labrador_graphql::ai::{AgentTaskState, PlatformErrorCode};
+
+use super::terminal::ShareSessionError;
+use super::AgentDriverError;
+
+/// Classify an `AgentDriverError` into a task state and a `TaskStatusUpdate`
+/// suitable for reporting via `update_agent_task`.
+pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskStatusUpdate) {
+    match error {
+        // --- Labrador-side errors (task → ERROR) ---
+        AgentDriverError::TerminalUnavailable | AgentDriverError::InvalidRuntimeState => (
+            AgentTaskState::Error,
+            TaskStatusUpdate::with_error_code(
+                "An internal error occurred. Please try running your task again. If the issue persists, contact support.",
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::BootstrapFailed => (
+            AgentTaskState::Error,
+            TaskStatusUpdate::with_error_code(
+                "Terminal session failed to start. Please try running your task again.",
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::ShareSessionFailed { error: share_err } => {
+            let message = match share_err {
+                ShareSessionError::Internal(_) => {
+                    "Failed to share agent session due to an internal error. Please try running your task again.".to_string()
+                }
+                ShareSessionError::Failed(reason) => {
+                    // The reason string comes from the session-sharing layer and is aimed at
+                    // interactive users (e.g. "try sharing again"). Provide a cloud-agent-
+                    // appropriate message instead of wrapping it, which would produce
+                    // repetitive "try again" text.
+                    format!("Failed to share agent session: {reason}")
+                }
+                ShareSessionError::Disabled => {
+                    "Session sharing is not enabled for your account. This is likely because \
+                     an administrator has disabled session sharing for your team. Please \
+                     verify that session sharing is enabled in your team settings, or try \
+                     running without the --share flag."
+                    .to_string()
+                }
+                ShareSessionError::Timeout => {
+                    "Failed to share agent session: timed out waiting for the session sharing \
+                     server to respond. Please check your network connection and try again."
+                    .to_string()
+                }
+                ShareSessionError::Interrupted => {
+                    "Session sharing was interrupted before it could complete. Please try running your task again.".to_string()
+                }
+            };
+            (
+                AgentTaskState::Error,
+                TaskStatusUpdate::with_error_code(
+                    message,
+                    match share_err {
+                        ShareSessionError::Disabled => PlatformErrorCode::FeatureNotAvailable,
+                        _ => PlatformErrorCode::InternalError,
+                    },
+                ),
+            )
+        }
+        AgentDriverError::LabradorDriveSyncFailed => (
+            AgentTaskState::Error,
+            TaskStatusUpdate::with_error_code(
+                format!(
+                    "{} failed to sync. Please check your network connection and try again.",
+                    ChannelState::app_name_drive()
+                ),
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::NotLoggedIn => {
+            let bin = labrador_cli::binary_name().unwrap_or_else(|| "labrador".to_string());
+            (
+                AgentTaskState::Error,
+                TaskStatusUpdate::with_error_code(
+                    format!(
+                        "Authentication required. Log in via '{bin} login', provide an API key via '--api-key', or set the LABRADOR_API_KEY environment variable."
+                    ),
+                    PlatformErrorCode::AuthenticationRequired,
+                ),
+            )
+        }
+        // --- User-side errors (task → FAILED) ---
+        AgentDriverError::AIWorkflowNotFound(id) => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!(
+                    "Saved prompt not found for ID {id}. Verify the prompt exists in your {}.",
+                    ChannelState::app_name_drive()
+                ),
+                PlatformErrorCode::ResourceNotFound,
+            ),
+        ),
+        AgentDriverError::InvalidWorkingDirectory { path, .. } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!(
+                    "Working directory '{}' does not exist or is not a directory. Verify the path in your environment configuration.",
+                    path.display()
+                ),
+                PlatformErrorCode::EnvironmentSetupFailed,
+            ),
+        ),
+
+        // --- Setup errors ---
+        AgentDriverError::TeamMetadataRefreshTimeout => (
+            AgentTaskState::Error,
+            TaskStatusUpdate::with_error_code(
+                "Timed out refreshing team metadata. Please check your network connection and try again.",
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::SkillResolutionFailed(msg) => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!("Skill resolution failed: {msg}"),
+                PlatformErrorCode::ResourceNotFound,
+            ),
+        ),
+        AgentDriverError::ConfigBuildFailed(err) => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!("Failed to build agent configuration: {err}"),
+                PlatformErrorCode::EnvironmentSetupFailed,
+            ),
+        ),
+        AgentDriverError::PromptResolutionFailed(err) => (
+            AgentTaskState::Error,
+            TaskStatusUpdate::with_error_code(
+                format!("Failed to resolve prompt for the run: {err}"),
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::SecretsFetchFailed(err) => (
+            AgentTaskState::Error,
+            TaskStatusUpdate::with_error_code(
+                format!("Failed to fetch task secrets: {err}"),
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::ConversationLoadFailed(msg) => (
+            AgentTaskState::Error,
+            TaskStatusUpdate::with_error_code(
+                format!("Failed to load conversation: {msg}"),
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::ConversationHarnessMismatch { conversation_id, expected, got } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!(
+                    "Conversation {conversation_id} was produced by the {expected} harness, but --harness {got} was requested. \
+                     Re-run with --harness {expected} (or omit --harness) to continue this conversation."
+                ),
+                PlatformErrorCode::EnvironmentSetupFailed,
+            ),
+        ),
+        AgentDriverError::TaskHarnessMismatch { task_id, expected, got } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!(
+                    "Task {task_id} was created with the {expected} harness, but --harness {got} was requested. \
+                     Re-run with --harness {expected} (or omit --harness) to continue this task."
+                ),
+                PlatformErrorCode::EnvironmentSetupFailed,
+            ),
+        ),
+        AgentDriverError::ConversationResumeStateMissing { harness, conversation_id } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!(
+                    "Conversation {conversation_id} has no stored transcript for the {harness} harness. \
+                     The prior run may have crashed before saving any state."
+                ),
+                PlatformErrorCode::ResourceNotFound,
+            ),
+        ),
+        AgentDriverError::HarnessCommandFailed { exit_code } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!("Harness command exited with code {exit_code}"),
+                PlatformErrorCode::InternalError,
+            ),
+        ),
+        AgentDriverError::HarnessSetupFailed { harness, reason } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!("Harness '{harness}' validation failed: {reason}"),
+                PlatformErrorCode::EnvironmentSetupFailed,
+            ),
+        ),
+        AgentDriverError::HarnessConfigSetupFailed { harness, error } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                format!("Harness '{harness}' config setup failed: {error}"),
+                PlatformErrorCode::EnvironmentSetupFailed,
+            ),
+        ),
+    }
+}
+
+#[cfg(test)]
+#[path = "error_classification_tests.rs"]
+mod tests;

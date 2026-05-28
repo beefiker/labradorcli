@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Labrador CLI</title>
+    <meta
+      name="description"
+      content="Labrador CLI is a Warp-based terminal app with local development workflows and downloadable release bundles from GitHub."
+    >
+    <meta name="theme-color" content="#10100f">
+    <link rel="canonical" href="https://labradorcli.com/">
+    <meta property="og:title" content="Labrador CLI">
+    <meta
+      property="og:description"
+      content="A Warp-based terminal app for local development workflows."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://labradorcli.com/">
+    <meta property="og:image" content="https://labradorcli.com/assets/labrador-icon.png">
+    <link rel="icon" href="/assets/labrador-icon.png">
+    <link rel="apple-touch-icon" href="/assets/labrador-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/script.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header" aria-label="Primary navigation">
+      <a class="brand" href="/" aria-label="Labrador CLI home">
+        <img src="/assets/labrador-icon.png" alt="" width="32" height="32">
+        <span>Labrador CLI</span>
+      </a>
+      <nav class="nav-links" aria-label="Site links">
+        <a href="#features">Features</a>
+        <a href="#downloads">Downloads</a>
+        <a href="#source">Source</a>
+        <a href="https://github.com/beefiker/labradorcli" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Warp-based terminal app</p>
+          <h1 id="hero-title">Labrador CLI</h1>
+          <p class="lede">
+            A fast terminal experience for local development, packaged as
+            downloadable app and CLI bundles from GitHub Releases.
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a
+              id="primaryDownload"
+              class="button button-primary"
+              href="https://github.com/beefiker/labradorcli/releases/latest"
+              rel="noreferrer"
+            >
+              Download latest
+            </a>
+            <a class="button button-secondary" href="#quickstart">View quickstart</a>
+          </div>
+          <p id="releaseStatus" class="release-status" aria-live="polite">
+            Checking GitHub Releases...
+          </p>
+        </div>
+
+        <div class="terminal-showcase" aria-label="Labrador CLI terminal preview">
+          <div class="window-bar" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <pre><code><span class="muted">$</span> labrador --help
+Usage: labrador [COMMAND]
+
+<span class="muted">$</span> git status --short
+M app/src/root_view.rs
+
+<span class="muted">$</span> labrador completions zsh
+# shell integration ready
+
+<span class="muted">$</span> cargo test -p labrador_cli
+<span class="green">ok</span> terminal workflow stays local</code></pre>
+        </div>
+      </section>
+
+      <section class="signal-strip" aria-label="Product signals">
+        <div>
+          <strong>GitHub-native releases</strong>
+          <span>Download bundles straight from repository artifacts.</span>
+        </div>
+        <div>
+          <strong>Terminal-first</strong>
+          <span>Built around the shell workflows developers already use.</span>
+        </div>
+        <div>
+          <strong>Local by default</strong>
+          <span>Keep command execution and project work on your machine.</span>
+        </div>
+      </section>
+
+      <section id="features" class="section-band">
+        <div class="section-heading">
+          <p class="eyebrow">Terminal experience</p>
+          <h2>A familiar terminal with Labrador workflows built in.</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <span class="feature-mark">01</span>
+            <h3>Warp-based foundation</h3>
+            <p>
+              Start from a modern terminal baseline with native app packaging,
+              fast command interaction, and developer-focused defaults.
+            </p>
+          </article>
+          <article>
+            <span class="feature-mark">02</span>
+            <h3>App and CLI together</h3>
+            <p>
+              Use Labrador as a desktop terminal, then drop into the CLI for
+              completions, scripted workflows, and release-channel builds.
+            </p>
+          </article>
+          <article>
+            <span class="feature-mark">03</span>
+            <h3>Local coding workflows</h3>
+            <p>
+              Run project-aware development tasks from the same environment
+              where you build, test, and inspect your repository.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="quickstart" class="quickstart-section">
+        <div class="section-heading">
+          <p class="eyebrow">Quickstart</p>
+          <h2>Download a bundle, then open Labrador.</h2>
+        </div>
+        <div class="quickstart-grid">
+          <div class="command-panel">
+            <div class="panel-title">After install</div>
+            <pre><code>labrador --help
+labrador completions zsh</code></pre>
+            <button class="copy-button" type="button" data-copy="labrador --help">
+              Copy command
+            </button>
+          </div>
+          <div class="checklist">
+            <h3>Good for</h3>
+            <ul>
+              <li>Daily shell and project navigation</li>
+              <li>Local development in a Warp-based terminal</li>
+              <li>Downloadable app and CLI release bundles</li>
+              <li>Optional AI-assisted coding workflows</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="downloads" class="download-section">
+        <div class="section-heading">
+          <p class="eyebrow">Downloads</p>
+          <h2>Release bundles come from GitHub.</h2>
+          <p>
+            The download button detects the visitor's platform and selects the
+            closest matching asset from the latest GitHub release. Until assets
+            exist, it opens the latest release page.
+          </p>
+        </div>
+        <div class="download-panel">
+          <div>
+            <h3>Latest release</h3>
+            <p id="releaseMeta">Waiting for GitHub release metadata.</p>
+          </div>
+          <div class="download-actions">
+            <a
+              id="downloadMirror"
+              class="button button-primary"
+              href="https://github.com/beefiker/labradorcli/releases/latest"
+              rel="noreferrer"
+            >
+              Download latest
+            </a>
+            <a
+              class="button button-secondary"
+              href="https://github.com/beefiker/labradorcli/releases"
+              rel="noreferrer"
+            >
+              All releases
+            </a>
+          </div>
+        </div>
+        <ul id="releaseAssets" class="asset-list" aria-label="Release assets"></ul>
+      </section>
+
+      <section id="source" class="section-band">
+        <div class="section-heading">
+          <p class="eyebrow">Source</p>
+          <h2>Public source, based on Warp.</h2>
+          <p>
+            Labrador CLI is built from a Warp-based terminal codebase. The
+            repository keeps the source visible and preserves Warp's AGPL/MIT
+            license split.
+          </p>
+          <a
+            class="button button-secondary"
+            href="https://github.com/beefiker/labradorcli"
+            rel="noreferrer"
+          >
+            View source
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>labradorcli.com</span>
+      <a href="https://github.com/beefiker/labradorcli" rel="noreferrer">Repository</a>
+      <a href="https://github.com/beefiker/labradorcli/releases" rel="noreferrer">Releases</a>
+    </footer>
+  </body>
+</html>

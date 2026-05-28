@@ -1,0 +1,23 @@
+[Desktop Entry]
+# The version of the desktop entry spec this conforms to.
+Version=1.0
+
+Type=Application
+
+Name=Labrador
+GenericName=TerminalEmulator
+
+Exec=labrador-terminal %U
+StartupWMClass=dev.labrador.Labrador
+
+Keywords=shell;prompt;command;commandline;cmd;
+
+Icon=dev.labrador.Labrador
+
+Categories=System;TerminalEmulator;
+
+# Don't run this application within a terminal.
+Terminal=false
+
+# Register ourselves as the handler for labrador:// URLs.
+MimeType=x-scheme-handler/labrador;

@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "script/test_welcome currently supports macOS only." >&2
+  exit 1
+fi
+
+PROFILE="${LABRADOR_DATA_PROFILE:-welcome-test}"
+DOMAIN="dev.labrador.Labrador-${PROFILE}"
+APP_BIN="target/debug/bundle/osx/Labrador.app/Contents/MacOS/labrador"
+DEBUG_BIN="target/debug/labrador"
+REBUILD="${LABRADOR_TEST_WELCOME_REBUILD:-0}"
+LOG_FILE="${TMPDIR:-/tmp}/labrador-welcome-test.log"
+
+launch_existing() {
+  local bin="$1"
+  echo "Logs: ${LOG_FILE}"
+  LABRADOR_DATA_PROFILE="${PROFILE}" "./${bin}" >"${LOG_FILE}" 2>&1 &
+  echo "Launched Labrador welcome test as PID $!"
+}
+
+if pgrep -f "Labrador.app/Contents/MacOS/labrador" >/dev/null; then
+  cat >&2 <<EOF
+Labrador is already running. Quit Labrador first, then run:
+
+  ./script/test_welcome
+
+This script uses an isolated test profile:
+  LABRADOR_DATA_PROFILE=${PROFILE}
+
+Your normal Labrador profile is not changed.
+EOF
+  exit 1
+fi
+
+defaults delete "${DOMAIN}" HasCompletedOnboarding >/dev/null 2>&1 || true
+defaults delete "${DOMAIN}" HasCompletedHOAOnboarding >/dev/null 2>&1 || true
+defaults synchronize "${DOMAIN}" >/dev/null 2>&1 || true
+
+echo "Launching Labrador first-run welcome test profile: ${PROFILE}"
+echo "Defaults domain: ${DOMAIN}"
+echo "Normal Labrador profile is untouched."
+
+if [[ "${REBUILD}" != "1" && -x "${APP_BIN}" ]]; then
+  echo "Using existing bundled app. Set LABRADOR_TEST_WELCOME_REBUILD=1 to rebuild first."
+  launch_existing "${APP_BIN}"
+  exit 0
+fi
+
+if [[ "${REBUILD}" != "1" && -x "${DEBUG_BIN}" ]]; then
+  echo "Using existing debug binary. Set LABRADOR_TEST_WELCOME_REBUILD=1 to rebuild first."
+  launch_existing "${DEBUG_BIN}"
+  exit 0
+fi
+
+if ! xcrun -f metal >/dev/null 2>&1; then
+  XCODE_DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+  if [[ -x "${XCODE_DEVELOPER_DIR}/Toolchains/XcodeDefault.xctoolchain/usr/bin/metal" ]]; then
+    export DEVELOPER_DIR="${XCODE_DEVELOPER_DIR}"
+    echo "Using full Xcode developer tools for Metal shader compilation: ${DEVELOPER_DIR}"
+  else
+    cat >&2 <<EOF
+Apple's Metal shader compiler is unavailable.
+
+Install full Xcode and its Metal toolchain, then either run:
+
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+or rerun this script with DEVELOPER_DIR pointing at a full Xcode install.
+EOF
+    exit 1
+  fi
+fi
+
+LABRADOR_DATA_PROFILE="${PROFILE}" ./script/run

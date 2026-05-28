@@ -1,0 +1,12 @@
+[package]
+name = "firebase"
+authors = ["Labrador Team <beefiker@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+description = "Utilities for firebase client APIs"
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true

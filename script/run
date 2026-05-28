@@ -1,0 +1,144 @@
+#!/bin/bash
+#
+# Cross-platform entrypoint for running a local Labrador build.
+#
+# On macOS this delegates to `./script/macos/run`, which builds and runs Labrador
+# as a real `.app` bundle (with code signing, plist updates, etc.). On Linux
+# and Windows it invokes `cargo run` directly for the appropriate binary.
+#
+# This script owns all cross-platform setup (selecting the OSS binary and
+# mapping legacy `--features` entries to environment variables), so
+# platform-specific scripts can assume those values are already provided via
+# environment variables.
+
+set -e
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+cd "${REPO_ROOT}"
+
+OS_TYPE="$(uname -s)"
+
+FEATURES="gui"
+
+LABRADOR_BIN_NAME="${LABRADOR_BIN_NAME:-labrador}"
+LABRADOR_CHANNEL="${LABRADOR_CHANNEL:-oss}"
+
+usage() {
+  cat <<EOF
+Usage: ./script/run [options] [-- app-args...]
+
+Build and run a local Labrador app bundle on macOS, or run the Labrador binary
+directly on Linux/Windows.
+
+Options:
+  --features FEATURES   Add comma-separated cargo features
+  --host-id HOST_ID     Set LABRADOR_CLOUD_MODE_DEFAULT_HOST
+  --release             Build in release mode
+  --profile PROFILE     Build with the named cargo profile
+  --dont-open           Build the macOS app bundle without opening it
+  --open_with_launchd   Open the macOS app via launchd
+  --generate-schema     Generate settings schema during macOS bundling
+  -h, --help            Show this help
+
+Use '--' before arguments that should be passed to Labrador itself.
+EOF
+}
+
+# Shared argument parsing. macOS-specific flags (--dont-open,
+# --open_with_launchd, --generate-schema) are forwarded through MAC_ARGS and
+# silently ignored on other platforms.
+MAC_ARGS=()
+CARGO_PARAMS=()
+LABRADOR_ARGS=()
+
+while (( "$#" )); do
+  case "$1" in
+    --)
+      shift
+      LABRADOR_ARGS=("$@")
+      break
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --features)
+      if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+        FEATURES="$FEATURES,$2"
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
+      ;;
+    --host-id)
+      if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+        export LABRADOR_CLOUD_MODE_DEFAULT_HOST="$2"
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
+      ;;
+    --release)
+      CARGO_PARAMS+=("$1")
+      MAC_ARGS+=("$1")
+      shift
+      ;;
+    --profile)
+      if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+        CARGO_PARAMS+=("$1" "$2")
+        MAC_ARGS+=("$1" "$2")
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
+      ;;
+    *)
+      # Unknown flags (including macOS-only flags like --dont-open) and any
+      # positional arguments are forwarded to the platform-specific script.
+      MAC_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# These cargo features were removed and replaced by environment variables read
+# by the channel configuration code. Intercept them here so that existing --features
+# invocations keep working.
+for mapping in \
+    "with_local_server:WITH_LOCAL_SERVER" \
+    "with_local_session_sharing_server:WITH_LOCAL_SESSION_SHARING_SERVER" \
+    "with_sandbox_telemetry:WITH_SANDBOX_TELEMETRY"; do
+    feature="${mapping%%:*}"
+    env_var="${mapping##*:}"
+    if [[ ",$FEATURES," =~ ,"$feature", ]]; then
+        export "$env_var"=1
+        FEATURES="$(echo "$FEATURES" | sed "s/,$feature,/,/; s/^$feature,//; s/,$feature$//; s/^$feature$//")"
+        FEATURES="$(echo "$FEATURES" | sed 's/,,*/,/g; s/^,//; s/,$//')"
+        echo "Note: '$feature' is no longer a cargo feature; setting $env_var=1 instead."
+    fi
+done
+
+export FEATURES
+export LABRADOR_BIN_NAME
+export LABRADOR_CHANNEL
+
+if [[ "$OS_TYPE" = "Darwin" ]]; then
+  if [[ ${#LABRADOR_ARGS[@]} -gt 0 ]]; then
+    exec ./script/macos/run "${MAC_ARGS[@]}" -- "${LABRADOR_ARGS[@]}"
+  else
+    exec ./script/macos/run "${MAC_ARGS[@]}"
+  fi
+elif [[ "$OS_TYPE" = "Linux" ]] || [[ "$OS_TYPE" =~ ^(MINGW64_NT|MSYS_NT) ]]; then
+  echo "Running cargo run --bin $LABRADOR_BIN_NAME --features \"$FEATURES\" ${CARGO_PARAMS[*]}"
+  if [[ ${#LABRADOR_ARGS[@]} -gt 0 ]]; then
+    cargo run --bin "$LABRADOR_BIN_NAME" --features "$FEATURES" "${CARGO_PARAMS[@]}" -- "${LABRADOR_ARGS[@]}"
+  else
+    cargo run --bin "$LABRADOR_BIN_NAME" --features "$FEATURES" "${CARGO_PARAMS[@]}"
+  fi
+else
+  echo "No run script defined for the current platform ($OS_TYPE)!" >&2
+  exit 1
+fi

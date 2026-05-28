@@ -1,0 +1,240 @@
+#!/bin/bash
+#
+# macOS-specific implementation of `./script/run`. Runs a local version of
+# Labrador as a real 'app' instead of a bare executable, so macOS can treat it
+# like a real signed app (custom URL schemes, user notifications, etc.).
+#
+# This script is invoked by `./script/run`, which handles cross-platform
+# setup (binary name selection and feature-to-env-var mapping). The following
+# env vars are expected to be set by the caller:
+#   LABRADOR_BIN_NAME  — "labrador"
+#   LABRADOR_CHANNEL   — "oss"
+#   FEATURES       — comma-separated cargo features (already normalized)
+# Must be called from the root directory of the Labrador repo.
+
+set -e
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
+cd "${REPO_ROOT}"
+
+: "${FEATURES:?FEATURES must be set (invoke via ./script/run)}"
+
+LABRADOR_BIN_NAME="${LABRADOR_BIN_NAME:-}"
+LABRADOR_CHANNEL="${LABRADOR_CHANNEL:-}"
+: "${LABRADOR_BIN_NAME:?LABRADOR_BIN_NAME must be set (invoke via ./script/run)}"
+: "${LABRADOR_CHANNEL:?LABRADOR_CHANNEL must be set (invoke via ./script/run)}"
+
+if [ "$LABRADOR_CHANNEL" = "local" ]; then
+    LABRADOR_APP_PATH="target/debug/bundle/osx/LabradorLocal.app"
+    LABRADOR_SCHEME_NAME="labradorlocal"
+else
+    LABRADOR_APP_PATH="target/debug/bundle/osx/Labrador.app"
+    LABRADOR_SCHEME_NAME="labrador"
+fi
+DONT_OPEN=false
+# Launches the binary with "open", meaning the Labrador process is
+# launched by the MacOS application launcher instead of a shell session.
+# Note that since Labrador isn't launched as a child process, using ctrl+c
+# won't kill the app (but will kill the tail process displaying output).
+# tl;dr better simulates running Labrador Dev/Stable
+OPEN_WITH_LAUNCHD=false
+
+# Arguments to pass directly to Labrador (specified after --)
+# This is not supported when opening with launchd, as passing CLI arguments to
+# an application doesn't make sense.
+LABRADOR_ARGS=()
+
+# Export this variable so it can be referenced by app/build.rs later when
+# running `cargo bundle`.
+export FRAMEWORK_OVERRIDE="dev"
+
+PARAMS=""
+while (( "$#" )); do
+  case "$1" in
+    --)
+      shift
+      LABRADOR_ARGS=("$@")
+      break
+      ;;
+    --dont-open)
+      DONT_OPEN=true
+      shift
+      ;;
+    --release)
+      echo "Detected release build, pointing at release bundle under target/release/bundle"
+      if [ "$LABRADOR_CHANNEL" = "local" ]; then
+          LABRADOR_APP_PATH="target/release/bundle/osx/LabradorLocal.app"
+      else
+          LABRADOR_APP_PATH="target/release/bundle/osx/Labrador.app"
+      fi
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+    --profile)
+      PROFILE="$2"
+      shift 2
+      if [ "$LABRADOR_CHANNEL" = "local" ]; then
+          LABRADOR_APP_PATH="target/${PROFILE}/bundle/osx/LabradorLocal.app"
+      else
+          LABRADOR_APP_PATH="target/${PROFILE}/bundle/osx/Labrador.app"
+      fi
+      PARAMS="$PARAMS --profile $PROFILE"
+      ;;
+    --open_with_launchd)
+      OPEN_WITH_LAUNCHD=true
+      shift
+      ;;
+    --generate-schema)
+      GENERATE_SCHEMA=true
+      shift
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done
+
+ensure_metal_toolchain() {
+  if xcrun -f metal >/dev/null 2>&1 &&
+     xcrun -f metallib >/dev/null 2>&1 &&
+     xcrun --sdk macosx metal --help >/dev/null 2>&1; then
+    return
+  fi
+
+  local selected_developer_dir
+  selected_developer_dir="$(xcode-select -p 2>/dev/null || true)"
+  local xcode_developer_dir="/Applications/Xcode.app/Contents/Developer"
+  local xcode_probe=""
+  local xcode_metal_probe=""
+  local xcode_metallib_probe=""
+
+  if [[ -d "$xcode_developer_dir" ]]; then
+    xcode_probe="$(DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metal 2>&1 || true)"
+    xcode_metal_probe="$(DEVELOPER_DIR="$xcode_developer_dir" xcrun --sdk macosx metal --help 2>&1 >/dev/null || true)"
+    xcode_metallib_probe="$(DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metallib 2>&1 || true)"
+    if DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metal >/dev/null 2>&1 &&
+       DEVELOPER_DIR="$xcode_developer_dir" xcrun -f metallib >/dev/null 2>&1 &&
+       DEVELOPER_DIR="$xcode_developer_dir" xcrun --sdk macosx metal --help >/dev/null 2>&1; then
+      export DEVELOPER_DIR="$xcode_developer_dir"
+      echo "Using full Xcode developer tools for Metal shader compilation: $DEVELOPER_DIR"
+      return
+    fi
+  fi
+
+  cat >&2 <<EOF
+Labrador needs Apple's Metal shader compiler to build the macOS app.
+
+Current developer tools:
+  ${selected_developer_dir:-unknown}
+EOF
+
+  if [[ "$xcode_probe" == *"license"* || "$xcode_metal_probe" == *"license"* ]]; then
+    cat >&2 <<EOF
+
+Full Xcode is installed, but its license has not been accepted. Run:
+
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+  sudo xcodebuild -license
+
+Then rerun:
+
+  ./script/run
+EOF
+  elif [[ "$xcode_metal_probe" == *"missing Metal Toolchain"* || "$xcode_metallib_probe" == *"metallib"* ]]; then
+    cat >&2 <<EOF
+
+Full Xcode is selected, but Apple's optional Metal Toolchain component is not installed. Run:
+
+  xcodebuild -downloadComponent MetalToolchain
+
+Then rerun:
+
+  ./script/run
+EOF
+  elif [[ -d "$xcode_developer_dir" ]]; then
+    cat >&2 <<EOF
+
+Full Xcode was found at:
+  $xcode_developer_dir
+
+But its Metal tools are not usable yet:
+  ${xcode_metal_probe:-$xcode_probe}
+
+After installing Xcode's Metal toolchain, either select full Xcode:
+
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+or rerun with:
+
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/run
+EOF
+  else
+    cat >&2 <<EOF
+
+Install full Xcode from the App Store or Apple Developer, then either select it:
+
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+or rerun with:
+
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/run
+EOF
+  fi
+
+  exit 1
+}
+
+ensure_metal_toolchain
+
+rm -rf "$LABRADOR_APP_PATH"
+
+pushd app > /dev/null
+echo "Bundling app (bin: $LABRADOR_BIN_NAME)..."
+BUNDLE_TERM="${TERM:-xterm-256color}"
+if [ "$BUNDLE_TERM" = "dumb" ]; then
+  BUNDLE_TERM="xterm-256color"
+fi
+TERM="$BUNDLE_TERM" cargo bundle --bin "$LABRADOR_BIN_NAME" --features "$FEATURES" $PARAMS
+echo "Successfully bundled..."
+popd > /dev/null
+
+if [[ ",$FEATURES," =~ ",cocoa_sentry," ]]; then
+  echo "Copying Sentry framework into app bundle..."
+  SENTRY_FRAMEWORK="app/frameworks/dev/Sentry-Dynamic-WithARM64e.xcframework/macos-arm64_arm64e_x86_64/Sentry.framework"
+  cp -a "$SENTRY_FRAMEWORK" "$LABRADOR_APP_PATH/Contents/Frameworks/"
+fi
+echo "Adding rpath to support mac frameworks (e.g. Sentry)"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$LABRADOR_APP_PATH/Contents/MacOS/$LABRADOR_BIN_NAME"
+
+export LABRADOR_PLIST_PATH="$LABRADOR_APP_PATH/Contents/Info.plist"
+./script/update_plist
+
+echo "Preparing bundled resources..."
+if [ "${GENERATE_SCHEMA:-false}" != "true" ]; then
+  export SKIP_SETTINGS_SCHEMA=1
+fi
+NO_LICENSES=1 "${REPO_ROOT}/script/prepare_bundled_resources" "$LABRADOR_APP_PATH/Contents/Resources" "$LABRADOR_CHANNEL"
+
+"${REPO_ROOT}/script/compile_icon" "$LABRADOR_CHANNEL" "$LABRADOR_APP_PATH"
+
+if [[ ",$FEATURES," =~ ",heap_usage_tracking," ]]; then
+  echo "Bundling pprof..."
+  HELPERS_DIR="$LABRADOR_APP_PATH/Contents/Helpers"
+  "${REPO_ROOT}/script/prepare_bundled_pprof" "$HELPERS_DIR"
+fi
+
+echo "Codesigning app..."
+SIGNING_CERT="$(security find-identity -p codesigning -v | grep "Apple Development" | awk '{print $2}' | head -1)"
+codesign --force --deep --options runtime --sign "${SIGNING_CERT:--}" "$LABRADOR_APP_PATH" --entitlements script/Debug-Entitlements.plist
+
+if [ "$DONT_OPEN" = false ] ; then
+    if  [ "$OPEN_WITH_LAUNCHD" = true ]; then
+        echo "Launching with MacOS application launcher"
+        PATH="" /usr/bin/open "./$LABRADOR_APP_PATH"
+        tail -f ~/Library/Logs/labrador_local.log
+    else
+        echo "Opening app at ./$LABRADOR_APP_PATH/Contents/MacOS/$LABRADOR_BIN_NAME"
+        "./$LABRADOR_APP_PATH/Contents/MacOS/$LABRADOR_BIN_NAME" "${LABRADOR_ARGS[@]}"
+    fi
+fi

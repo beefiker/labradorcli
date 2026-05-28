@@ -1,0 +1,1 @@
+echo -e '\n# Auto-Labradorify\nstatus --is-interactive; and printf '\''\eP$f{"hook": "SourcedRcFileForLabrador", "value": { "shell": "%", "uname": "'$(uname)'"% }}\x9c'\'' ' >> %

@@ -1,0 +1,9 @@
+---
+name: "Run Labrador locally with shell"
+command: "LABRADOR_SHELL_PATH={{shell}} cargo run"
+description: "Runs Labrador with the particular shell so devs don't need to change their login shell to test a different shell locally"
+arguments:
+  - name: shell
+    description: path of shell to use
+author: Labrador Team
+shells: []

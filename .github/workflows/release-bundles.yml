@@ -1,0 +1,184 @@
+name: Release Bundles
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create or update"
+        required: true
+        default: "v0.1.0"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -C debuginfo=line-tables-only --cfg=web_sys_unstable_apis
+
+jobs:
+  prepare-release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: release
+        name: Resolve release tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          notes="$(mktemp)"
+          cat > "$notes" <<'EOF'
+          Portable Labrador CLI release bundles.
+
+          These assets are unsigned CLI builds for local development workflows. Desktop app installers will be published separately after platform signing and notarization are configured.
+          EOF
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Labrador CLI $RELEASE_TAG" \
+              --notes-file "$notes"
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Labrador CLI $RELEASE_TAG" \
+              --notes-file "$notes"
+          fi
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: prepare-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            os: macos-latest
+            shell: bash
+          - platform: linux
+            os: ubuntu-latest
+            shell: bash
+          - platform: windows
+            os: windows-latest
+            shell: pwsh
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            brotli \
+            build-essential \
+            cmake \
+            curl \
+            git \
+            jq \
+            libasound2-dev \
+            libexpat1-dev \
+            libfontconfig1-dev \
+            libfreetype-dev \
+            libgit2-dev \
+            libssl-dev \
+            pkg-config \
+            python-is-python3 \
+            unzip
+
+          protoc_version="25.1"
+          case "$(uname -m)" in
+            x86_64) protoc_zip="protoc-${protoc_version}-linux-x86_64.zip" ;;
+            aarch64) protoc_zip="protoc-${protoc_version}-linux-aarch_64.zip" ;;
+            *) echo "Unsupported architecture for protoc: $(uname -m)"; exit 1 ;;
+          esac
+
+          curl -fsSL -o "$RUNNER_TEMP/protoc.zip" \
+            "https://github.com/protocolbuffers/protobuf/releases/download/v${protoc_version}/${protoc_zip}"
+          sudo unzip -o "$RUNNER_TEMP/protoc.zip" -d /usr/local bin/protoc 'include/*'
+
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: brew install protobuf
+
+      - name: Install Windows build dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "25.1"
+          $archive = "protoc-$version-win64.zip"
+          $url = "https://github.com/protocolbuffers/protobuf/releases/download/v$version/$archive"
+          $zipPath = Join-Path $env:RUNNER_TEMP $archive
+          $installDir = Join-Path $env:RUNNER_TEMP "protoc"
+
+          Invoke-WebRequest -Uri $url -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
+          Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $installDir "bin")
+
+      - name: Build CLI
+        run: cargo build -p labrador --bin labrador --release --features standalone
+
+      - name: Package Unix bundle
+        if: matrix.shell == 'bash'
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#v}"
+          arch="$(uname -m)"
+          asset="labradorcli-${version}-${{ matrix.platform }}-${arch}.tar.gz"
+
+          mkdir -p package dist
+          cp target/release/labrador package/labrador
+          chmod +x package/labrador
+          cp README.md NOTICE LICENSE-AGPL LICENSE-MIT package/
+
+          tar -czf "dist/$asset" -C package .
+          gh release upload "$RELEASE_TAG" "dist/$asset" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Package Windows bundle
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart("v")
+          $arch = $env:PROCESSOR_ARCHITECTURE.ToLowerInvariant()
+          $asset = "labradorcli-$version-windows-$arch.zip"
+
+          New-Item -ItemType Directory -Force package, dist | Out-Null
+          Copy-Item target/release/labrador.exe package/labrador.exe
+          Copy-Item README.md, NOTICE, LICENSE-AGPL, LICENSE-MIT package/
+
+          Compress-Archive -Path package/* -DestinationPath "dist/$asset" -Force
+          gh release upload $env:RELEASE_TAG "dist/$asset" `
+            --repo $env:GITHUB_REPOSITORY `
+            --clobber

@@ -1,0 +1,48 @@
+use js_sys::ReferenceError;
+use thiserror::Error;
+use wasm_bindgen::{JsCast, JsValue};
+
+pub use labrador_web_event_bus::{emit_event, LabradorEvent};
+
+/// This function should be called early in application initialization to ensure that
+/// static variables are initialized.
+pub(super) fn init() {
+    unsafe {
+        extern "C" {
+            /// __wasm_call_ctors is a function defined by the `wasm-ld` linker, and is used to
+            /// initialize static variables.
+            ///
+            /// It should be called once at runtime before other code is executed.
+            fn __wasm_call_ctors();
+        }
+
+        __wasm_call_ctors();
+    }
+}
+
+mod ffi {
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(js_name = "labradorUserHandoff", catch)]
+        pub fn user_handoff() -> Result<Option<String>, JsValue>;
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum AuthHandoffError {
+    #[error("The host page doesn't support user handoff")]
+    Unsupported,
+    #[error("Unexpected handoff error: {0:?}")]
+    Unexpected(JsValue),
+}
+
+/// Fetch the user's Firebase refresh token from the host React app.
+pub fn user_handoff() -> Result<Option<String>, AuthHandoffError> {
+    match ffi::user_handoff() {
+        Ok(handoff) => Ok(handoff),
+        Err(err) if ReferenceError::instanceof(&err) => Err(AuthHandoffError::Unsupported),
+        Err(err) => Err(AuthHandoffError::Unexpected(err)),
+    }
+}

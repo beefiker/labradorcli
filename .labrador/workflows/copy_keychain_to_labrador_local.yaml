@@ -1,0 +1,6 @@
+---
+name: "Copy Labrador dev keychain to Labrador local"
+command: "security add-generic-password -a User -U -s dev.labrador.LabradorLocal -w \"$(security find-generic-password -a User -s dev.labrador.LabradorDev -w)\""
+description: "Copies the refresh token from the development app into the local Labrador app so that it can authenticate."
+author: Labrador Team
+shells: []

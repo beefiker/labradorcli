@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ]
+    },
+    "wiki-rag": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/Users/bee/Documents/Company/wiki-rag",
+        "run",
+        "python",
+        "-m",
+        "wiki_rag.mcp_server"
+      ]
+    }
+  }
+}

@@ -1,0 +1,154 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "attach",
+      "name": "Debug already-running process",
+      "pid": "${command:pickMyProcess}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'labrador'",
+      "cargo": {
+        "args": ["build", "--bin=labrador"],
+        "filter": {
+          "name": "labrador",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable",
+      "preLaunchTask": "build_labrador",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/Labrador.app/Contents/MacOS/labrador",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'labrador' with fast_dev",
+      "cargo": {
+        "args": ["build", "--bin=labrador", "--features=fast_dev"],
+        "filter": {
+          "name": "labrador",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'labrador' with local server",
+      "cargo": {
+        "args": ["build", "--bin=labrador"],
+        "env": {
+          "WITH_LOCAL_SERVER": "1"
+        },
+        "filter": {
+          "name": "labrador",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable local session sharing server",
+      "preLaunchTask": "build_labrador_localsessionsharing",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/Labrador.app/Contents/MacOS/labrador",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable with fast_dev",
+      "env": {
+        "RUST_BACKTRACE": "1"
+      },
+      "preLaunchTask": "build_labrador_fastdev",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/Labrador.app/Contents/MacOS/labrador",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug MacOS executable with fast_dev + local session sharing server",
+      "preLaunchTask": "build_labrador_fastdev_localsessionsharing",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/Labrador.app/Contents/MacOS/labrador",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'labrador'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=labrador", "--package=labrador"],
+        "filter": {
+          "name": "labrador",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration tests in executable 'integration'",
+      "cargo": {
+        "args": ["build", "--bin=integration", "--package=integration"],
+        "env": {
+          "LABRADOR_UI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS": "1"
+        },
+        "filter": {
+          "name": "integration",
+          "kind": "bin"
+        }
+      },
+      "args": ["test_waterfall_input"],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'labrador_ui'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=labrador_ui"],
+        "filter": {
+          "name": "labrador_ui",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["rust"]
+    }
+  ]
+}

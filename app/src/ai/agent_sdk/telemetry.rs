@@ -1,0 +1,387 @@
+use crate::features::FeatureFlag;
+use serde_json::{json, Value};
+use strum_macros::{EnumDiscriminants, EnumIter};
+use labrador_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
+pub(super) enum CliTelemetryEvent {
+    /// Executing `labrador agent run`
+    AgentRun {
+        gui: bool,
+        requested_mcp_servers: usize,
+        has_environment: bool,
+        /// Optional task ID when running against an ambient agent task.
+        task_id: Option<String>,
+        /// Which execution harness was selected (e.g. "oz", "claude").
+        harness: String,
+    },
+    /// Executing `labrador agent run-ambient`
+    AgentRunAmbient,
+    /// Executing `labrador agent profile list`
+    AgentProfileList,
+    /// Executing `labrador agent list`
+    AgentList,
+    /// Executing `labrador environment list`
+    EnvironmentList,
+    /// Executing `labrador environment create`
+    EnvironmentCreate,
+    /// Executing `labrador environment delete`
+    EnvironmentDelete,
+    /// Executing `labrador environment update`
+    EnvironmentUpdate,
+    /// Executing `labrador environment get`
+    EnvironmentGet,
+    /// Executing `labrador environment image list`
+    EnvironmentImageList,
+    /// Executing `labrador mcp list`
+    MCPList,
+    /// Executing `labrador model list`
+    ModelList,
+    /// Executing `labrador task list`
+    TaskList,
+    /// Executing `labrador task get`
+    TaskGet,
+    /// Executing `labrador run conversation get`
+    ConversationGet,
+    /// Executing `labrador run get <id> --conversation`
+    RunConversationGet,
+    /// Executing `labrador run message watch`
+    RunMessageWatch { harness: &'static str },
+    /// Executing `labrador run message send`
+    RunMessageSend { harness: &'static str },
+    /// Executing `labrador run message list`
+    RunMessageList { harness: &'static str },
+    /// Executing `labrador run message read`
+    RunMessageRead { harness: &'static str },
+    /// Executing `labrador run message mark-delivered`
+    RunMessageMarkDelivered { harness: &'static str },
+    /// Executing `labrador login`
+    Login,
+    /// Executing `labrador logout`
+    Logout,
+    /// Executing `labrador whoami`
+    Whoami,
+    /// Executing `labrador provider setup`
+    ProviderSetup,
+    /// Executing `labrador provider list`
+    ProviderList,
+    /// Executing `labrador integration create`
+    IntegrationCreate,
+    /// Executing `labrador integration update`
+    IntegrationUpdate,
+    /// Executing `labrador integration list`
+    IntegrationList,
+    /// Executing `labrador artifact upload`
+    ArtifactUpload,
+    /// Executing `labrador artifact get`
+    ArtifactGet,
+    /// Executing `labrador artifact download`
+    ArtifactDownload,
+    /// Executing `labrador schedule create`
+    ScheduleCreate,
+    /// Executing `labrador schedule list`
+    ScheduleList,
+    /// Executing `labrador schedule get`
+    ScheduleGet,
+    /// Executing `labrador schedule pause`
+    SchedulePause,
+    /// Executing `labrador schedule unpause`
+    ScheduleUnpause,
+    /// Executing `labrador schedule update`
+    ScheduleUpdate,
+    /// Executing `labrador schedule delete`
+    ScheduleDelete,
+    /// Executing `labrador secret create`
+    SecretCreate,
+    /// Executing `labrador secret delete`
+    SecretDelete,
+    /// Executing `labrador secret update`
+    SecretUpdate,
+    /// Executing `labrador secret list`
+    SecretList,
+    /// Executing `labrador harness-support ping`
+    HarnessSupportPing,
+    /// Executing `labrador harness-support report-artifact`
+    HarnessSupportReportArtifact { artifact_type: &'static str },
+    /// Executing `labrador harness-support notify-user`
+    HarnessSupportNotifyUser,
+    /// Executing `labrador harness-support finish-task`
+    HarnessSupportFinishTask { success: bool },
+}
+
+impl TelemetryEvent for CliTelemetryEvent {
+    fn name(&self) -> &'static str {
+        CliTelemetryEventDiscriminants::from(self).name()
+    }
+
+    fn payload(&self) -> Option<Value> {
+        match self {
+            CliTelemetryEvent::AgentRun {
+                gui,
+                requested_mcp_servers,
+                has_environment,
+                task_id,
+                harness,
+            } => Some(json!({
+                "gui": gui,
+                "requested_mcp_servers": requested_mcp_servers,
+                "has_environment": has_environment,
+                "task_id": task_id,
+                "harness": harness,
+            })),
+            CliTelemetryEvent::AgentRunAmbient => None,
+            CliTelemetryEvent::AgentProfileList => None,
+            CliTelemetryEvent::AgentList => None,
+            CliTelemetryEvent::EnvironmentList => None,
+            CliTelemetryEvent::EnvironmentCreate => None,
+            CliTelemetryEvent::EnvironmentDelete => None,
+            CliTelemetryEvent::EnvironmentUpdate => None,
+            CliTelemetryEvent::EnvironmentGet => None,
+            CliTelemetryEvent::EnvironmentImageList => None,
+            CliTelemetryEvent::MCPList => None,
+            CliTelemetryEvent::ModelList => None,
+            CliTelemetryEvent::TaskList => None,
+            CliTelemetryEvent::TaskGet => None,
+            CliTelemetryEvent::ConversationGet => None,
+            CliTelemetryEvent::RunConversationGet => None,
+            CliTelemetryEvent::RunMessageWatch { harness } => Some(json!({ "harness": harness })),
+            CliTelemetryEvent::RunMessageSend { harness } => Some(json!({ "harness": harness })),
+            CliTelemetryEvent::RunMessageList { harness } => Some(json!({ "harness": harness })),
+            CliTelemetryEvent::RunMessageRead { harness } => Some(json!({ "harness": harness })),
+            CliTelemetryEvent::RunMessageMarkDelivered { harness } => {
+                Some(json!({ "harness": harness }))
+            }
+            CliTelemetryEvent::Login => None,
+            CliTelemetryEvent::Logout => None,
+            CliTelemetryEvent::Whoami => None,
+            CliTelemetryEvent::ProviderSetup => None,
+            CliTelemetryEvent::ProviderList => None,
+            CliTelemetryEvent::IntegrationCreate => None,
+            CliTelemetryEvent::IntegrationUpdate => None,
+            CliTelemetryEvent::IntegrationList => None,
+            CliTelemetryEvent::ArtifactUpload => None,
+            CliTelemetryEvent::ArtifactGet => None,
+            CliTelemetryEvent::ArtifactDownload => None,
+            CliTelemetryEvent::ScheduleCreate => None,
+            CliTelemetryEvent::ScheduleList => None,
+            CliTelemetryEvent::ScheduleGet => None,
+            CliTelemetryEvent::SchedulePause => None,
+            CliTelemetryEvent::ScheduleUnpause => None,
+            CliTelemetryEvent::ScheduleUpdate => None,
+            CliTelemetryEvent::ScheduleDelete => None,
+            CliTelemetryEvent::SecretCreate => None,
+            CliTelemetryEvent::SecretDelete => None,
+            CliTelemetryEvent::SecretUpdate => None,
+            CliTelemetryEvent::SecretList => None,
+            CliTelemetryEvent::HarnessSupportPing => None,
+            CliTelemetryEvent::HarnessSupportReportArtifact { artifact_type } => {
+                Some(json!({ "artifact_type": artifact_type }))
+            }
+            CliTelemetryEvent::HarnessSupportNotifyUser => None,
+            CliTelemetryEvent::HarnessSupportFinishTask { success } => {
+                Some(json!({ "success": success }))
+            }
+        }
+    }
+
+    fn description(&self) -> &'static str {
+        CliTelemetryEventDiscriminants::from(self).description()
+    }
+
+    fn enablement_state(&self) -> EnablementState {
+        CliTelemetryEventDiscriminants::from(self).enablement_state()
+    }
+
+    fn contains_ugc(&self) -> bool {
+        false
+    }
+
+    fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
+        labrador_core::telemetry::enum_events::<Self>()
+    }
+}
+
+impl TelemetryEventDesc for CliTelemetryEventDiscriminants {
+    fn name(&self) -> &'static str {
+        match self {
+            CliTelemetryEventDiscriminants::AgentRun => "CLI.Execute.Agent.Run",
+            CliTelemetryEventDiscriminants::AgentRunAmbient => "CLI.Execute.Agent.RunAmbient",
+            CliTelemetryEventDiscriminants::AgentProfileList => "CLI.Execute.Agent.Profile.List",
+            CliTelemetryEventDiscriminants::AgentList => "CLI.Execute.Agent.List",
+            CliTelemetryEventDiscriminants::EnvironmentList => "CLI.Execute.Environment.List",
+            CliTelemetryEventDiscriminants::EnvironmentCreate => "CLI.Execute.Environment.Create",
+            CliTelemetryEventDiscriminants::EnvironmentDelete => "CLI.Execute.Environment.Delete",
+            CliTelemetryEventDiscriminants::EnvironmentUpdate => "CLI.Execute.Environment.Update",
+            CliTelemetryEventDiscriminants::EnvironmentGet => "CLI.Execute.Environment.Get",
+            CliTelemetryEventDiscriminants::EnvironmentImageList => {
+                "CLI.Execute.Environment.Image.List"
+            }
+            CliTelemetryEventDiscriminants::MCPList => "CLI.Execute.MCP.List",
+            CliTelemetryEventDiscriminants::ModelList => "CLI.Execute.Model.List",
+            CliTelemetryEventDiscriminants::TaskList => "CLI.Execute.Task.List",
+            CliTelemetryEventDiscriminants::TaskGet => "CLI.Execute.Task.Get",
+            CliTelemetryEventDiscriminants::ConversationGet => "CLI.Execute.Conversation.Get",
+            CliTelemetryEventDiscriminants::RunConversationGet => {
+                "CLI.Execute.Run.Conversation.Get"
+            }
+            CliTelemetryEventDiscriminants::RunMessageWatch => "CLI.Execute.Run.Message.Watch",
+            CliTelemetryEventDiscriminants::RunMessageSend => "CLI.Execute.Run.Message.Send",
+            CliTelemetryEventDiscriminants::RunMessageList => "CLI.Execute.Run.Message.List",
+            CliTelemetryEventDiscriminants::RunMessageRead => "CLI.Execute.Run.Message.Read",
+            CliTelemetryEventDiscriminants::RunMessageMarkDelivered => {
+                "CLI.Execute.Run.Message.MarkDelivered"
+            }
+            CliTelemetryEventDiscriminants::Login => "CLI.Execute.Login",
+            CliTelemetryEventDiscriminants::Logout => "CLI.Execute.Logout",
+            CliTelemetryEventDiscriminants::Whoami => "CLI.Execute.Whoami",
+            CliTelemetryEventDiscriminants::ProviderSetup => "CLI.Execute.Provider.Setup",
+            CliTelemetryEventDiscriminants::ProviderList => "CLI.Execute.Provider.List",
+            CliTelemetryEventDiscriminants::IntegrationCreate => "CLI.Execute.Integration.Create",
+            CliTelemetryEventDiscriminants::IntegrationUpdate => "CLI.Execute.Integration.Update",
+            CliTelemetryEventDiscriminants::IntegrationList => "CLI.Execute.Integration.List",
+            CliTelemetryEventDiscriminants::ArtifactUpload => "CLI.Execute.Artifact.Upload",
+            CliTelemetryEventDiscriminants::ArtifactGet => "CLI.Execute.Artifact.Get",
+            CliTelemetryEventDiscriminants::ArtifactDownload => "CLI.Execute.Artifact.Download",
+            CliTelemetryEventDiscriminants::ScheduleCreate => "CLI.Execute.Schedule.Create",
+            CliTelemetryEventDiscriminants::ScheduleList => "CLI.Execute.Schedule.List",
+            CliTelemetryEventDiscriminants::ScheduleGet => "CLI.Execute.Schedule.Get",
+            CliTelemetryEventDiscriminants::SchedulePause => "CLI.Execute.Schedule.Pause",
+            CliTelemetryEventDiscriminants::ScheduleUnpause => "CLI.Execute.Schedule.Unpause",
+            CliTelemetryEventDiscriminants::ScheduleUpdate => "CLI.Execute.Schedule.Update",
+            CliTelemetryEventDiscriminants::ScheduleDelete => "CLI.Execute.Schedule.Delete",
+            CliTelemetryEventDiscriminants::SecretCreate => "CLI.Execute.Secret.Create",
+            CliTelemetryEventDiscriminants::SecretDelete => "CLI.Execute.Secret.Delete",
+            CliTelemetryEventDiscriminants::SecretUpdate => "CLI.Execute.Secret.Update",
+            CliTelemetryEventDiscriminants::SecretList => "CLI.Execute.Secret.List",
+            CliTelemetryEventDiscriminants::HarnessSupportPing => "CLI.Execute.HarnessSupport.Ping",
+            CliTelemetryEventDiscriminants::HarnessSupportReportArtifact => {
+                "CLI.Execute.HarnessSupport.ReportArtifact"
+            }
+            CliTelemetryEventDiscriminants::HarnessSupportNotifyUser => {
+                "CLI.Execute.HarnessSupport.NotifyUser"
+            }
+            CliTelemetryEventDiscriminants::HarnessSupportFinishTask => {
+                "CLI.Execute.HarnessSupport.FinishTask"
+            }
+        }
+    }
+
+    fn description(&self) -> &'static str {
+        match self {
+            CliTelemetryEventDiscriminants::AgentRun => "Ran an agent from the CLI",
+            CliTelemetryEventDiscriminants::AgentRunAmbient => "Ran an ambient agent from the CLI",
+            CliTelemetryEventDiscriminants::AgentProfileList => {
+                "Listed agent profiles from the CLI"
+            }
+            CliTelemetryEventDiscriminants::AgentList => "Listed agents from the CLI",
+            CliTelemetryEventDiscriminants::EnvironmentList => {
+                "Listed cloud environments from the CLI"
+            }
+            CliTelemetryEventDiscriminants::EnvironmentCreate => {
+                "Created a cloud environment from the CLI"
+            }
+            CliTelemetryEventDiscriminants::EnvironmentDelete => {
+                "Deleted a cloud environment from the CLI"
+            }
+            CliTelemetryEventDiscriminants::EnvironmentUpdate => {
+                "Updated a cloud environment from the CLI"
+            }
+            CliTelemetryEventDiscriminants::EnvironmentGet => {
+                "Got cloud environment details from the CLI"
+            }
+            CliTelemetryEventDiscriminants::EnvironmentImageList => {
+                "Listed available base images from the CLI"
+            }
+            CliTelemetryEventDiscriminants::MCPList => "Listed MCP servers from the CLI",
+            CliTelemetryEventDiscriminants::ModelList => "Listed models from the CLI",
+            CliTelemetryEventDiscriminants::TaskList => "Listed tasks from the CLI",
+            CliTelemetryEventDiscriminants::TaskGet => "Got status of task from the CLI",
+            CliTelemetryEventDiscriminants::ConversationGet => {
+                "Got conversation by ID from the CLI"
+            }
+            CliTelemetryEventDiscriminants::RunConversationGet => {
+                "Got run conversation from the CLI"
+            }
+            CliTelemetryEventDiscriminants::RunMessageWatch => "Watched run messages from the CLI",
+            CliTelemetryEventDiscriminants::RunMessageSend => "Sent a run message from the CLI",
+            CliTelemetryEventDiscriminants::RunMessageList => "Listed run messages from the CLI",
+            CliTelemetryEventDiscriminants::RunMessageRead => "Read a run message from the CLI",
+            CliTelemetryEventDiscriminants::RunMessageMarkDelivered => {
+                "Marked a run message as delivered from the CLI"
+            }
+            CliTelemetryEventDiscriminants::Login => "Logged in via the CLI",
+            CliTelemetryEventDiscriminants::Logout => "Logged out via the CLI",
+            CliTelemetryEventDiscriminants::Whoami => "Printed current user info from the CLI",
+            CliTelemetryEventDiscriminants::ProviderSetup => "Set up a provider via the CLI",
+            CliTelemetryEventDiscriminants::ProviderList => "Listed providers from the CLI",
+            CliTelemetryEventDiscriminants::IntegrationCreate => {
+                "Created an integration from the CLI"
+            }
+            CliTelemetryEventDiscriminants::IntegrationUpdate => {
+                "Updated an integration from the CLI"
+            }
+            CliTelemetryEventDiscriminants::IntegrationList => "Listed integrations from the CLI",
+            CliTelemetryEventDiscriminants::ArtifactUpload => "Uploaded an artifact from the CLI",
+            CliTelemetryEventDiscriminants::ArtifactGet => "Got artifact metadata from the CLI",
+            CliTelemetryEventDiscriminants::ArtifactDownload => {
+                "Downloaded an artifact from the CLI"
+            }
+            CliTelemetryEventDiscriminants::ScheduleCreate => {
+                "Created a scheduled agent from the CLI"
+            }
+            CliTelemetryEventDiscriminants::ScheduleList => "Listed scheduled agents from the CLI",
+            CliTelemetryEventDiscriminants::ScheduleGet => {
+                "Got scheduled agent configuration from the CLI"
+            }
+            CliTelemetryEventDiscriminants::SchedulePause => {
+                "Paused a scheduled agent from the CLI"
+            }
+            CliTelemetryEventDiscriminants::ScheduleUnpause => {
+                "Unpaused a scheduled agent from the CLI"
+            }
+            CliTelemetryEventDiscriminants::ScheduleUpdate => {
+                "Updated a scheduled agent from the CLI"
+            }
+            CliTelemetryEventDiscriminants::ScheduleDelete => {
+                "Deleted a scheduled agent from the CLI"
+            }
+            CliTelemetryEventDiscriminants::SecretCreate => "Created a secret from the CLI",
+            CliTelemetryEventDiscriminants::SecretDelete => "Deleted a secret from the CLI",
+            CliTelemetryEventDiscriminants::SecretUpdate => "Updated a secret from the CLI",
+            CliTelemetryEventDiscriminants::SecretList => "Listed secrets from the CLI",
+            CliTelemetryEventDiscriminants::HarnessSupportPing => {
+                "Pinged harness-support from the CLI"
+            }
+            CliTelemetryEventDiscriminants::HarnessSupportReportArtifact => {
+                "Reported an artifact via harness-support from the CLI"
+            }
+            CliTelemetryEventDiscriminants::HarnessSupportNotifyUser => {
+                "Sent a user notification via harness-support from the CLI"
+            }
+            CliTelemetryEventDiscriminants::HarnessSupportFinishTask => {
+                "Reported task completion via harness-support from the CLI"
+            }
+        }
+    }
+
+    fn enablement_state(&self) -> EnablementState {
+        match self {
+            Self::HarnessSupportPing
+            | Self::HarnessSupportReportArtifact
+            | Self::HarnessSupportNotifyUser
+            | Self::HarnessSupportFinishTask => EnablementState::Flag(FeatureFlag::AgentHarness),
+            Self::ArtifactUpload | Self::ArtifactGet | Self::ArtifactDownload => {
+                EnablementState::Flag(FeatureFlag::ArtifactCommand)
+            }
+            Self::RunMessageWatch
+            | Self::RunMessageSend
+            | Self::RunMessageList
+            | Self::RunMessageRead
+            | Self::RunMessageMarkDelivered => EnablementState::Flag(FeatureFlag::OrchestrationV2),
+            _ => EnablementState::Always,
+        }
+    }
+}
+
+labrador_core::register_telemetry_event!(CliTelemetryEvent);
