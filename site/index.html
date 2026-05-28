@@ -78,17 +78,17 @@
               <div class="artifact-preview">
                 <span>macOS</span>
                 <strong>DMG</strong>
-                <small>Unsigned early build with binary, install script, and licenses.</small>
+                <small>Drag Labrador.app into Applications from the disk image.</small>
               </div>
               <div class="artifact-preview">
                 <span>Linux</span>
-                <strong>tar.gz</strong>
-                <small>Portable archive with binary, README, NOTICE, and licenses.</small>
+                <strong>AppImage + deb</strong>
+                <small>Run the AppImage directly or install the Debian package.</small>
               </div>
               <div class="artifact-preview">
                 <span>Windows</span>
-                <strong>zip</strong>
-                <small>Portable archive with labrador.exe, README, NOTICE, and licenses.</small>
+                <strong>Setup exe</strong>
+                <small>Use the installer for Start Menu, PATH, and app registration.</small>
               </div>
             </div>
             <p class="release-note">
@@ -102,7 +102,7 @@
       <section class="signal-strip" aria-label="Product signals">
         <div>
           <strong>Release artifacts</strong>
-          <span>macOS DMG, Linux tar.gz, and Windows zip bundles.</span>
+          <span>macOS DMG, Linux AppImage/deb, and Windows setup exe.</span>
         </div>
         <div>
           <strong>Warp-based source</strong>
@@ -132,8 +132,8 @@
             <span class="feature-mark">02</span>
             <h3>Platform release bundles</h3>
             <p>
-              GitHub Releases publish a macOS DMG, Linux tar.gz archive, and
-              Windows zip archive from the same tagged source.
+              GitHub Releases publish a macOS app DMG, Linux AppImage and deb,
+              and Windows installer from the same tagged source.
             </p>
           </article>
           <article>
@@ -160,26 +160,26 @@
         <div class="quickstart-grid install-grid">
           <article class="install-card">
             <span>macOS</span>
-            <h3>Download the DMG.</h3>
+            <h3>Drag into Applications.</h3>
             <p>
-              Open the disk image and use the included binary or install script.
-              The build is unsigned, so macOS may ask you to approve it.
+              Open the DMG, drag Labrador.app onto Applications, then launch it
+              from Applications. Unsigned builds may require manual approval.
             </p>
           </article>
           <article class="install-card">
             <span>Linux</span>
-            <h3>Extract the archive.</h3>
+            <h3>Run AppImage or install deb.</h3>
             <p>
-              The tar.gz bundle contains the Labrador binary alongside README,
-              NOTICE, and license files from the tagged release.
+              Use the AppImage for a portable desktop app, or install the Debian
+              package on compatible distributions.
             </p>
           </article>
           <article class="install-card">
             <span>Windows</span>
-            <h3>Extract the zip.</h3>
+            <h3>Run the setup installer.</h3>
             <p>
-              The Windows bundle contains labrador.exe and the same release
-              documentation included with the other platform artifacts.
+              The setup exe installs Labrador, registers shell integration, and
+              can add the command wrapper to PATH.
             </p>
           </article>
         </div>

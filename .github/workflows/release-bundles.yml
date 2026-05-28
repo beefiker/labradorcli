@@ -46,9 +46,11 @@ jobs:
         run: |
           notes="$(mktemp)"
           cat > "$notes" <<'EOF'
-          Portable Labrador CLI release bundles.
+          Labrador CLI terminal application release bundles.
 
-          macOS is distributed as an unsigned DMG. Linux is distributed as a tar.gz archive. Windows is distributed as a zip archive.
+          macOS is distributed as a DMG containing Labrador.app and an Applications drop link. Windows is distributed as a setup installer. Linux is distributed as an AppImage plus a Debian package.
+
+          Builds are unsigned unless the repository has platform signing secrets configured.
           EOF
 
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -102,6 +104,7 @@ jobs:
             build-essential \
             cmake \
             curl \
+            fakeroot \
             git \
             jq \
             libasound2-dev \
@@ -113,6 +116,8 @@ jobs:
             pkg-config \
             python-is-python3 \
             unzip
+
+          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64
 
           protoc_version="25.1"
           case "$(uname -m)" in
@@ -128,7 +133,11 @@ jobs:
       - name: Install macOS build dependencies
         if: runner.os == 'macOS'
         shell: bash
-        run: brew install protobuf
+        run: |
+          set -euo pipefail
+
+          brew install protobuf create-dmg
+          ./script/install_cargo_bundle
 
       - name: Install Windows build dependencies
         if: runner.os == 'Windows'
@@ -145,10 +154,10 @@ jobs:
           Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
           Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $installDir "bin")
 
-      - name: Build CLI
-        run: cargo build -p labrador --bin labrador --release --features standalone
+          choco install innosetup --no-progress -y
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files (x86)\Inno Setup 6"
 
-      - name: Package Linux bundle
+      - name: Package Linux app bundles
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -156,74 +165,135 @@ jobs:
 
           version="${RELEASE_TAG#v}"
           arch="$(uname -m)"
-          asset="labradorcli-${version}-linux-${arch}.tar.gz"
+          out_dir="target/release-lto/bundle/linux"
 
-          mkdir -p package dist
-          cp target/release/labrador package/labrador
-          chmod +x package/labrador
-          cp README.md NOTICE LICENSE-AGPL LICENSE-MIT package/
+          export PATH="$HOME/.local/bin:$PATH"
+          export APPIMAGE_EXTRACT_AND_RUN=1
 
-          tar -czf "dist/$asset" -C package .
-          gh release upload "$RELEASE_TAG" "dist/$asset" \
+          ./script/linux/install_linuxdeploy
+          ./script/linux/bundle \
+            --channel oss \
+            --release-tag "$RELEASE_TAG" \
+            --packages appimage,deb
+
+          mkdir -p dist
+          appimage="$(find "$out_dir" -maxdepth 1 -name '*.AppImage' -print -quit)"
+          deb="$(find "$out_dir" -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$appimage"
+          test -n "$deb"
+
+          cp "$appimage" "dist/labradorcli-${version}-linux-${arch}.AppImage"
+          case "$arch" in
+            x86_64) deb_arch="amd64" ;;
+            aarch64) deb_arch="arm64" ;;
+            *) deb_arch="$arch" ;;
+          esac
+          cp "$deb" "dist/labradorcli-${version}-linux-${deb_arch}.deb"
+
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+            while IFS= read -r name; do
+              case "$name" in
+                labradorcli-${version}-linux-*)
+                  gh release delete-asset "$RELEASE_TAG" "$name" \
+                    --repo "$GITHUB_REPOSITORY" \
+                    --yes || true
+                  ;;
+              esac
+            done
+
+          gh release upload "$RELEASE_TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
 
-      - name: Package macOS DMG
+      - name: Package macOS app DMG
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          LABRADOR_NOTARIZATION_PASSWORD: ${{ secrets.LABRADOR_NOTARIZATION_PASSWORD }}
+          LABRADOR_NOTARIZATION_APPLE_ID: ${{ secrets.LABRADOR_NOTARIZATION_APPLE_ID }}
+          LABRADOR_DEVELOPER_ID_CERT: ${{ secrets.LABRADOR_DEVELOPER_ID_CERT }}
+          LABRADOR_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.LABRADOR_DEVELOPER_ID_CERT_PASSWORD }}
+          LABRADOR_CODESIGN_KEYCHAIN_PASSWORD: ${{ secrets.LABRADOR_CODESIGN_KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
 
           version="${RELEASE_TAG#v}"
-          arch="$(uname -m)"
-          volume_name="Labrador CLI ${version}"
-          asset="labradorcli-${version}-macos-${arch}.dmg"
-          package_dir="package/${volume_name}"
+          asset="labradorcli-${version}-macos-universal.dmg"
+          out_dir="target/release-lto/bundle/osx"
 
-          mkdir -p "$package_dir" dist
-          cp target/release/labrador "$package_dir/labrador"
-          chmod +x "$package_dir/labrador"
-          cp README.md NOTICE LICENSE-AGPL LICENSE-MIT "$package_dir/"
+          sign_args=(--nosign)
+          if [[ -n "${LABRADOR_NOTARIZATION_PASSWORD:-}" &&
+                -n "${LABRADOR_NOTARIZATION_APPLE_ID:-}" &&
+                -n "${LABRADOR_DEVELOPER_ID_CERT:-}" &&
+                -n "${LABRADOR_DEVELOPER_ID_CERT_PASSWORD:-}" &&
+                -n "${LABRADOR_CODESIGN_KEYCHAIN_PASSWORD:-}" ]]; then
+            sign_args=(--read-passwords-from-env)
+          fi
 
-          cat > "$package_dir/install.sh" <<'EOF'
-          #!/bin/sh
-          set -eu
+          ./script/macos/bundle \
+            --channel oss \
+            --release-tag "$RELEASE_TAG" \
+            --dmg-name-suffix "$version" \
+            "${sign_args[@]}"
 
-          install_dir="${1:-/usr/local/bin}"
-          script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+          dmg="$(find "$out_dir" -maxdepth 1 -name 'Labrador*.dmg' -print -quit)"
+          test -n "$dmg"
 
-          mkdir -p "$install_dir"
-          cp "$script_dir/labrador" "$install_dir/labrador"
-          chmod +x "$install_dir/labrador"
+          mkdir -p dist
+          cp "$dmg" "dist/$asset"
 
-          echo "Installed labrador to $install_dir/labrador"
-          EOF
-          chmod +x "$package_dir/install.sh"
+          mount_dir="$(mktemp -d)"
+          hdiutil attach "dist/$asset" \
+            -mountpoint "$mount_dir" \
+            -nobrowse \
+            -readonly
+          test -d "$mount_dir/Labrador.app"
+          test -e "$mount_dir/Applications"
+          hdiutil detach "$mount_dir"
 
-          hdiutil create \
-            -volname "$volume_name" \
-            -srcfolder "$package_dir" \
-            -ov \
-            -format UDZO \
-            "dist/$asset"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+            while IFS= read -r name; do
+              case "$name" in
+                labradorcli-${version}-macos-*.dmg)
+                  gh release delete-asset "$RELEASE_TAG" "$name" \
+                    --repo "$GITHUB_REPOSITORY" \
+                    --yes || true
+                  ;;
+              esac
+            done
 
           gh release upload "$RELEASE_TAG" "dist/$asset" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
 
-      - name: Package Windows bundle
+      - name: Package Windows installer
         if: matrix.shell == 'pwsh'
         shell: pwsh
         run: |
           $version = $env:RELEASE_TAG.TrimStart("v")
-          $arch = $env:PROCESSOR_ARCHITECTURE.ToLowerInvariant()
-          $asset = "labradorcli-$version-windows-$arch.zip"
+          $asset = "labradorcli-$version-windows-x64-setup.exe"
 
-          New-Item -ItemType Directory -Force package, dist | Out-Null
-          Copy-Item target/release/labrador.exe package/labrador.exe
-          Copy-Item README.md, NOTICE, LICENSE-AGPL, LICENSE-MIT package/
+          .\script\windows\bundle.ps1 `
+            -CHANNEL oss `
+            -RELEASE_TAG $env:RELEASE_TAG `
+            -ARCH x64
 
-          Compress-Archive -Path package/* -DestinationPath "dist/$asset" -Force
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item script/windows/Output/LabradorSetup.exe "dist/$asset"
+
+          $assets = gh release view $env:RELEASE_TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            --json assets `
+            --jq '.assets[].name'
+
+          foreach ($name in $assets) {
+            if ($name -like "labradorcli-$version-windows-*") {
+              gh release delete-asset $env:RELEASE_TAG $name `
+                --repo $env:GITHUB_REPOSITORY `
+                --yes
+            }
+          }
+
           gh release upload $env:RELEASE_TAG "dist/$asset" `
             --repo $env:GITHUB_REPOSITORY `
             --clobber

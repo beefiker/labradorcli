@@ -62,6 +62,10 @@ function scoreAsset(asset, platformId) {
 
   if (
     name.endsWith(".dmg") ||
+    name.endsWith(".appimage") ||
+    name.endsWith(".deb") ||
+    name.endsWith(".exe") ||
+    name.endsWith(".msi") ||
     name.endsWith(".zip") ||
     name.endsWith(".tar.gz") ||
     name.endsWith(".tgz")

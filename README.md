@@ -45,8 +45,14 @@ Cloudflare Pages settings:
 ## Releases
 
 Release bundles are built by the `Release Bundles` GitHub Actions workflow. It
-can be run manually for a tag such as `v0.1.0`, and it uploads a macOS DMG,
-Linux tar.gz archive, and Windows zip archive to the matching GitHub Release.
+can be run manually for a tag such as `v0.1.0`, and it uploads platform app
+installers to the matching GitHub Release:
+
+- macOS: a DMG containing `Labrador.app` and an Applications drop link.
+- Linux: an AppImage plus a Debian package.
+- Windows: a setup installer built with Inno Setup.
+
+Builds are unsigned unless platform signing secrets are configured in GitHub.
 
 ## Licensing
 

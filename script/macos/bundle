@@ -735,8 +735,8 @@ if [[ "$ARTIFACT" = app ]]; then
     create-dmg "${args[@]}"
   }
 
-  # If we're codesigning, stage the signed app and use that to create the DMG.
-  # Otherwise, create a DMG from the bundle dir directly.
+  # Stage only the app bundle before creating the DMG, so Finder shows the
+  # expected drag-to-Applications install window instead of raw build output.
   if [[ $CODESIGN = true ]]; then
     if test -d "$DMG_DIR"; then
       echo "Clearing old dmg directory $DMG_DIR"
@@ -754,13 +754,18 @@ if [[ "$ARTIFACT" = app ]]; then
     NOTARIZATION_ARTIFACT="$DMG_DIR/$DMG_NAME"
     STAPLE_TICKET=true
   else
-    echo "Creating $DMG_DIR"
-    mkdir -p "$DMG_DIR"
-
     echo "Cleaning up any existing DMG files before creating new ones..."
     cleanup_dmg_files "$DMG_DIR"
 
-    create_labrador_dmg "$BUNDLE_DIR"
+    if test -d "$DMG_DIR"; then
+      echo "Clearing old dmg directory $DMG_DIR"
+      rm -r "$DMG_DIR"
+    fi
+    echo "Creating clean unsigned DMG staging directory $DMG_DIR"
+    mkdir -p "$DMG_DIR"
+    cp -R "$BUNDLE_DIR/$LABRADOR_APP_NAME.app" "$DMG_DIR"
+
+    create_labrador_dmg "$DMG_DIR"
   fi
 fi
 
