@@ -92,6 +92,10 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: Install release cargo tools
+        shell: bash
+        run: ./script/install_cargo_release_deps --no-build-deps
+
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         shell: bash
