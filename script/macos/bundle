@@ -24,14 +24,17 @@
 #
 # Once the stapling is done, the app can be shared.
 #
-# Three passwords are read from GCP Secret Manager (or from env if --read-passwords-from-env is set) if you are codesigning.
+# Signing credentials are read from GCP Secret Manager (or from env if --read-passwords-from-env is set) if you are codesigning.
 # 1) LABRADOR_NOTARIZATION_PASSWORD:  This is an "app-specific password" that
-#    is tied to the zach@labrador.dev account.  See https://support.apple.com/en-us/HT204397
+#    is tied to the Apple ID used for notarization. See https://support.apple.com/en-us/HT204397
 # 2) LABRADOR_DEVELOPER_ID_CERT_PASSWORD: This is a password tied to the private key
 #    of our cert - it is needed to use the cert to sign our binary.
 # 3) LABRADOR_CODESIGN_KEYCHAIN_PASSWORD: This is an arbitrary password only used
 #    in the lifetime of this app for creating the keychain used to sign.  Can
 #    be anything.
+# LABRADOR_NOTARIZATION_APPLE_ID, LABRADOR_DEVELOPER_ID_CERT, and
+# LABRADOR_APPLE_TEAM_ID must also be set when reading signing credentials from
+# the environment.
 #
 # See
 # https://github.com/burtonageo/cargo-bundle
@@ -610,8 +613,7 @@ if [[ $READ_PASSWORDS_FROM_ENV != true ]]; then
 fi
 
 if [[ $CODESIGN = true ]]; then
-  # TODO - does this need to change per user? Seems like it's tied to the notarization password.
-  APPLE_TEAM_ID="2BBY89MBSN"
+  APPLE_TEAM_ID="${LABRADOR_APPLE_TEAM_ID:-}"
   CODESIGN_KEYCHAIN_NAME="labrador-codesign-keychain"
 
   echo "Starting codesigning..."
@@ -622,8 +624,19 @@ if [[ $CODESIGN = true ]]; then
     LABRADOR_DEVELOPER_ID_CERT="${LABRADOR_DEVELOPER_ID_CERT:-}"
     LABRADOR_DEVELOPER_ID_CERT_PASSWORD="${LABRADOR_DEVELOPER_ID_CERT_PASSWORD:-}"
     LABRADOR_CODESIGN_KEYCHAIN_PASSWORD="${LABRADOR_CODESIGN_KEYCHAIN_PASSWORD:-}"
+    APPLE_TEAM_ID="${LABRADOR_APPLE_TEAM_ID:-}"
     if [ -z "$LABRADOR_NOTARIZATION_PASSWORD" ] ; then
       echo "LABRADOR_NOTARIZATION_PASSWORD must be set for code signing"
+      exit 1
+    fi
+
+    if [ -z "$LABRADOR_NOTARIZATION_APPLE_ID" ] ; then
+      echo "LABRADOR_NOTARIZATION_APPLE_ID must be set for code signing"
+      exit 1
+    fi
+
+    if [ -z "$LABRADOR_DEVELOPER_ID_CERT" ] ; then
+      echo "LABRADOR_DEVELOPER_ID_CERT must be set for code signing"
       exit 1
     fi
 
@@ -634,6 +647,11 @@ if [[ $CODESIGN = true ]]; then
 
     if [ -z "$LABRADOR_CODESIGN_KEYCHAIN_PASSWORD" ] ; then
       echo "LABRADOR_CODESIGN_KEYCHAIN_PASSWORD must be set for code signing"
+      exit 1
+    fi
+
+    if [ -z "$APPLE_TEAM_ID" ] ; then
+      echo "LABRADOR_APPLE_TEAM_ID must be set for code signing"
       exit 1
     fi
   fi
@@ -791,6 +809,7 @@ if [[ $CODESIGN = true ]]; then
   echo "Verifying notarization ticket..."
   if [[ "$ARTIFACT" = app ]]; then
     xcrun stapler validate "$DMG_DIR/$DMG_NAME"
+    spctl -a -t open --context context:primary-signature -vv "$DMG_DIR/$DMG_NAME"
   elif [[ "$ARTIFACT" = cli ]]; then
     spctl -a -t open --context context:primary-signature -vv "$OUT_DIR/$LABRADOR_BIN"
   fi

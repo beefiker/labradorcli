@@ -50,7 +50,7 @@ jobs:
 
           macOS is distributed as a DMG containing Labrador.app and an Applications drop link. Windows is distributed as a setup installer. Linux is distributed as an AppImage plus a Debian package.
 
-          Builds are unsigned unless the repository has platform signing secrets configured.
+          macOS DMGs are Developer ID signed and notarized when the required Apple signing secrets are configured. Otherwise, the workflow publishes unsigned testing bundles.
           EOF
 
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -218,6 +218,7 @@ jobs:
           LABRADOR_DEVELOPER_ID_CERT: ${{ secrets.LABRADOR_DEVELOPER_ID_CERT }}
           LABRADOR_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.LABRADOR_DEVELOPER_ID_CERT_PASSWORD }}
           LABRADOR_CODESIGN_KEYCHAIN_PASSWORD: ${{ secrets.LABRADOR_CODESIGN_KEYCHAIN_PASSWORD }}
+          LABRADOR_APPLE_TEAM_ID: ${{ secrets.LABRADOR_APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
 
@@ -230,7 +231,8 @@ jobs:
                 -n "${LABRADOR_NOTARIZATION_APPLE_ID:-}" &&
                 -n "${LABRADOR_DEVELOPER_ID_CERT:-}" &&
                 -n "${LABRADOR_DEVELOPER_ID_CERT_PASSWORD:-}" &&
-                -n "${LABRADOR_CODESIGN_KEYCHAIN_PASSWORD:-}" ]]; then
+                -n "${LABRADOR_CODESIGN_KEYCHAIN_PASSWORD:-}" &&
+                -n "${LABRADOR_APPLE_TEAM_ID:-}" ]]; then
             sign_args=(--read-passwords-from-env)
           fi
 
@@ -245,6 +247,11 @@ jobs:
 
           mkdir -p dist
           cp "$dmg" "dist/$asset"
+
+          if [[ "${sign_args[0]}" != "--nosign" ]]; then
+            xcrun stapler validate "dist/$asset"
+            spctl -a -t open --context context:primary-signature -vv "dist/$asset"
+          fi
 
           mount_dir="$(mktemp -d)"
           hdiutil attach "dist/$asset" \

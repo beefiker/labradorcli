@@ -24,6 +24,26 @@
     <script src="/script.js" defer></script>
   </head>
   <body>
+    <div
+      class="top-marquee"
+      aria-label="Labrador CLI is an early public build. Download releases from GitHub."
+    >
+      <div class="top-marquee-track" aria-hidden="true">
+        <div class="top-marquee-group">
+          <span>Labrador CLI early public build</span>
+          <span>Download from GitHub Releases</span>
+          <span>macOS DMG, Linux AppImage/deb, Windows setup exe</span>
+          <span>Signed macOS DMG when secrets are configured</span>
+        </div>
+        <div class="top-marquee-group">
+          <span>Labrador CLI early public build</span>
+          <span>Download from GitHub Releases</span>
+          <span>macOS DMG, Linux AppImage/deb, Windows setup exe</span>
+          <span>Signed macOS DMG when secrets are configured</span>
+        </div>
+      </div>
+    </div>
+
     <header class="site-header" aria-label="Primary navigation">
       <a class="brand" href="/" aria-label="Labrador CLI home">
         <img src="/assets/labrador-icon.png" alt="" width="32" height="32">
@@ -96,7 +116,7 @@
         </div>
         <div>
           <strong>Early build</strong>
-          <span>Unsigned artifacts while packaging and app behavior stabilize.</span>
+          <span>Signed macOS DMGs when release secrets are configured.</span>
         </div>
       </section>
 
@@ -139,8 +159,8 @@
           <h2>Start from the latest GitHub release.</h2>
           <p>
             These bundles are for early testing. Download the asset for your
-            platform, inspect the included source notices, and expect normal
-            unsigned-app prompts on desktop operating systems.
+            platform, inspect the included source notices, and use the latest
+            release for the most current packaging fixes.
           </p>
         </div>
         <div class="quickstart-grid install-grid">
@@ -149,7 +169,7 @@
             <h3>Drag into Applications.</h3>
             <p>
               Open the DMG, drag Labrador.app onto Applications, then launch it
-              from Applications. Unsigned builds may require manual approval.
+              from Applications.
             </p>
           </article>
           <article class="install-card">

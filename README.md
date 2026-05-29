@@ -52,7 +52,19 @@ installers to the matching GitHub Release:
 - Linux: an AppImage plus a Debian package.
 - Windows: a setup installer built with Inno Setup.
 
-Builds are unsigned unless platform signing secrets are configured in GitHub.
+macOS DMGs are Developer ID signed and notarized when signing is configured, so
+Gatekeeper can verify the app after download. Configure these GitHub repository
+secrets before running the release workflow:
+
+- `LABRADOR_APPLE_TEAM_ID`
+- `LABRADOR_NOTARIZATION_APPLE_ID`
+- `LABRADOR_NOTARIZATION_PASSWORD`
+- `LABRADOR_DEVELOPER_ID_CERT`
+- `LABRADOR_DEVELOPER_ID_CERT_PASSWORD`
+- `LABRADOR_CODESIGN_KEYCHAIN_PASSWORD`
+
+If any macOS signing secret is missing, the workflow still publishes an unsigned
+testing DMG.
 
 ## Licensing
 
