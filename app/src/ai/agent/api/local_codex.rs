@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     env,
+    ffi::OsString,
     path::{Path, PathBuf},
     process::{Command as StdCommand, Stdio},
     sync::OnceLock,
@@ -14,13 +15,13 @@ use ai::{local_claude_auth, local_openai_auth};
 use command::r#async::Command;
 use futures::Stream;
 use futures_lite::{io::BufReader, stream, AsyncBufReadExt, StreamExt as _};
+use labrador_core::channel::ChannelState;
+use labrador_multi_agent_api as api;
 use prost_types::FieldMask;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
-use labrador_core::channel::ChannelState;
-use labrador_multi_agent_api as api;
 
 use crate::ai::agent::AIAgentInput;
 use crate::ai::predict::generate_ai_input_suggestions::{
@@ -743,6 +744,7 @@ fn run_codex_streaming(
     async_stream::stream! {
         let codex_bin = codex_bin();
         let mut command = Command::new(codex_bin.clone());
+        configure_local_agent_command_env(&mut command, &codex_bin);
         command
             .arg("exec")
             .arg("--json")
@@ -887,6 +889,7 @@ async fn run_claude(
     let claude_bin = claude_bin();
     let claude_bin_env_hint = local_agent_env_hint(CLAUDE_BIN_ENV_VAR);
     let mut command = Command::new(claude_bin.clone());
+    configure_local_agent_command_env(&mut command, &claude_bin);
     command
         .arg("-p")
         .arg("--output-format")
@@ -942,6 +945,7 @@ fn run_claude_streaming(
     async_stream::stream! {
         let claude_bin = claude_bin();
         let mut command = Command::new(claude_bin.clone());
+        configure_local_agent_command_env(&mut command, &claude_bin);
         command
             .arg("-p")
             .arg("--output-format")
@@ -2023,6 +2027,55 @@ fn configured_claude_bin() -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn configure_local_agent_command_env(command: &mut Command, cli_bin: &str) {
+    if let Some(path) = local_agent_path(cli_bin) {
+        command.env("PATH", path);
+    }
+}
+
+fn local_agent_path(cli_bin: &str) -> Option<OsString> {
+    let node_bin = find_node_bin();
+    local_agent_path_with_binary_dirs(cli_bin, node_bin.as_deref(), env::var_os("PATH"))
+}
+
+fn local_agent_path_with_binary_dirs(
+    cli_bin: &str,
+    node_bin: Option<&str>,
+    current_path: Option<OsString>,
+) -> Option<OsString> {
+    let mut paths = Vec::new();
+    push_binary_parent_dir(&mut paths, cli_bin);
+    if let Some(node_bin) = node_bin {
+        push_binary_parent_dir(&mut paths, node_bin);
+    }
+
+    if let Some(current_path) = current_path {
+        for path in env::split_paths(&current_path) {
+            push_unique_path(&mut paths, path);
+        }
+    }
+
+    (!paths.is_empty())
+        .then(|| env::join_paths(paths).ok())
+        .flatten()
+}
+
+fn push_binary_parent_dir(paths: &mut Vec<PathBuf>, binary: &str) {
+    let Some(parent) = Path::new(binary).parent() else {
+        return;
+    };
+    if parent.as_os_str().is_empty() {
+        return;
+    }
+    push_unique_path(paths, parent.to_path_buf());
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if !paths.iter().any(|existing| existing == &path) {
+        paths.push(path);
+    }
+}
+
 fn find_codex_bin() -> Option<String> {
     find_executable_in_path("codex")
         .or_else(find_common_codex_bin)
@@ -2033,6 +2086,12 @@ fn find_claude_bin() -> Option<String> {
     find_executable_in_path("claude")
         .or_else(find_common_claude_bin)
         .or_else(find_claude_with_user_shell)
+}
+
+fn find_node_bin() -> Option<String> {
+    find_executable_in_path("node")
+        .or_else(find_common_node_bin)
+        .or_else(find_node_with_user_shell)
 }
 
 fn find_executable_in_path(name: &str) -> Option<String> {
@@ -2049,6 +2108,10 @@ fn find_common_codex_bin() -> Option<String> {
 
 fn find_common_claude_bin() -> Option<String> {
     find_common_bin("claude")
+}
+
+fn find_common_node_bin() -> Option<String> {
+    find_common_bin("node")
 }
 
 fn find_common_bin(binary_name: &str) -> Option<String> {
@@ -2098,6 +2161,10 @@ fn find_codex_with_user_shell() -> Option<String> {
 
 fn find_claude_with_user_shell() -> Option<String> {
     find_binary_with_user_shell("claude")
+}
+
+fn find_node_with_user_shell() -> Option<String> {
+    find_binary_with_user_shell("node")
 }
 
 fn path_to_string(path: PathBuf) -> String {
@@ -3896,6 +3963,29 @@ mod tests {
         assert_eq!(
             local_agent_stream_error_text("", "Local Agent timed out"),
             "Local Agent timed out"
+        );
+    }
+
+    #[test]
+    fn local_agent_path_includes_cli_and_node_binary_dirs() {
+        let existing_path = env::join_paths([PathBuf::from("/usr/bin"), PathBuf::from("/bin")])
+            .expect("test path should join");
+        let path = local_agent_path_with_binary_dirs(
+            "/Users/test/.npm-global/bin/codex",
+            Some("/Users/test/.nvm/versions/node/v22.12.0/bin/node"),
+            Some(existing_path),
+        )
+        .expect("path should be built");
+        let entries = env::split_paths(&path).collect::<Vec<_>>();
+
+        assert_eq!(
+            entries,
+            vec![
+                PathBuf::from("/Users/test/.npm-global/bin"),
+                PathBuf::from("/Users/test/.nvm/versions/node/v22.12.0/bin"),
+                PathBuf::from("/usr/bin"),
+                PathBuf::from("/bin"),
+            ]
         );
     }
 
