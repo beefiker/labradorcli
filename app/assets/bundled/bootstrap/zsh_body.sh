@@ -402,22 +402,22 @@ if [[ -z ${LABRADOR_BOOTSTRAPPED:-} ]]; then
 
         # Get Node.js version if node is available and we're in a Node.js project
         if command -v node > /dev/null 2>&1; then
-            # Check for package.json in current directory and parent directories
+            # Check for Node project markers in current directory and parent directories
             local current_dir="$PWD"
-            local found_package_json=false
-            local package_json_dir=""
+            local found_node_project_marker=false
+            local node_project_dir=""
             while [[ "$current_dir" != "/" ]]; do
-                if [[ -f "$current_dir/package.json" ]]; then
-                    found_package_json=true
-                    package_json_dir="$current_dir"
+                if [[ -f "$current_dir/package.json" || -f "$current_dir/.nvmrc" || -f "$current_dir/.node-version" ]]; then
+                    found_node_project_marker=true
+                    node_project_dir="$current_dir"
                     break
                 fi
                 current_dir=$(dirname "$current_dir")
             done
 
-            # Only show node version if package.json is within a git repository
-            if [[ "$found_package_json" = true ]]; then
-                local git_dir="$package_json_dir"
+            # Only show node version if the project marker is within a git repository
+            if [[ "$found_node_project_marker" = true ]]; then
+                local git_dir="$node_project_dir"
                 local in_git_repo=false
                 while [[ "$git_dir" != "/" ]]; do
                     if [[ -d "$git_dir/.git" ]]; then

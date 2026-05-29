@@ -498,23 +498,27 @@ $null = New-Module -Name Labrador-Module -ScriptBlock {
             $hasNodeCommand = Get-Command -CommandType Application node 2>$null
             if ($hasNodeCommand) {
                 try {
-                    # Walk up from the current directory to find a package.json
+                    # Walk up from the current directory to find a Node project marker.
                     $dir = Get-Item -LiteralPath (Get-Location).Path
-                    $foundPackageJson = $false
-                    $packageJsonDir = $null
+                    $foundNodeProjectMarker = $false
+                    $nodeProjectDir = $null
                     while ($null -ne $dir) {
-                        $candidate = Join-Path $dir.FullName 'package.json'
-                        if (Test-Path -LiteralPath $candidate) {
-                            $foundPackageJson = $true
-                            $packageJsonDir = $dir.FullName
+                        $hasProjectMarker = (
+                            (Test-Path -LiteralPath (Join-Path $dir.FullName 'package.json')) -or
+                            (Test-Path -LiteralPath (Join-Path $dir.FullName '.nvmrc')) -or
+                            (Test-Path -LiteralPath (Join-Path $dir.FullName '.node-version'))
+                        )
+                        if ($hasProjectMarker) {
+                            $foundNodeProjectMarker = $true
+                            $nodeProjectDir = $dir.FullName
                             break
                         }
                         $dir = $dir.Parent
                     }
 
-                    if ($foundPackageJson) {
-                        # Verify package.json resides within a Git repository by walking up to find a .git directory
-                        $probe = Get-Item -LiteralPath $packageJsonDir
+                    if ($foundNodeProjectMarker) {
+                        # Verify the project marker resides within a Git repository by walking up to find a .git directory
+                        $probe = Get-Item -LiteralPath $nodeProjectDir
                         $inGitRepo = $false
                         while ($null -ne $probe) {
                             if (Test-Path -LiteralPath (Join-Path $probe.FullName '.git')) {

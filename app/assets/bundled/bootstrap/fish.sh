@@ -349,22 +349,22 @@ function labrador_precmd --on-event fish_prompt --on-event fish_posterror
 
       # Get Node.js version if node is available and we're in a Node.js project
       if command -v node > /dev/null 2>&1
-          # Check for package.json in current directory and parent directories
+          # Check for Node project markers in current directory and parent directories
           set current_dir (pwd)
-          set found_package_json false
-          set package_json_dir ""
+          set found_node_project_marker false
+          set node_project_dir ""
           while test "$current_dir" != "/"
-              if test -f "$current_dir/package.json"
-                  set found_package_json true
-                  set package_json_dir "$current_dir"
+              if test -f "$current_dir/package.json"; or test -f "$current_dir/.nvmrc"; or test -f "$current_dir/.node-version"
+                  set found_node_project_marker true
+                  set node_project_dir "$current_dir"
                   break
               end
               set current_dir (dirname "$current_dir")
           end
 
-          # Only show node version if package.json is within a git repository
-          if test "$found_package_json" = true
-              set git_dir "$package_json_dir"
+          # Only show node version if the project marker is within a git repository
+          if test "$found_node_project_marker" = true
+              set git_dir "$node_project_dir"
               set in_git_repo false
               while test "$git_dir" != "/"
                   if test -d "$git_dir/.git"
