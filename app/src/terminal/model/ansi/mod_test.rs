@@ -19,6 +19,8 @@ struct MockHandler {
     identity_reported: bool,
     d_proto_hooks: Vec<DProtoHook>,
     pluggable_notifications: Vec<(Option<String>, String)>,
+    clipboard_stores: Vec<(u8, Vec<u8>)>,
+    clipboard_loads: Vec<(u8, String)>,
 }
 
 impl Handler for MockHandler {
@@ -147,9 +149,13 @@ impl Handler for MockHandler {
 
     fn reset_color(&mut self, _: usize) {}
 
-    fn clipboard_store(&mut self, _: u8, _: &[u8]) {}
+    fn clipboard_store(&mut self, clipboard: u8, base64: &[u8]) {
+        self.clipboard_stores.push((clipboard, base64.to_vec()));
+    }
 
-    fn clipboard_load(&mut self, _: u8, _: &str) {}
+    fn clipboard_load(&mut self, clipboard: u8, terminator: &str) {
+        self.clipboard_loads.push((clipboard, terminator.to_owned()));
+    }
 
     fn decaln(&mut self) {}
 
@@ -244,6 +250,8 @@ impl Default for MockHandler {
             identity_reported: false,
             d_proto_hooks: Vec::new(),
             pluggable_notifications: Vec::new(),
+            clipboard_stores: Vec::new(),
+            clipboard_loads: Vec::new(),
         }
     }
 }
@@ -835,6 +843,24 @@ fn parse_osc777_non_notify_subcommand_ignored() {
     let (_, handler) = parse_bytes(bytes);
 
     assert_eq!(handler.pluggable_notifications.len(), 0);
+}
+
+#[test]
+fn parse_osc52_clipboard_store_is_still_supported() {
+    let bytes = b"\x1b]52;c;YWJj\x07";
+    let (_, handler) = parse_bytes(bytes);
+
+    assert_eq!(handler.clipboard_stores, vec![(b'c', b"YWJj".to_vec())]);
+    assert!(handler.clipboard_loads.is_empty());
+}
+
+#[test]
+fn parse_osc52_clipboard_load_query_is_ignored() {
+    let bytes = b"\x1b]52;c;?\x07";
+    let (_, handler) = parse_bytes(bytes);
+
+    assert!(handler.clipboard_loads.is_empty());
+    assert!(handler.clipboard_stores.is_empty());
 }
 
 #[test]
