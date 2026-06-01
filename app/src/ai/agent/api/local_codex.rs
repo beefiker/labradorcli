@@ -2921,9 +2921,8 @@ fn find_and_cd_command(target: &str) -> String {
     let no_match_message = format!("No matching directory found for {target}");
 
     format!(
-        "target=$(mdfind {} 2>/dev/null | while IFS= read -r path; do [ -d \"$path\" ] && printf '%s\\n' \"$path\" && break; done); if [ -z \"$target\" ]; then target=$(find \"$HOME/Documents\" \"$HOME/Downloads\" \"$HOME/Desktop\" \"$HOME\" -iname {} -type d -print -quit 2>/dev/null); fi; if [ -n \"$target\" ]; then cd \"$target\" && pwd; else echo {} >&2; false; fi",
+        "target=$(mdfind {} 2>/dev/null | while IFS= read -r path; do [ -d \"$path\" ] && printf '%s\\n' \"$path\" && break; done); if [ -n \"$target\" ]; then cd \"$target\" && pwd; else echo {} >&2; false; fi",
         shell_quote(&mdfind_query),
-        shell_quote(&pattern),
         shell_quote(&no_match_message),
     )
 }
@@ -4385,7 +4384,9 @@ mod tests {
         let tool_call = direct_terminal_tool_call(&inputs, None).unwrap();
 
         assert!(tool_call.command.contains("mdfind"));
-        assert!(tool_call.command.contains("find \"$HOME/Documents\""));
+        assert!(!tool_call.command.contains("$HOME/Documents"));
+        assert!(!tool_call.command.contains("$HOME/Downloads"));
+        assert!(!tool_call.command.contains("$HOME/Desktop"));
         assert!(tool_call.command.contains("cd \"$target\" && pwd"));
         assert!(tool_call.is_read_only);
     }
