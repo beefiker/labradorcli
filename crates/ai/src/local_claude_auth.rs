@@ -5,6 +5,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 const CLAUDE_CONFIG_JSON_ENV_VAR: &str = "LABRADOR_CLAUDE_CONFIG_JSON";
+const LEGACY_CLAUDE_CONFIG_JSON_ENV_VAR: &str = "DWARF_CLAUDE_CONFIG_JSON";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +21,11 @@ fn default_config_json_path() -> PathBuf {
     env::var_os(CLAUDE_CONFIG_JSON_ENV_VAR)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
+        .or_else(|| {
+            env::var_os(LEGACY_CLAUDE_CONFIG_JSON_ENV_VAR)
+                .filter(|value| !value.is_empty())
+                .map(PathBuf::from)
+        })
         .or_else(|| dirs::home_dir().map(|home| home.join(".claude.json")))
         .unwrap_or_else(|| PathBuf::from(".claude.json"))
 }

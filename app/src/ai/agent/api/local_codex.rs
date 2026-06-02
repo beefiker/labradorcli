@@ -745,8 +745,13 @@ fn run_codex_streaming(
         let codex_bin = codex_bin();
         let mut command = Command::new(codex_bin.clone());
         configure_local_agent_command_env(&mut command, &codex_bin);
+        if let Some(codex_home) = local_openai_auth::prepare_isolated_codex_home() {
+            command.env("CODEX_HOME", codex_home);
+        }
         command
             .arg("exec")
+            .arg("--ignore-user-config")
+            .arg("--ignore-rules")
             .arg("--json")
             .arg("--skip-git-repo-check")
             .arg("--sandbox")

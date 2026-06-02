@@ -1,8 +1,9 @@
 pub use crate::aws_credentials::{AwsCredentials, AwsCredentialsState};
-use serde::{Deserialize, Serialize};
+use labrador_core::channel::{Channel, ChannelState};
 use labrador_multi_agent_api as api;
 use labrador_ui::{Entity, ModelContext, SingletonEntity};
 use labrador_ui_extras::secure_storage::{self, AppContextExt};
+use serde::{Deserialize, Serialize};
 
 const SECURE_STORAGE_KEY: &str = "AiApiKeys";
 
@@ -57,7 +58,11 @@ pub struct ApiKeyManager {
 
 impl ApiKeyManager {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        let keys = Self::load_keys_from_secure_storage(ctx);
+        let keys = if Self::uses_secure_storage_for_channel(ChannelState::channel()) {
+            Self::load_keys_from_secure_storage(ctx)
+        } else {
+            ApiKeys::default()
+        };
         Self {
             keys,
             aws_credentials_state: AwsCredentialsState::Missing,
@@ -196,6 +201,11 @@ impl ApiKeyManager {
     }
 
     fn write_keys_to_secure_storage(&mut self, ctx: &mut ModelContext<Self>) {
+        if !Self::uses_secure_storage_for_channel(ChannelState::channel()) {
+            log::info!("Skipping AI API key persistence for OSS build");
+            return;
+        }
+
         let keys = self.keys.clone();
 
         let json = match serde_json::to_string(&keys) {
@@ -209,6 +219,36 @@ impl ApiKeyManager {
         if let Err(e) = ctx.secure_storage().write_value(SECURE_STORAGE_KEY, &json) {
             log::error!("Failed to write API keys to secure storage: {e:#}");
         }
+    }
+
+    fn uses_secure_storage_for_channel(channel: Channel) -> bool {
+        !matches!(channel, Channel::Oss)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oss_channel_skips_api_key_secure_storage() {
+        assert!(!ApiKeyManager::uses_secure_storage_for_channel(
+            Channel::Oss
+        ));
+    }
+
+    #[test]
+    fn first_party_channels_keep_api_key_secure_storage() {
+        assert!(ApiKeyManager::uses_secure_storage_for_channel(
+            Channel::Stable
+        ));
+        assert!(ApiKeyManager::uses_secure_storage_for_channel(
+            Channel::Preview
+        ));
+        assert!(ApiKeyManager::uses_secure_storage_for_channel(Channel::Dev));
+        assert!(ApiKeyManager::uses_secure_storage_for_channel(
+            Channel::Local
+        ));
     }
 }
 

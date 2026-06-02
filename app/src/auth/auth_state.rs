@@ -74,7 +74,7 @@ impl AuthState {
     /// 1. Test user (test/integration/skip_login builds)
     /// 2. Provided API key
     /// 3. LABRADOR_USER_SECRET or the legacy user-secret environment variable
-    /// 4. Persisted user from secure storage
+    /// 4. Persisted user from secure storage, except in OSS builds
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub fn initialize(ctx: &AppContext, api_key: Option<String>) -> Self {
         let state = Self::new(ctx);
@@ -108,26 +108,34 @@ impl AuthState {
             return state;
         }
 
-        // Try reading from secure storage.
-        match PersistedUser::from_secure_storage(ctx) {
-            Ok(persisted) => {
-                if persisted.auth_tokens.refresh_token.is_empty() {
-                    log::warn!(
-                        "Found persisted user with empty refresh token; clearing secure storage entry"
-                    );
-                    let _ = PersistedUser::remove_from_secure_storage(ctx).map_err(|err| {
-                        log::warn!("Unable to clear invalid user from secure storage: {err:?}");
-                    });
-                } else {
-                    state.apply_persisted_user(persisted);
+        if Self::should_restore_user_from_secure_storage_for_channel(ChannelState::channel()) {
+            // Try reading from secure storage.
+            match PersistedUser::from_secure_storage(ctx) {
+                Ok(persisted) => {
+                    if persisted.auth_tokens.refresh_token.is_empty() {
+                        log::warn!(
+                            "Found persisted user with empty refresh token; clearing secure storage entry"
+                        );
+                        let _ = PersistedUser::remove_from_secure_storage(ctx).map_err(|err| {
+                            log::warn!("Unable to clear invalid user from secure storage: {err:?}");
+                        });
+                    } else {
+                        state.apply_persisted_user(persisted);
+                    }
+                }
+                Err(err) => {
+                    log::info!("Unable to read user from secure storage: {err:?}");
                 }
             }
-            Err(err) => {
-                log::info!("Unable to read user from secure storage: {err:?}");
-            }
+        } else {
+            log::info!("Skipping persisted Labrador user restore for OSS build");
         }
 
         state
+    }
+
+    fn should_restore_user_from_secure_storage_for_channel(channel: Channel) -> bool {
+        !matches!(channel, Channel::Oss)
     }
 
     fn should_use_test_user() -> bool {
@@ -487,3 +495,21 @@ impl Entity for AuthStateProvider {
 }
 
 impl SingletonEntity for AuthStateProvider {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oss_channel_skips_user_secure_storage_restore() {
+        assert!(!AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Oss));
+    }
+
+    #[test]
+    fn first_party_channels_keep_user_secure_storage_restore() {
+        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Stable));
+        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Preview));
+        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Dev));
+        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Local));
+    }
+}

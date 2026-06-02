@@ -3,13 +3,14 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use ai::local_openai_auth;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use parking_lot::Mutex;
-use tempfile::NamedTempFile;
 use labrador_cli::agent::Harness;
 use labrador_managed_secrets::ManagedSecretValue;
 use labrador_ui::{ModelHandle, ModelSpawner};
+use parking_lot::Mutex;
+use tempfile::NamedTempFile;
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_sdk::AmbientAgentTaskId;
@@ -87,7 +88,23 @@ impl ThirdPartyHarness for CodexHarness {
 /// `--dangerously-bypass-approvals-and-sandbox` disables both the sandbox and approval
 /// prompts so the agent can run autonomously.
 fn codex_command(cli_name: &str, prompt_path: &str) -> String {
-    format!("{cli_name} --dangerously-bypass-approvals-and-sandbox \"$(cat '{prompt_path}')\"")
+    let env_prefix = local_openai_auth::prepare_isolated_codex_home()
+        .map(|codex_home| {
+            format!(
+                "CODEX_HOME={} ",
+                shell_quote(&codex_home.display().to_string())
+            )
+        })
+        .unwrap_or_default();
+
+    format!(
+        "{env_prefix}{cli_name} --dangerously-bypass-approvals-and-sandbox \"$(cat {})\"",
+        shell_quote(prompt_path)
+    )
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 enum CodexRunnerState {
