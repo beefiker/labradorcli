@@ -66,6 +66,20 @@ secrets before running the release workflow:
 If any macOS signing secret is missing, the workflow still publishes an unsigned
 testing DMG.
 
+### macOS Open Anyway Note 🍎🔐✨
+
+My Apple Developer ID is expired right now XD, so the current macOS testing DMG
+may be blocked by Gatekeeper on first launch.
+
+If that happens:
+
+1. Open the DMG and drag `Labrador.app` into Applications.
+2. Try to open Labrador once.
+3. Open System Settings → Privacy & Security.
+4. Click Open Anyway for Labrador.
+
+This is expected for the current unsigned testing build.
+
 ## Licensing
 
 Labrador CLI preserves Warp's license split:
