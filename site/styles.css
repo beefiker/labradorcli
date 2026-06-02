@@ -251,17 +251,30 @@ h3 {
 
 .macos-alert {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   gap: 8px;
   max-width: 680px;
   margin-top: 18px;
-  padding: 18px 20px;
+  padding: 18px 22px 18px 16px;
   border: 1px solid var(--ink);
   border-radius: 8px;
   background: #fff7d8;
   box-shadow: 6px 6px 0 var(--coral);
 }
 
+.macos-alert-emoji {
+  display: inline-block;
+  font-size: clamp(3.2rem, 6vw, 5rem);
+  line-height: 0.92;
+  transform: rotate(-10deg) translateY(2px);
+  transform-origin: 52% 66%;
+  filter: drop-shadow(4px 5px 0 rgba(255, 104, 71, 0.28));
+}
+
 .macos-alert strong {
+  display: block;
+  margin-bottom: 6px;
   font-size: clamp(1.35rem, 2vw, 1.8rem);
   line-height: 1.08;
 }
@@ -531,6 +544,9 @@ h3 {
 .macos-download-emoji {
   font-size: clamp(2.8rem, 7vw, 5.5rem);
   line-height: 1;
+  transform: rotate(-9deg);
+  transform-origin: 52% 70%;
+  filter: drop-shadow(5px 6px 0 rgba(255, 104, 71, 0.24));
 }
 
 .macos-download-note strong {
@@ -618,6 +634,15 @@ h3 {
 
   .macos-download-note {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .macos-alert {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 18px;
+  }
+
+  .macos-alert-emoji {
+    font-size: 4rem;
   }
 
   .nav-links {
