@@ -24,6 +24,7 @@ use ai::skills::{
 };
 use async_channel::Sender;
 use chrono::{DateTime, Duration, Utc};
+use labrador_core::channel::{Channel, ChannelState};
 use repo_metadata::{
     repositories::{DetectedRepositories, RepoDetectionSource},
     repository::{Repository, SubscriberId},
@@ -70,7 +71,12 @@ pub struct SkillWatcher {
 
 impl SkillWatcher {
     pub fn new(ctx: &mut ModelContext<Self>, watcher_event_tx: Sender<SkillWatcherEvent>) -> Self {
-        Self::new_internal(ctx, watcher_event_tx, dirs::home_dir())
+        let home_dir = if ChannelState::channel() == Channel::Oss {
+            None
+        } else {
+            dirs::home_dir()
+        };
+        Self::new_internal(ctx, watcher_event_tx, home_dir)
     }
 
     /// Test-only constructor that skips home-directory watching so tests are not

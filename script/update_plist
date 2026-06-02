@@ -259,12 +259,7 @@ fi
 
 echo "Updating plist with permissions descriptions"
 plutil -insert NSAppleEventsUsageDescription -string "A program in Labrador wants to use AppleScript." "$LABRADOR_PLIST_PATH"
-plutil -insert NSCameraUsageDescription -string "A program in Labrador wants to use the camera." "$LABRADOR_PLIST_PATH"
 plutil -insert NSMicrophoneUsageDescription -string "A program in Labrador wants to use your microphone." "$LABRADOR_PLIST_PATH"
-plutil -insert NSContactsUsageDescription -string "A program in Labrador wants to use your contacts." "$LABRADOR_PLIST_PATH"
-plutil -insert NSCalendarsUsageDescription -string "A program in Labrador wants to use your calendar." "$LABRADOR_PLIST_PATH"
-plutil -insert NSLocationUsageDescription -string "A program in Labrador wants to use your location information." "$LABRADOR_PLIST_PATH"
-plutil -insert NSPhotoLibraryUsageDescription -string "A program in Labrador wants to use your photo library." "$LABRADOR_PLIST_PATH"
 
 echo "Disabling use of Liquid Glass on macOS Tahoe"
 plutil -insert UIDesignRequiresCompatibility -bool true "$LABRADOR_PLIST_PATH"

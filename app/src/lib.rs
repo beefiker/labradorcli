@@ -1336,7 +1336,9 @@ fn initialize_app(
     {
         ctx.add_singleton_model(DirectoryWatcher::new);
         ctx.add_singleton_model(|_| DetectedRepositories::default());
-        if let Some(home_dir) = dirs::home_dir() {
+        if ChannelState::channel() == labrador_core::channel::Channel::Oss {
+            log::info!("Skipping home directory watcher registration for OSS build");
+        } else if let Some(home_dir) = dirs::home_dir() {
             ctx.add_singleton_model(|ctx| HomeDirectoryWatcher::new(home_dir, ctx));
         } else {
             log::info!("Home directory not found; skipping HomeDirectoryWatcher registration");

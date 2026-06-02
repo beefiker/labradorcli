@@ -11,6 +11,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::LazyLock;
+use labrador_core::channel::{Channel, ChannelState};
 use labrador_core::safe_warn;
 use labrador_ui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 use watcher::HomeDirectoryWatcherEvent;
@@ -144,6 +145,15 @@ impl FileMCPWatcher {
             },
             |_, _| {},
         );
+
+        if ChannelState::channel() == Channel::Oss {
+            return Self {
+                file_mcp_tx,
+                home_provider_watchers: HashMap::new(),
+                project_repo_watchers: HashSet::new(),
+                cloud_env_pending: HashMap::new(),
+            };
+        }
 
         // Subscribe to changes to detected repositories.
         ctx.subscribe_to_model(&DetectedRepositories::handle(ctx), {
