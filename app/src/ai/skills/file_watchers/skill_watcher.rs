@@ -12,7 +12,6 @@ use super::{
         is_skill_file, read_skills_from_directories,
     },
 };
-use watcher::{BulkFilesystemWatcherEvent, HomeDirectoryWatcher, HomeDirectoryWatcherEvent};
 
 use crate::server::datetime_ext::DateTimeExt;
 use crate::labrador_managed_paths_watcher::{
@@ -108,14 +107,6 @@ impl SkillWatcher {
         );
 
         if home_dir.is_some() {
-            ctx.subscribe_to_model(
-                &HomeDirectoryWatcher::handle(ctx),
-                |me, event, ctx| match event {
-                    HomeDirectoryWatcherEvent::HomeFilesChanged(event) => {
-                        me.handle_home_files_changed(event, ctx);
-                    }
-                },
-            );
             ctx.subscribe_to_model(&LabradorManagedPathsWatcher::handle(ctx), |me, event, ctx| {
                 me.handle_labrador_managed_paths_event(event, ctx);
             });
@@ -125,9 +116,6 @@ impl SkillWatcher {
         //
         // We watch each skills "parent directory" under the home directory (e.g., `~/.agents`,
         // `~/.claude`) rather than the entire home directory, to reduce watch overhead.
-        //
-        // Note: This will not create watchers for provider directories that haven't been created yet.
-        // We use a separate HomeDirectoryWatcher to detect when those are created and start watching them after they are created.
         let mut home_provider_watchers = HashMap::new();
         if let Some(home_path) = home_dir {
             Self::spawn_read_skills_from_directories(labrador_managed_skill_dirs(), ctx);
@@ -700,100 +688,6 @@ impl SkillWatcher {
             .iter()
             .find(|repo_path| path.starts_with(repo_path))
             .cloned()
-    }
-
-    /// Handle changes to top-level files in the home directory.
-    /// For skills, these are newly created provider directories
-    fn handle_home_files_changed(
-        &mut self,
-        event: &BulkFilesystemWatcherEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let mut deleted_paths = Vec::new();
-        let mut added_paths = Vec::new();
-
-        let provider_root_paths: HashSet<String> = SKILL_PROVIDER_DEFINITIONS
-            .iter()
-            .filter(|provider| provider.provider != SkillProvider::Labrador)
-            .filter_map(|provider| {
-                let component = provider.skills_path.components().next();
-                component.map(|component| component.as_os_str().to_string_lossy().to_string())
-            })
-            .collect();
-
-        // Process deleted files
-        for target_file in event.deleted.iter() {
-            let file_name = target_file
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            if provider_root_paths.contains(&file_name) {
-                deleted_paths.push(target_file.clone());
-            }
-        }
-
-        // Process moved files
-        for (to_target, from_target) in event.moved.iter() {
-            let from_file_name = from_target
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            if provider_root_paths.contains(&from_file_name) {
-                deleted_paths.push(from_target.clone());
-            }
-            let to_file_name = to_target
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            if provider_root_paths.contains(&to_file_name) {
-                added_paths.push(to_target.clone());
-            }
-        }
-
-        // Process added files
-        // We don't care about modified files because that doesn't affect existing watchers
-        for target_file in event.added.iter() {
-            let file_name = target_file
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            if provider_root_paths.contains(&file_name) {
-                added_paths.push(target_file.clone());
-            }
-        }
-
-        // Clean up directory watchers for deleted provider paths.
-        for deleted_path in &deleted_paths {
-            if let Some((repo_handle, subscriber_id)) =
-                self.home_provider_watchers.remove(deleted_path)
-            {
-                repo_handle.update(ctx, |repo, ctx| {
-                    repo.stop_watching(subscriber_id, ctx);
-                });
-            }
-        }
-
-        if !deleted_paths.is_empty() {
-            let _ = self
-                .watcher_event_tx
-                .try_send(SkillWatcherEvent::SkillsDeleted {
-                    paths: deleted_paths,
-                });
-        }
-
-        for added_path in added_paths {
-            // For each newly added provider root path, add a watcher for it
-            Self::watch_home_provider_path(
-                &added_path,
-                &self.repository_message_tx,
-                &mut self.home_provider_watchers,
-                ctx,
-            );
-        }
     }
 
     fn handle_labrador_managed_paths_event(

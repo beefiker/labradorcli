@@ -74,9 +74,13 @@ impl AuthState {
     /// 1. Test user (test/integration/skip_login builds)
     /// 2. Provided API key
     /// 3. LABRADOR_USER_SECRET or the legacy user-secret environment variable
-    /// 4. Persisted user from secure storage, except in OSS builds
+    /// 4. Persisted user from secure storage, if enabled for this startup and channel
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
-    pub fn initialize(ctx: &AppContext, api_key: Option<String>) -> Self {
+    pub fn initialize(
+        ctx: &AppContext,
+        api_key: Option<String>,
+        restore_user_from_secure_storage: bool,
+    ) -> Self {
         let state = Self::new(ctx);
 
         if Self::should_use_test_user() {
@@ -108,7 +112,10 @@ impl AuthState {
             return state;
         }
 
-        if Self::should_restore_user_from_secure_storage_for_channel(ChannelState::channel()) {
+        if Self::should_restore_user_from_secure_storage(
+            restore_user_from_secure_storage,
+            ChannelState::channel(),
+        ) {
             // Try reading from secure storage.
             match PersistedUser::from_secure_storage(ctx) {
                 Ok(persisted) => {
@@ -134,8 +141,11 @@ impl AuthState {
         state
     }
 
-    fn should_restore_user_from_secure_storage_for_channel(channel: Channel) -> bool {
-        !matches!(channel, Channel::Oss)
+    fn should_restore_user_from_secure_storage(
+        restore_user_from_secure_storage: bool,
+        channel: Channel,
+    ) -> bool {
+        restore_user_from_secure_storage && !matches!(channel, Channel::Oss)
     }
 
     fn should_use_test_user() -> bool {
@@ -501,15 +511,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn oss_channel_skips_user_secure_storage_restore() {
-        assert!(!AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Oss));
+    fn user_secure_storage_restore_requires_startup_opt_in() {
+        assert!(!AuthState::should_restore_user_from_secure_storage(
+            false,
+            Channel::Stable
+        ));
     }
 
     #[test]
-    fn first_party_channels_keep_user_secure_storage_restore() {
-        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Stable));
-        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Preview));
-        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Dev));
-        assert!(AuthState::should_restore_user_from_secure_storage_for_channel(Channel::Local));
+    fn oss_channel_skips_user_secure_storage_restore() {
+        assert!(!AuthState::should_restore_user_from_secure_storage(
+            true,
+            Channel::Oss
+        ));
+    }
+
+    #[test]
+    fn opted_in_first_party_channels_restore_user_secure_storage() {
+        assert!(AuthState::should_restore_user_from_secure_storage(
+            true,
+            Channel::Stable
+        ));
+        assert!(AuthState::should_restore_user_from_secure_storage(
+            true,
+            Channel::Preview
+        ));
+        assert!(AuthState::should_restore_user_from_secure_storage(
+            true,
+            Channel::Dev
+        ));
+        assert!(AuthState::should_restore_user_from_secure_storage(
+            true,
+            Channel::Local
+        ));
     }
 }

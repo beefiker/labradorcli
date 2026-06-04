@@ -14,7 +14,6 @@ use std::sync::LazyLock;
 use labrador_core::channel::{Channel, ChannelState};
 use labrador_core::safe_warn;
 use labrador_ui::{Entity, ModelContext, ModelHandle, SingletonEntity};
-use watcher::HomeDirectoryWatcherEvent;
 
 use crate::ai::mcp::{
     home_config_file_path, parsing::normalize_codex_toml_to_json, MCPProvider,
@@ -23,7 +22,6 @@ use crate::ai::mcp::{
 use crate::labrador_managed_paths_watcher::{
     labrador_managed_mcp_config_path, LabradorManagedPathsWatcher, LabradorManagedPathsWatcherEvent,
 };
-use crate::HomeDirectoryWatcher;
 use strum::IntoEnumIterator;
 
 static ENV_VAR_REGEX: LazyLock<Regex> =
@@ -37,8 +35,7 @@ static HOME_SUBDIR_REGEX: LazyLock<Regex> =
 /// Returns the subdirectory under the home directory that needs its own [`DirectoryWatcher`],
 /// inferred from the provider's home config path. Matches paths that are exactly one directory
 /// deep (e.g. `.codex/config.toml` -> `.codex`, `.labrador/.mcp.json` -> `.labrador`). Returns `None`
-/// when the config file lives directly in the home dir (e.g. `.claude.json`) and is already
-/// covered by `HomeDirectoryWatcher`.
+/// when the config file lives directly in the home dir (e.g. `.claude.json`).
 fn home_subdir_to_watch(provider: MCPProvider) -> Option<PathBuf> {
     let path_str = provider.home_config_path().to_str()?;
     HOME_SUBDIR_REGEX
@@ -122,7 +119,6 @@ impl RepositorySubscriber for FileMCPSubscriber {
 /// Model that watches the filesystem for file-based MCP config changes and emits
 /// [`FileMCPWatcherEvent`]s.
 pub struct FileMCPWatcher {
-    file_mcp_tx: Sender<FileMCPDetectionMessage>,
     /// Watcher handles for home provider subdirectories (e.g. `~/.codex`), keyed by subdir path.
     /// Used to cleanup watchers when the subdir is deleted at runtime.
     home_provider_watchers: HashMap<PathBuf, (ModelHandle<Repository>, SubscriberId)>,
@@ -148,7 +144,6 @@ impl FileMCPWatcher {
 
         if ChannelState::channel() == Channel::Oss {
             return Self {
-                file_mcp_tx,
                 home_provider_watchers: HashMap::new(),
                 project_repo_watchers: HashSet::new(),
                 cloud_env_pending: HashMap::new(),
@@ -179,10 +174,6 @@ impl FileMCPWatcher {
             }
         });
 
-        // Subscribe to changes to top-level files in the home directory.
-        ctx.subscribe_to_model(&HomeDirectoryWatcher::handle(ctx), |me, event, ctx| {
-            me.handle_home_directory_watcher_event(event, ctx);
-        });
         ctx.subscribe_to_model(
             &LabradorManagedPathsWatcher::handle(ctx),
             |me, event, ctx| {
@@ -208,7 +199,7 @@ impl FileMCPWatcher {
                 match home_subdir_to_watch(provider) {
                     None => {
                         // Initial scan of config files for providers whose config lives directly in
-                        // home (i.e. ~/.claude.json). HomeDirectoryWatcher handles incremental updates.
+                        // home (i.e. ~/.claude.json).
                         let Some(config_path) = home_config_file_path(provider) else {
                             continue;
                         };
@@ -218,8 +209,6 @@ impl FileMCPWatcher {
                         // For providers whose home config lives in a subdir (e.g. ~/.codex for Codex)
                         // start watching the subdir for file-based MCP servers, if it exists.
                         let subdir_path = home_dir.join(&subdir);
-                        // Note: this will fail if the subdir doesn't exist yet.
-                        // We register upon creation of the subdir via HomeDirectoryWatcher.
                         Self::watch_home_provider_dir(
                             &subdir_path,
                             home_dir.clone(),
@@ -233,7 +222,6 @@ impl FileMCPWatcher {
         }
 
         Self {
-            file_mcp_tx,
             home_provider_watchers,
             project_repo_watchers: HashSet::new(),
             cloud_env_pending: HashMap::new(),
@@ -342,91 +330,6 @@ impl FileMCPWatcher {
                 });
             }
         });
-    }
-
-    /// Handle incoming home directory watcher events.
-    ///
-    /// For providers whose config sits directly in home (no subdir), handles add/delete of
-    /// the config file itself. For providers with a home subdir, handles creation and deletion
-    /// of that subdir, registering or cleaning up a `DirectoryWatcher` accordingly.
-    fn handle_home_directory_watcher_event(
-        &mut self,
-        event: &HomeDirectoryWatcherEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let HomeDirectoryWatcherEvent::HomeFilesChanged(fs_event) = event;
-        let Some(home_dir) = dirs::home_dir() else {
-            return;
-        };
-
-        for provider in MCPProvider::iter() {
-            if provider == MCPProvider::Labrador {
-                continue;
-            }
-            match home_subdir_to_watch(provider) {
-                None => {
-                    // Config lives directly in home (e.g. ~/.claude.json).
-                    // HomeDirectoryWatcher watches home non-recursively, so we handle
-                    // add/delete/move of the config file here.
-                    let Some(config_path) = home_config_file_path(provider) else {
-                        continue;
-                    };
-
-                    let was_deleted = fs_event.deleted.contains(&config_path)
-                        || fs_event.moved.values().any(|v| v == &config_path);
-                    if was_deleted {
-                        ctx.emit(FileMCPWatcherEvent::ConfigRemoved {
-                            root_path: home_dir.clone(),
-                            provider,
-                        });
-                    }
-
-                    let was_added = fs_event.added_or_updated_iter().any(|p| p == &config_path)
-                        || fs_event.moved.contains_key(&config_path);
-                    if was_added {
-                        self.update_servers_from_config_file(
-                            &config_path,
-                            home_dir.clone(),
-                            provider,
-                            ctx,
-                        );
-                    }
-                }
-                Some(subdir) => {
-                    // Config lives in a home subdir (e.g. ~/.codex/config.toml).
-                    // HomeDirectoryWatcher detects creation/deletion of the subdir itself;
-                    // file changes within it are handled by the registered DirectoryWatcher.
-                    let subdir_path = home_dir.join(&subdir);
-
-                    let subdir_added = fs_event.added.contains(&subdir_path)
-                        || fs_event.moved.contains_key(&subdir_path);
-                    if subdir_added {
-                        // If the subdir (i.e. ~/.codex) is created, start watching it for file-based MCP servers.
-                        Self::watch_home_provider_dir(
-                            &subdir_path,
-                            home_dir.clone(),
-                            self.file_mcp_tx.clone(),
-                            &mut self.home_provider_watchers,
-                            ctx,
-                        );
-                    }
-
-                    let subdir_deleted = fs_event.deleted.contains(&subdir_path)
-                        || fs_event.moved.values().any(|v| v == &subdir_path);
-                    if subdir_deleted {
-                        if let Some((repo_handle, id)) =
-                            self.home_provider_watchers.remove(&subdir_path)
-                        {
-                            repo_handle.update(ctx, |repo, ctx| repo.stop_watching(id, ctx));
-                        }
-                        ctx.emit(FileMCPWatcherEvent::ConfigRemoved {
-                            root_path: home_dir.clone(),
-                            provider,
-                        });
-                    }
-                }
-            }
-        }
     }
 
     fn handle_labrador_managed_paths_event(

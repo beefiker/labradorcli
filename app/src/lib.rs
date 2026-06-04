@@ -154,9 +154,6 @@ use labrador_cli::{agent::AgentCommand, CliCommand};
 use repo_metadata::{
     repositories::DetectedRepositories, watcher::DirectoryWatcher, RepoMetadataModel,
 };
-#[cfg(feature = "local_fs")]
-use watcher::HomeDirectoryWatcher;
-
 use settings_view::pane_manager::SettingsPaneManager;
 use terminal::general_settings::GeneralSettings;
 use terminal::keys_settings::KeysSettings;
@@ -1037,13 +1034,18 @@ fn initialize_app(
         LaunchMode::App { api_key, .. } if ChannelState::channel().is_dogfood() => api_key.clone(),
         _ => None,
     };
-    let api_key = if FeatureFlag::APIKeyAuthentication.is_enabled() {
+    let api_key_authentication_enabled = FeatureFlag::APIKeyAuthentication.is_enabled();
+    let api_key = if api_key_authentication_enabled {
         api_key
     } else {
         None
     };
 
-    let auth_state = Arc::new(AuthState::initialize(ctx, api_key));
+    let auth_state = Arc::new(AuthState::initialize(
+        ctx,
+        api_key,
+        api_key_authentication_enabled,
+    ));
     timer.mark_interval_end("AUTH_MANAGER_SET_USER");
 
     let _ = launch_mode;
@@ -1170,7 +1172,13 @@ fn initialize_app(
     });
 
     // Initialize ApiKeyManager after UserWorkspaces so it can subscribe to workspace/settings changes
-    ctx.add_singleton_model(::ai::api_keys::ApiKeyManager::new);
+    if FeatureFlag::APIKeyManagement.is_enabled() {
+        ctx.add_singleton_model(::ai::api_keys::ApiKeyManager::new);
+    } else {
+        ctx.add_singleton_model(
+            ::ai::api_keys::ApiKeyManager::new_without_startup_secure_storage_load,
+        );
+    }
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "crash_reporting")] {
@@ -1336,13 +1344,6 @@ fn initialize_app(
     {
         ctx.add_singleton_model(DirectoryWatcher::new);
         ctx.add_singleton_model(|_| DetectedRepositories::default());
-        if ChannelState::channel() == labrador_core::channel::Channel::Oss {
-            log::info!("Skipping home directory watcher registration for OSS build");
-        } else if let Some(home_dir) = dirs::home_dir() {
-            ctx.add_singleton_model(|ctx| HomeDirectoryWatcher::new(home_dir, ctx));
-        } else {
-            log::info!("Home directory not found; skipping HomeDirectoryWatcher registration");
-        }
     }
 
     #[cfg(feature = "local_fs")]

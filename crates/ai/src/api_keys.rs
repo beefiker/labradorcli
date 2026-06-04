@@ -58,11 +58,26 @@ pub struct ApiKeyManager {
 
 impl ApiKeyManager {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        let keys = if Self::uses_secure_storage_for_channel(ChannelState::channel()) {
+        Self::new_with_startup_secure_storage_load(true, ctx)
+    }
+
+    pub fn new_without_startup_secure_storage_load(ctx: &mut ModelContext<Self>) -> Self {
+        Self::new_with_startup_secure_storage_load(false, ctx)
+    }
+
+    fn new_with_startup_secure_storage_load(
+        load_keys_from_secure_storage: bool,
+        ctx: &mut ModelContext<Self>,
+    ) -> Self {
+        let keys = if Self::should_load_keys_from_secure_storage(
+            load_keys_from_secure_storage,
+            ChannelState::channel(),
+        ) {
             Self::load_keys_from_secure_storage(ctx)
         } else {
             ApiKeys::default()
         };
+
         Self {
             keys,
             aws_credentials_state: AwsCredentialsState::Missing,
@@ -224,6 +239,13 @@ impl ApiKeyManager {
     fn uses_secure_storage_for_channel(channel: Channel) -> bool {
         !matches!(channel, Channel::Oss)
     }
+
+    fn should_load_keys_from_secure_storage(
+        load_keys_from_secure_storage: bool,
+        channel: Channel,
+    ) -> bool {
+        load_keys_from_secure_storage && Self::uses_secure_storage_for_channel(channel)
+    }
 }
 
 #[cfg(test)]
@@ -231,22 +253,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn oss_channel_skips_api_key_secure_storage() {
-        assert!(!ApiKeyManager::uses_secure_storage_for_channel(
+    fn api_key_secure_storage_load_requires_startup_opt_in() {
+        assert!(!ApiKeyManager::should_load_keys_from_secure_storage(
+            false,
+            Channel::Stable
+        ));
+    }
+
+    #[test]
+    fn oss_channel_skips_api_key_secure_storage_load() {
+        assert!(!ApiKeyManager::should_load_keys_from_secure_storage(
+            true,
             Channel::Oss
         ));
     }
 
     #[test]
-    fn first_party_channels_keep_api_key_secure_storage() {
-        assert!(ApiKeyManager::uses_secure_storage_for_channel(
+    fn opted_in_first_party_channels_load_api_key_secure_storage() {
+        assert!(ApiKeyManager::should_load_keys_from_secure_storage(
+            true,
             Channel::Stable
         ));
-        assert!(ApiKeyManager::uses_secure_storage_for_channel(
+        assert!(ApiKeyManager::should_load_keys_from_secure_storage(
+            true,
             Channel::Preview
         ));
-        assert!(ApiKeyManager::uses_secure_storage_for_channel(Channel::Dev));
-        assert!(ApiKeyManager::uses_secure_storage_for_channel(
+        assert!(ApiKeyManager::should_load_keys_from_secure_storage(
+            true,
+            Channel::Dev
+        ));
+        assert!(ApiKeyManager::should_load_keys_from_secure_storage(
+            true,
             Channel::Local
         ));
     }
