@@ -29,15 +29,17 @@ use crate::{
 use async_compat::CompatExt as _;
 use cfg_if::cfg_if;
 use futures::FutureExt as _;
+use labrador_core::safe_error;
+use labrador_core::{
+    execution_mode::AppExecutionMode, features::FeatureFlag, settings::Setting as _,
+};
+use labrador_ui::AppContext;
+use labrador_ui::{windowing::WindowManager, ModelContext, SingletonEntity};
 use rmcp::{transport::ConfigureCommandExt as _, ServiceExt as _};
 use simple_logger::manager::LogManager;
 use simple_logger::SimpleLogger;
 use tokio::io::AsyncBufReadExt as _;
 use uuid::Uuid;
-use labrador_core::safe_error;
-use labrador_core::{execution_mode::AppExecutionMode, features::FeatureFlag, settings::Setting as _};
-use labrador_ui::AppContext;
-use labrador_ui::{windowing::WindowManager, ModelContext, SingletonEntity};
 
 use super::{
     oauth::{self, AuthContext, FileBasedPersistedCredentialsMap, PersistedCredentialsMap},
@@ -164,29 +166,15 @@ impl TemplatableMCPServerManager {
             active_servers: Default::default(),
             spawned_servers: Default::default(),
             server_credentials: Default::default(),
+            server_credentials_loaded: false,
             file_based_server_credentials: Default::default(),
+            file_based_server_credentials_loaded: false,
             locally_installed_servers,
             server_error_messages: Default::default(),
             spawner: Some(ctx.spawner()),
             pending_reconnections: Default::default(),
             pending_oauth_csrf: Default::default(),
         };
-
-        // If we're not in a test, try to load credentials from secure storage.
-        if !cfg!(test) {
-            me.server_credentials = load_credentials_from_secure_storage::<PersistedCredentialsMap>(
-                ctx,
-                TEMPLATABLE_MCP_CREDENTIALS_KEY,
-            );
-
-            if FeatureFlag::FileBasedMcp.is_enabled() {
-                me.file_based_server_credentials = load_credentials_from_secure_storage::<
-                    FileBasedPersistedCredentialsMap,
-                >(
-                    ctx, FILE_BASED_MCP_CREDENTIALS_KEY
-                );
-            }
-        }
 
         if AppExecutionMode::as_ref(ctx).can_autostart_mcp_servers() {
             for installation_uuid in running_server_uuids {
@@ -196,6 +184,33 @@ impl TemplatableMCPServerManager {
 
         let _ = running_legacy_server_uuids;
         me
+    }
+
+    pub(crate) fn ensure_server_credentials_loaded(&mut self, app: &mut AppContext) {
+        if self.server_credentials_loaded {
+            return;
+        }
+
+        if !cfg!(test) {
+            self.server_credentials = load_credentials_from_secure_storage::<PersistedCredentialsMap>(
+                app,
+                TEMPLATABLE_MCP_CREDENTIALS_KEY,
+            );
+        }
+        self.server_credentials_loaded = true;
+    }
+
+    pub(crate) fn ensure_file_based_server_credentials_loaded(&mut self, app: &mut AppContext) {
+        if self.file_based_server_credentials_loaded {
+            return;
+        }
+
+        if !cfg!(test) && FeatureFlag::FileBasedMcp.is_enabled() {
+            self.file_based_server_credentials = load_credentials_from_secure_storage::<
+                FileBasedPersistedCredentialsMap,
+            >(app, FILE_BASED_MCP_CREDENTIALS_KEY);
+        }
+        self.file_based_server_credentials_loaded = true;
     }
 
     pub fn is_server_installation_shared(
@@ -520,6 +535,11 @@ impl TemplatableMCPServerManager {
         let (oauth_result_tx, oauth_result_rx) = async_channel::unbounded();
 
         let is_headless = AppExecutionMode::as_ref(ctx).is_autonomous();
+
+        self.ensure_server_credentials_loaded(ctx);
+        if FeatureFlag::FileBasedMcp.is_enabled() {
+            self.ensure_file_based_server_credentials_loaded(ctx);
+        }
 
         let mut persisted_credentials = self.server_credentials.get(&template_uuid).cloned();
         if persisted_credentials.is_none() && FeatureFlag::FileBasedMcp.is_enabled() {
@@ -1193,6 +1213,7 @@ impl TemplatableMCPServerManager {
         installation_hashes: &Vec<u64>,
         ctx: &mut ModelContext<Self>,
     ) {
+        self.ensure_file_based_server_credentials_loaded(ctx);
         for hash in installation_hashes {
             self.file_based_server_credentials.remove(hash);
         }

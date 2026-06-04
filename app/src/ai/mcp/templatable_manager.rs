@@ -12,10 +12,10 @@ use std::collections::HashMap;
 use crate::ai::mcp::FileBasedMCPManager;
 use crate::ai::mcp::{templatable_installation::TemplatableMCPServerInstallation, MCPServerState};
 use futures_util::stream::AbortHandle;
-use uuid::Uuid;
 #[cfg(not(target_family = "wasm"))]
 use labrador_ui::ModelSpawner;
 use labrador_ui::{Entity, SingletonEntity};
+use uuid::Uuid;
 
 #[cfg(not(target_family = "wasm"))]
 type ReconnectResultSender =
@@ -43,9 +43,13 @@ pub struct TemplatableMCPServerManager {
     /// we use them instead of going through the OAuth flow again.
     #[cfg(not(target_family = "wasm"))]
     server_credentials: oauth::PersistedCredentialsMap,
+    #[cfg(not(target_family = "wasm"))]
+    server_credentials_loaded: bool,
     /// Cached credentials for file-based servers, keyed by installation hash.
     #[cfg(not(target_family = "wasm"))]
     file_based_server_credentials: oauth::FileBasedPersistedCredentialsMap,
+    #[cfg(not(target_family = "wasm"))]
+    file_based_server_credentials_loaded: bool,
     /// Error messages for failed servers, keyed by installation UUID.
     server_error_messages: HashMap<Uuid, String>,
     /// Spawner for running tasks in the context of this manager.

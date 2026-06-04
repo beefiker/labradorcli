@@ -47,13 +47,25 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::{mpsc::SyncSender, Arc};
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
+use labrador_cli::agent::Harness;
+use labrador_core::command::ExitCode;
+use labrador_core::context_flag::ContextFlag;
+use labrador_core::HostId;
+use labrador_ui::elements::{
+    CrossAxisAlignment, DispatchEventResult, EventHandler, Flex, MainAxisSize, Shrinkable, Stack,
+};
+use labrador_ui::keymap::{Context, EditableBinding, FixedBinding};
+use labrador_ui::notification::NotificationSendError;
+use labrador_util::path::convert_wsl_to_windows_host_path;
+#[cfg(feature = "local_fs")]
+use labrador_util::path::LineAndColumnArg;
 use markdown_parser::FormattedTextFragment;
 use parking_lot::FairMutex;
 use pathfinder_geometry::rect::RectF;
@@ -66,18 +78,6 @@ use tree::DEFAULT_FLEX_VALUE;
 use typed_path::TypedPath;
 use url::Url;
 use uuid::Uuid;
-use labrador_cli::agent::Harness;
-use labrador_core::command::ExitCode;
-use labrador_core::context_flag::ContextFlag;
-use labrador_core::HostId;
-use labrador_util::path::convert_wsl_to_windows_host_path;
-#[cfg(feature = "local_fs")]
-use labrador_util::path::LineAndColumnArg;
-use labrador_ui::elements::{
-    CrossAxisAlignment, DispatchEventResult, EventHandler, Flex, MainAxisSize, Shrinkable, Stack,
-};
-use labrador_ui::keymap::{Context, EditableBinding, FixedBinding};
-use labrador_ui::notification::NotificationSendError;
 
 use labrador_ui::windowing::WindowManager;
 use labrador_ui::{
@@ -127,9 +127,9 @@ use crate::terminal::view::{
     LeftPanelTargetView, SyncEvent, TerminalViewState,
 };
 use crate::terminal::{MockTerminalManager, ShellLaunchData, ShellLaunchState};
+use labrador_server_client::ids::SyncId;
 use session_sharing_protocol::sharer::SessionSourceType;
 use settings::Setting as _;
-use labrador_server_client::ids::SyncId;
 
 use crate::code::active_file::ActiveFileModel;
 use crate::util::bindings::{is_binding_pty_compliant, CustomAction};
@@ -926,6 +926,37 @@ type InitialLayoutCallback = Box<
     ) -> (PaneData, InitialFocus),
 >;
 
+fn restored_terminal_startup_directory(cwd: Option<String>) -> Option<PathBuf> {
+    let path = cwd.map(PathBuf::from)?;
+    should_restore_terminal_startup_directory(&path).then_some(path)
+}
+
+fn should_restore_terminal_startup_directory(path: &Path) -> bool {
+    if path_is_macos_protected_home_folder(path) {
+        log::info!("Skipping restored startup directory in a macOS protected folder");
+        return false;
+    }
+
+    path.is_dir()
+}
+
+#[cfg(target_os = "macos")]
+fn path_is_macos_protected_home_folder(path: &Path) -> bool {
+    let Some(home_dir) = dirs::home_dir() else {
+        return false;
+    };
+
+    ["Desktop", "Documents", "Downloads"]
+        .into_iter()
+        .map(|dir_name| home_dir.join(dir_name))
+        .any(|protected_dir| path.starts_with(protected_dir))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn path_is_macos_protected_home_folder(_path: &Path) -> bool {
+    false
+}
+
 impl PaneGroup {
     /// Executes the provided callback for each TerminalView contained within
     /// this pane group.
@@ -1423,10 +1454,7 @@ impl PaneGroup {
                         }
                     });
 
-                let startup_directory = terminal_snapshot
-                    .cwd
-                    .map(PathBuf::from)
-                    .filter(|path| path.is_dir());
+                let startup_directory = restored_terminal_startup_directory(terminal_snapshot.cwd);
 
                 // Filter conversation IDs to only include those that have task messages
                 // and are not entirely passive (ignored suggestions).
@@ -6065,5 +6093,25 @@ impl View for PaneGroup {
         _new_window_id: WindowId,
         _ctx: &mut ViewContext<Self>,
     ) {
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::path_is_macos_protected_home_folder;
+
+    #[test]
+    fn protected_home_folder_detection_matches_platform() {
+        let Some(home_dir) = dirs::home_dir() else {
+            return;
+        };
+
+        assert_eq!(
+            path_is_macos_protected_home_folder(&home_dir.join("Documents").join("repo")),
+            cfg!(target_os = "macos")
+        );
+        assert!(!path_is_macos_protected_home_folder(
+            &home_dir.join(".labrador")
+        ));
     }
 }

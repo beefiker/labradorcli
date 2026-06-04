@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, bail};
+use labrador_core::channel::ChannelState;
+use labrador_ui::ModelSpawner;
+use labrador_ui_extras::secure_storage::AppContextExt as _;
 use oauth2::{RefreshToken, TokenResponse as _};
 use rmcp::transport::{
     auth::{
@@ -13,9 +16,6 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
-use labrador_core::channel::ChannelState;
-use labrador_ui::ModelSpawner;
-use labrador_ui_extras::secure_storage::AppContextExt as _;
 
 use super::{MCPServerState, TemplatableMCPServerManager};
 use {crate::ai::mcp::FileBasedMCPManager, labrador_ui::SingletonEntity};
@@ -495,6 +495,7 @@ impl TemplatableMCPServerManager {
         credentials: PersistedCredentials,
     ) {
         if let Some(hash) = FileBasedMCPManager::as_ref(app).get_hash_by_uuid(installation_uuid) {
+            self.ensure_file_based_server_credentials_loaded(app);
             self.file_based_server_credentials.insert(hash, credentials);
             write_to_secure_storage(
                 app,
@@ -505,6 +506,7 @@ impl TemplatableMCPServerManager {
         }
 
         if let Some(template_uuid) = self.get_template_uuid(installation_uuid) {
+            self.ensure_server_credentials_loaded(app);
             self.server_credentials.insert(template_uuid, credentials);
             write_to_secure_storage(
                 app,
@@ -524,6 +526,7 @@ impl TemplatableMCPServerManager {
         app: &mut labrador_ui::AppContext,
     ) {
         if let Some(template_uuid) = self.get_template_uuid(installation_uuid) {
+            self.ensure_server_credentials_loaded(app);
             self.server_credentials.remove(&template_uuid);
             write_to_secure_storage(
                 app,
