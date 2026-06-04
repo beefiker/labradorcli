@@ -17,9 +17,9 @@ use crate::ai::{
 
 use super::agent_view::{AgentViewController, AgentViewEntryOrigin, EnterAgentViewError};
 use ai::project_context::model::ProjectContextModel;
-use parking_lot::FairMutex;
 use labrador_core::features::FeatureFlag;
 use labrador_ui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use parking_lot::FairMutex;
 
 use crate::ai::agent::conversation::{AIConversationAutoexecuteMode, ConversationStatus};
 use crate::{
@@ -266,15 +266,19 @@ impl BlocklistAIContextModel {
                         ctx,
                     );
                 }
+                BlocklistAIHistoryEvent::SetActiveConversation { .. }
+                | BlocklistAIHistoryEvent::UpdatedConversationMetadata { .. } => {
+                    if !me.vision_supported_for_selected_conversation(ctx) {
+                        me.clear_pending_images(ctx);
+                    }
+                }
                 _ => {}
             }
         });
 
         ctx.subscribe_to_model(&LLMPreferences::handle(ctx), |me, event, ctx| {
             if let LLMPreferencesEvent::UpdatedActiveAgentModeLLM = event {
-                let llm_prefs = LLMPreferences::as_ref(ctx);
-                let vision_supported = llm_prefs.vision_supported(ctx, Some(me.terminal_view_id));
-                if !vision_supported {
+                if !me.vision_supported_for_selected_conversation(ctx) {
                     me.clear_pending_images(ctx);
                 }
             }
@@ -679,6 +683,21 @@ impl BlocklistAIContextModel {
         });
 
         to_remove
+    }
+
+    fn vision_supported_for_selected_conversation(&self, app: &AppContext) -> bool {
+        let selected_model_id = self
+            .selected_conversation_id(app)
+            .and_then(|conversation_id| {
+                BlocklistAIHistoryModel::as_ref(app)
+                    .selected_model_id_for_conversation(&conversation_id)
+            });
+
+        LLMPreferences::as_ref(app).vision_supported_for_conversation(
+            app,
+            Some(self.terminal_view_id),
+            selected_model_id,
+        )
     }
 
     pub fn pending_query_state(&self) -> &PendingQueryState {

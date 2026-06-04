@@ -9,13 +9,6 @@ use crate::{
         calculate_max_profile_name_width, calculate_scaled_font_size,
     },
 };
-use pathfinder_color::ColorU;
-#[cfg(not(target_family = "wasm"))]
-use settings::Setting as _;
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::Arc;
 use labrador_ui::{
     elements::{
         ChildView, Clipped, Container, CornerRadius, CrossAxisAlignment, Fill, Flex,
@@ -26,6 +19,13 @@ use labrador_ui::{
     AppContext, Element, Entity, EntityId, SingletonEntity as _, TypedActionView, View, ViewAsRef,
     ViewContext, ViewHandle,
 };
+use pathfinder_color::ColorU;
+#[cfg(not(target_family = "wasm"))]
+use settings::Setting as _;
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use labrador_core::ui::{
     color::{
@@ -36,11 +36,11 @@ use labrador_core::ui::{
     theme,
 };
 
-use std::boxed::Box;
 use labrador_ui::{
     ui_components::segmented_control::{SegmentedControl, SegmentedControlEvent},
     ModelHandle,
 };
+use std::boxed::Box;
 
 use labrador_core::ui::appearance::Appearance;
 use labrador_core::ui::theme::color::internal_colors;
@@ -206,8 +206,14 @@ fn calculate_profile_model_selector_threshold(
         .font_cache()
         .em_width(appearance.monospace_font_family(), scaled_font_size);
 
-    let llm_preferences = LLMPreferences::as_ref(ctx);
-    let active_llm = llm_preferences.get_active_base_model(ctx, Some(terminal_view_id));
+    let selected_model_id = BlocklistAIHistoryModel::as_ref(ctx)
+        .active_conversation(terminal_view_id)
+        .and_then(|conversation| conversation.selected_model_id());
+    let active_llm = LLMPreferences::as_ref(ctx).get_active_base_model_for_conversation(
+        ctx,
+        Some(terminal_view_id),
+        selected_model_id,
+    );
     let model_name_char_count = active_llm.menu_display_name().chars().count() as f32;
     let model_text_width = model_name_char_count * em_width;
 

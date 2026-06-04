@@ -2,12 +2,12 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use input_classifier::InputType;
+use labrador_core::features::FeatureFlag;
+use labrador_ui::{AppContext, ModelHandle, SingletonEntity, WeakViewHandle};
 use session_sharing_protocol::common::{
     CLIAgentSessionState, InputMode, InputType as ProtocolInputType, SelectedAgentModel,
     SelectedConversation, ServerConversationToken, UniversalDeveloperInputContextUpdate,
 };
-use labrador_core::features::FeatureFlag;
-use labrador_ui::{AppContext, ModelHandle, SingletonEntity, WeakViewHandle};
 
 use crate::ai::blocklist::agent_view::{AgentViewController, AgentViewEntryOrigin};
 use crate::ai::blocklist::{BlocklistAIContextModel, BlocklistAIHistoryModel, InputConfig};
@@ -31,8 +31,15 @@ pub(crate) fn apply_selected_agent_model_update(
 
     // Check if this is already our current model - if so, skip the update to avoid loops
     let llm_prefs = LLMPreferences::as_ref(ctx);
+    let selected_model_id_for_conversation = BlocklistAIHistoryModel::as_ref(ctx)
+        .active_conversation(terminal_view_id)
+        .and_then(|conversation| conversation.selected_model_id());
     let current_model_id = llm_prefs
-        .get_active_base_model(ctx, Some(terminal_view_id))
+        .get_active_base_model_for_conversation(
+            ctx,
+            Some(terminal_view_id),
+            selected_model_id_for_conversation,
+        )
         .id
         .clone();
     if current_model_id == model_id {
@@ -54,6 +61,13 @@ pub(crate) fn apply_selected_agent_model_update(
     // Update the local LLMPreferences to match the selected model
     LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
         prefs.update_preferred_agent_mode_llm(&model_id, terminal_view_id, ctx);
+    });
+    BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+        history.set_selected_model_id_for_active_conversation(
+            terminal_view_id,
+            model_id.clone(),
+            ctx,
+        );
     });
 }
 

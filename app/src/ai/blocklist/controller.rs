@@ -242,8 +242,15 @@ impl RequestInput {
         app: &AppContext,
     ) -> Self {
         let llm_prefs = LLMPreferences::as_ref(app);
+        let selected_model_id = BlocklistAIHistoryModel::as_ref(app)
+            .selected_model_id_for_conversation(&conversation_id)
+            .cloned();
         let model_id = llm_prefs
-            .get_active_base_model(app, Some(terminal_view_id))
+            .get_active_base_model_for_conversation(
+                app,
+                Some(terminal_view_id),
+                selected_model_id.as_ref(),
+            )
             .id
             .clone();
         let coding_model_id = llm_prefs

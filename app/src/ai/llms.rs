@@ -749,6 +749,21 @@ impl LLMPreferences {
         self.get_preferred_base_model(app, terminal_view_id)
     }
 
+    pub fn get_active_base_model_for_conversation<'a>(
+        &'a self,
+        app: &'a AppContext,
+        terminal_view_id: Option<EntityId>,
+        selected_model_id: Option<&LLMId>,
+    ) -> &'a LLMInfo {
+        if let Some(selected) =
+            selected_model_id.and_then(|id| self.models_by_feature.agent_mode.info_for_id(id))
+        {
+            return self.resolve_effective_local_agent_model(selected);
+        }
+
+        self.get_active_base_model(app, terminal_view_id)
+    }
+
     /// Returns `LLMInfo` for the currently selected LLM to be used for Agent Mode.
     fn get_preferred_base_model(
         &self,
@@ -1232,8 +1247,13 @@ impl LLMPreferences {
         ctx.emit(LLMPreferencesEvent::UpdatedAvailableLLMs);
     }
 
-    pub fn vision_supported(&self, app: &AppContext, terminal_view_id: Option<EntityId>) -> bool {
-        self.get_active_base_model(app, terminal_view_id)
+    pub fn vision_supported_for_conversation(
+        &self,
+        app: &AppContext,
+        terminal_view_id: Option<EntityId>,
+        selected_model_id: Option<&LLMId>,
+    ) -> bool {
+        self.get_active_base_model_for_conversation(app, terminal_view_id, selected_model_id)
             .vision_supported
     }
 

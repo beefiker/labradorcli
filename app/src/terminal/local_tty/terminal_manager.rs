@@ -1,6 +1,7 @@
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::auth::auth_state::AuthState;
 use crate::auth::AuthStateProvider;
+use crate::terminal::labradorify::settings::LabradorifySettings;
 use crate::terminal::model::terminal_model::ExitReason;
 use crate::terminal::shared_session::shared_handlers::{
     apply_auto_approve_agent_actions_update, apply_cli_agent_state_update, apply_input_mode_update,
@@ -8,7 +9,6 @@ use crate::terminal::shared_session::shared_handlers::{
     build_selected_conversation_update, RemoteUpdateGuard,
 };
 use crate::terminal::shell::ShellName;
-use crate::terminal::labradorify::settings::LabradorifySettings;
 use crate::terminal::TerminalManager as _;
 use anyhow::Context as _;
 use async_broadcast::InactiveReceiver;
@@ -37,6 +37,8 @@ use pathfinder_geometry::vector::Vector2F;
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
+use labrador_ui::r#async::executor::Background;
+use labrador_ui::{AppContext, ModelContext, ModelHandle, SingletonEntity, ViewHandle, WindowId};
 use session_sharing_protocol::common::{
     ActivePrompt, AgentPromptFailureReason, CLIAgentSessionState, CommandExecutionFailureReason,
     ControlAction, ControlActionFailureReason, SelectedAgentModel,
@@ -47,8 +49,6 @@ use session_sharing_protocol::common::{
     LongRunningCommandAgentInteractionState, SelectedConversation, UniversalDeveloperInputContext,
 };
 use settings::Setting as _;
-use labrador_ui::r#async::executor::Background;
-use labrador_ui::{AppContext, ModelContext, ModelHandle, SingletonEntity, ViewHandle, WindowId};
 
 use labrador_core::execution_mode::AppExecutionMode;
 
@@ -436,8 +436,15 @@ impl TerminalManager {
 
             if let Some(network) = session_sharer_for_models.borrow().as_ref() {
                 let llm_prefs = LLMPreferences::as_ref(ctx);
+                let selected_model_id_for_conversation = BlocklistAIHistoryModel::as_ref(ctx)
+                    .active_conversation(terminal_view_id)
+                    .and_then(|conversation| conversation.selected_model_id());
                 let selected_model_id: String = llm_prefs
-                    .get_active_base_model(ctx, Some(terminal_view_id))
+                    .get_active_base_model_for_conversation(
+                        ctx,
+                        Some(terminal_view_id),
+                        selected_model_id_for_conversation,
+                    )
                     .id
                     .clone()
                     .into();
@@ -976,7 +983,9 @@ impl TerminalManager {
             *LabradorifySettings::as_ref(ctx)
                 .enable_ssh_labradorification
                 .value()
-                && !*LabradorifySettings::as_ref(ctx).use_ssh_tmux_wrapper.value()
+                && !*LabradorifySettings::as_ref(ctx)
+                    .use_ssh_tmux_wrapper
+                    .value()
         } else {
             *SshSettings::as_ref(ctx).enable_legacy_ssh_wrapper.value()
         };
@@ -2328,8 +2337,7 @@ fn get_shell_starter_internal(
             unsupported_shell,
             starter,
         } => {
-            if let Some(_unsupported_shell) = unsupported_shell {
-            }
+            if let Some(_unsupported_shell) = unsupported_shell {}
 
             ShellStarter::Direct(starter)
         }

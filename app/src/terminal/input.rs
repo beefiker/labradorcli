@@ -194,6 +194,7 @@ use ai::skills::SkillReference;
 use diesel::SqliteConnection;
 use futures::FutureExt as _;
 use itertools::Itertools;
+use labrador_completer::util::parse_current_commands_and_tokens;
 use lazy_static::lazy_static;
 use ordered_float::Float;
 use regex::Regex;
@@ -211,7 +212,6 @@ use std::{
 };
 use string_offset::CharOffset;
 use vim::vim::{VimHandler, VimMode};
-use labrador_completer::util::parse_current_commands_and_tokens;
 
 use labrador_completer::{
     completer::{
@@ -228,7 +228,6 @@ use labrador_core::{
     ui::theme::{color::internal_colors, AnsiColorIdentifier},
 };
 use labrador_editor::editor::NavigationKey;
-use labrador_util::path::ShellFamily;
 use labrador_ui::{
     accessibility::{AccessibilityContent, ActionAccessibilityContent, LabradorA11yRole},
     clipboard::{ClipboardContent, ImageData},
@@ -260,6 +259,7 @@ pub use labrador_ui::{
     geometry::vector::{vec2f, Vector2F},
     WindowId,
 };
+use labrador_util::path::ShellFamily;
 
 use self::decorations::InputBackgroundJobOptions;
 use super::{
@@ -2618,8 +2618,16 @@ impl Input {
                     .attachment_chips
                     .iter()
                     .any(|c| matches!(c.attachment_type, AttachmentType::Image));
-                let vision_supported =
-                    LLMPreferences::as_ref(ctx).vision_supported(ctx, Some(me.terminal_view_id));
+                let selected_model_id = me
+                    .ai_context_model
+                    .as_ref(ctx)
+                    .selected_conversation(ctx)
+                    .and_then(|conversation| conversation.selected_model_id());
+                let vision_supported = LLMPreferences::as_ref(ctx).vision_supported_for_conversation(
+                    ctx,
+                    Some(me.terminal_view_id),
+                    selected_model_id,
+                );
                 if has_image_chips && !vision_supported {
                     let window_id = ctx.window_id();
                     ToastStack::handle(ctx).update(ctx, |ts, ctx| {
@@ -4320,11 +4328,16 @@ impl Input {
 
         let llm_prefs = LLMPreferences::as_ref(ctx);
 
-        let vision_supported = llm_prefs.vision_supported(ctx, Some(self.terminal_view_id));
-
         let num_images_attached = self.ai_context_model.as_ref(ctx).pending_images().len();
 
         let conversation = self.ai_context_model.as_ref(ctx).selected_conversation(ctx);
+        let selected_model_id =
+            conversation.and_then(|conversation| conversation.selected_model_id());
+        let vision_supported = llm_prefs.vision_supported_for_conversation(
+            ctx,
+            Some(self.terminal_view_id),
+            selected_model_id,
+        );
 
         let num_images_in_conversation = conversation
             .and_then(|conversation| conversation.get_root_task())
@@ -7701,7 +7714,8 @@ impl Input {
                             // the completions finish quickly, since that causes a jittery UX.
                             let _ = ctx.spawn(
                                 async move {
-                                    labrador_ui::r#async::Timer::after(Duration::from_millis(750)).await;
+                                    labrador_ui::r#async::Timer::after(Duration::from_millis(750))
+                                        .await;
                                     old_buffer_text_original
                                 },
                                 move |input, old_buffer_text_original, ctx| {

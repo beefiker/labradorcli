@@ -7,11 +7,13 @@ use crate::auth::{AuthStateProvider, UserUid};
 use crate::editor::ReplicaId;
 use crate::terminal::shared_session::network::heartbeat::{Event as HeartbeatEvent, Heartbeat};
 use crate::terminal::shared_session::{connect_endpoint, max_session_size};
+use crate::BlocklistAIHistoryModel;
 use async_channel::Receiver;
 use byte_unit::{Byte, UnitType};
 use futures_util::stream::AbortHandle;
 use futures_util::{SinkExt, StreamExt};
 use instant::Instant;
+use labrador_core::{channel::ChannelState, features::FeatureFlag};
 use parking_lot::FairMutex;
 use session_sharing_protocol::common::{
     ActivePrompt, ActivePromptUpdate, AgentPromptFailureReason, AgentPromptRequest,
@@ -31,7 +33,6 @@ use session_sharing_protocol::sharer::{
 };
 use session_sharing_protocol::sharer::{FailedToInitializeSessionReason, SessionEndedReason};
 use std::collections::HashMap;
-use labrador_core::{channel::ChannelState, features::FeatureFlag};
 
 use std::pin::pin;
 use std::sync::Arc;
@@ -605,8 +606,15 @@ impl Network {
 
         // Get the selected model before spawning the async task
         let llm_prefs = crate::ai::llms::LLMPreferences::as_ref(ctx);
+        let selected_model_id_for_conversation = BlocklistAIHistoryModel::as_ref(ctx)
+            .active_conversation(terminal_view_id)
+            .and_then(|conversation| conversation.selected_model_id());
         let selected_model_id: String = llm_prefs
-            .get_active_base_model(ctx, Some(terminal_view_id))
+            .get_active_base_model_for_conversation(
+                ctx,
+                Some(terminal_view_id),
+                selected_model_id_for_conversation,
+            )
             .id
             .clone()
             .into();

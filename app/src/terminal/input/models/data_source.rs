@@ -1,7 +1,5 @@
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 use itertools::Itertools;
-use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use ordered_float::OrderedFloat;
 use labrador_core::channel::ChannelState;
 use labrador_core::ui::appearance::Appearance;
 use labrador_core::ui::icons::Icon;
@@ -17,7 +15,10 @@ use labrador_ui::text_layout::ClipConfig;
 use labrador_ui::ui_components::button::ButtonVariant;
 use labrador_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use labrador_ui::{AppContext, Element, Entity, EntityId, SingletonEntity as _};
+use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use ordered_float::OrderedFloat;
 
+use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::llms::{
     is_using_api_key_for_provider, DisableReason, LLMId, LLMInfo, LLMPreferences, LLMProvider,
     LLMSpec,
@@ -224,8 +225,15 @@ impl SyncDataSource for ModelSelectorDataSource {
                 .id
                 .clone()
         } else {
+            let selected_model_id = BlocklistAIHistoryModel::as_ref(app)
+                .active_conversation(self.terminal_view_id)
+                .and_then(|conversation| conversation.selected_model_id());
             llm_preferences
-                .get_active_base_model(app, Some(self.terminal_view_id))
+                .get_active_base_model_for_conversation(
+                    app,
+                    Some(self.terminal_view_id),
+                    selected_model_id,
+                )
                 .id
                 .clone()
         };

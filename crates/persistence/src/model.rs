@@ -1036,6 +1036,9 @@ pub struct AgentConversationData {
     pub run_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autoexecute_override: Option<PersistedAutoexecuteMode>,
+    /// The base agent model selected for this conversation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_model_id: Option<String>,
     /// The last event sequence number from the v2 orchestration event log
     /// that this conversation has observed. Used on restore to resume event
     /// delivery without re-delivering already-processed events.
@@ -1348,6 +1351,7 @@ mod tests {
             parent_conversation_id: None,
             run_id: None,
             autoexecute_override: None,
+            selected_model_id: None,
             last_event_sequence: Some(42),
         };
         let json = serde_json::to_string(&data).expect("serialize");
@@ -1366,6 +1370,19 @@ mod tests {
     }
 
     #[test]
+    fn agent_conversation_data_roundtrips_selected_model_id() {
+        let json = r#"{"server_conversation_token":null,"selected_model_id":"claude-sonnet"}"#;
+        let data: AgentConversationData = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(data.selected_model_id.as_deref(), Some("claude-sonnet"));
+
+        let roundtripped = serde_json::to_string(&data).expect("serialize");
+        assert!(
+            roundtripped.contains(r#""selected_model_id":"claude-sonnet""#),
+            "selected model should be serialized: {roundtripped}"
+        );
+    }
+
+    #[test]
     fn agent_conversation_data_skips_serializing_none_last_event_sequence() {
         let data = AgentConversationData {
             server_conversation_token: None,
@@ -1378,6 +1395,7 @@ mod tests {
             parent_conversation_id: None,
             run_id: None,
             autoexecute_override: None,
+            selected_model_id: None,
             last_event_sequence: None,
         };
         let json = serde_json::to_string(&data).expect("serialize");

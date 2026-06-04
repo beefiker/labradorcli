@@ -28,6 +28,7 @@ use crate::ai::agent::task::TaskId;
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::CancellationReason;
 use crate::ai::artifacts::Artifact;
+use crate::ai::llms::{LLMId, LLMPreferences};
 
 use crate::input_suggestions::HistoryOrder;
 use crate::persistence::model::AgentConversationData;
@@ -378,6 +379,79 @@ impl BlocklistAIHistoryModel {
         conversation_id: &AIConversationId,
     ) -> Option<&mut AIConversation> {
         self.conversations_by_id.get_mut(conversation_id)
+    }
+
+    pub fn selected_model_id_for_conversation(
+        &self,
+        conversation_id: &AIConversationId,
+    ) -> Option<&LLMId> {
+        self.conversation(conversation_id)
+            .and_then(|conversation| conversation.selected_model_id())
+    }
+
+    pub fn set_selected_model_id_for_conversation(
+        &mut self,
+        conversation_id: AIConversationId,
+        terminal_view_id: EntityId,
+        model_id: LLMId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let Some(conversation) = self.conversations_by_id.get_mut(&conversation_id) else {
+            return;
+        };
+
+        if conversation.set_selected_model_id(model_id) {
+            conversation.write_updated_conversation_state(ctx);
+            ctx.emit(BlocklistAIHistoryEvent::UpdatedConversationMetadata {
+                terminal_view_id: Some(terminal_view_id),
+                conversation_id,
+            });
+        }
+    }
+
+    pub fn clear_selected_model_id_for_conversation(
+        &mut self,
+        conversation_id: AIConversationId,
+        terminal_view_id: EntityId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let Some(conversation) = self.conversations_by_id.get_mut(&conversation_id) else {
+            return;
+        };
+
+        if conversation.clear_selected_model_id() {
+            conversation.write_updated_conversation_state(ctx);
+            ctx.emit(BlocklistAIHistoryEvent::UpdatedConversationMetadata {
+                terminal_view_id: Some(terminal_view_id),
+                conversation_id,
+            });
+        }
+    }
+
+    pub fn set_selected_model_id_for_active_conversation(
+        &mut self,
+        terminal_view_id: EntityId,
+        model_id: LLMId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if let Some(conversation_id) = self.active_conversation_id(terminal_view_id) {
+            self.set_selected_model_id_for_conversation(
+                conversation_id,
+                terminal_view_id,
+                model_id,
+                ctx,
+            );
+        }
+    }
+
+    pub fn clear_selected_model_id_for_active_conversation(
+        &mut self,
+        terminal_view_id: EntityId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if let Some(conversation_id) = self.active_conversation_id(terminal_view_id) {
+            self.clear_selected_model_id_for_conversation(conversation_id, terminal_view_id, ctx);
+        }
     }
 
     /// Returns all child conversations whose `parent_conversation_id` matches
@@ -768,7 +842,12 @@ impl BlocklistAIHistoryModel {
         is_viewing_shared_session: bool,
         ctx: &mut ModelContext<Self>,
     ) -> AIConversationId {
+        let selected_model_id = LLMPreferences::as_ref(ctx)
+            .get_active_base_model(ctx, Some(terminal_view_id))
+            .id
+            .clone();
         let mut new_conversation = AIConversation::new(is_viewing_shared_session);
+        new_conversation.set_selected_model_id(selected_model_id);
         if is_autoexecute_override {
             new_conversation.toggle_autoexecute_override();
         }
@@ -1090,6 +1169,9 @@ impl BlocklistAIHistoryModel {
             parent_conversation_id: None,
             run_id: None,
             autoexecute_override: Some(source_conversation.autoexecute_override().into()),
+            selected_model_id: source_conversation
+                .selected_model_id()
+                .map(|id| id.to_string()),
             // The event cursor belongs to the source conversation's run; the
             // forked conversation will establish its own cursor.
             last_event_sequence: None,
@@ -1245,6 +1327,7 @@ impl BlocklistAIHistoryModel {
             parent_conversation_id: None,
             run_id: None,
             autoexecute_override: Some(conversation.autoexecute_override().into()),
+            selected_model_id: conversation.selected_model_id().map(|id| id.to_string()),
             // The event cursor belongs to the source conversation's run; the
             // forked conversation will establish its own cursor.
             last_event_sequence: None,
@@ -2415,4 +2498,3 @@ pub const FORK_PREFIX: &str = "(Fork) ";
 
 /// The prefix used when saving a conversation before a rewind operation.
 pub const PRE_REWIND_PREFIX: &str = "(Pre-Rewind) ";
-

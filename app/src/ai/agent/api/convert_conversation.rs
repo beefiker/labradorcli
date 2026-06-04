@@ -84,6 +84,7 @@ pub fn convert_conversation_data_to_ai_conversation(
             parent_conversation_id: None,
             run_id: None,
             autoexecute_override: None,
+            selected_model_id: None,
             last_event_sequence: None,
         },
         RestorationMode::Continue => AgentConversationData {
@@ -103,6 +104,7 @@ pub fn convert_conversation_data_to_ai_conversation(
             // dispatch time; adding it here would avoid a round-trip to StreamInit.
             run_id: None,
             autoexecute_override: None,
+            selected_model_id: None,
             last_event_sequence: None,
         },
     };

@@ -1,10 +1,7 @@
+use crate::channel::ChannelState;
 use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent};
 use indexmap::IndexMap;
 use instant::{Duration, Instant};
-use parking_lot::FairMutex;
-use pathfinder_color::ColorU;
-use pathfinder_geometry::vector::vec2f;
-use std::sync::Arc;
 use labrador_ui::{
     elements::{
         Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
@@ -19,7 +16,10 @@ use labrador_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewContext, ViewHandle,
 };
-use crate::channel::ChannelState;
+use parking_lot::FairMutex;
+use pathfinder_color::ColorU;
+use pathfinder_geometry::vector::vec2f;
+use std::sync::Arc;
 
 const SIDECAR_HORIZONTAL_GAP: f32 = 8.;
 const SIDECAR_POSITION_ID: &str = "model_sidecar_panel";
@@ -28,7 +28,8 @@ use crate::{
     ai::{
         blocklist::{
             prompt::PromptIconButtonTheme, BlocklistAIController, BlocklistAIControllerEvent,
-            BlocklistAIInputEvent, BlocklistAIInputModel,
+            BlocklistAIHistoryEvent, BlocklistAIHistoryModel, BlocklistAIInputEvent,
+            BlocklistAIInputModel,
         },
         execution_profiles::{
             model_menu_items::{available_model_menu_items, has_reasoning_variants, is_auto},
@@ -89,8 +90,25 @@ pub fn calculate_scaled_font_size(appearance: &labrador_core::ui::appearance::Ap
     }
 }
 
+fn active_base_llm_for_terminal<'a>(
+    terminal_view_id: EntityId,
+    app: &'a AppContext,
+) -> &'a LLMInfo {
+    let selected_model_id = BlocklistAIHistoryModel::as_ref(app)
+        .active_conversation(terminal_view_id)
+        .and_then(|conversation| conversation.selected_model_id());
+
+    LLMPreferences::as_ref(app).get_active_base_model_for_conversation(
+        app,
+        Some(terminal_view_id),
+        selected_model_id,
+    )
+}
+
 /// Calculate the maximum width for profile name text (we will clip to this width)
-pub fn calculate_max_profile_name_width(appearance: &labrador_core::ui::appearance::Appearance) -> f32 {
+pub fn calculate_max_profile_name_width(
+    appearance: &labrador_core::ui::appearance::Appearance,
+) -> f32 {
     let scaled_font_size = calculate_scaled_font_size(appearance);
     scaled_font_size * MAX_PROFILE_NAME_WIDTH_SCALE_FACTOR
 }
@@ -460,6 +478,29 @@ impl ProfileModelSelector {
             },
         );
 
+        ctx.subscribe_to_model(
+            &BlocklistAIHistoryModel::handle(ctx),
+            |me, _, event, ctx| {
+                if event
+                    .terminal_view_id()
+                    .is_some_and(|id| id != me.terminal_view_id)
+                {
+                    return;
+                }
+
+                match event {
+                    BlocklistAIHistoryEvent::StartedNewConversation { .. }
+                    | BlocklistAIHistoryEvent::SetActiveConversation { .. }
+                    | BlocklistAIHistoryEvent::UpdatedConversationMetadata { .. }
+                    | BlocklistAIHistoryEvent::RestoredConversations { .. } => {
+                        me.refresh_state(ctx);
+                        ctx.notify();
+                    }
+                    _ => {}
+                }
+            },
+        );
+
         if let Some(controller) = &controller {
             ctx.subscribe_to_model(controller, |me, _, event, ctx| {
                 if let BlocklistAIControllerEvent::SentRequest { .. } = event {
@@ -620,7 +661,7 @@ impl ProfileModelSelector {
             {
                 llm_preferences.get_active_cli_agent_model(ctx, Some(self.terminal_view_id))
             } else {
-                llm_preferences.get_active_base_model(ctx, Some(self.terminal_view_id))
+                active_base_llm_for_terminal(self.terminal_view_id, ctx)
             };
 
             if let Some(description) = &active_llm.description {
@@ -762,7 +803,7 @@ impl ProfileModelSelector {
     fn refresh_model_menu(&mut self, ctx: &mut ViewContext<Self>) {
         let llm_preferences = LLMPreferences::as_ref(ctx);
 
-        let active_llm = llm_preferences.get_active_base_model(ctx, Some(self.terminal_view_id));
+        let active_llm = active_base_llm_for_terminal(self.terminal_view_id, ctx);
 
         let active_profile =
             AIExecutionProfilesModel::as_ref(ctx).active_profile(Some(self.terminal_view_id), ctx);
@@ -844,7 +885,7 @@ impl ProfileModelSelector {
         ctx: &mut ViewContext<Self>,
     ) {
         let llm_preferences = LLMPreferences::as_ref(ctx);
-        let active_llm = llm_preferences.get_active_base_model(ctx, Some(self.terminal_view_id));
+        let active_llm = active_base_llm_for_terminal(self.terminal_view_id, ctx);
         let active_llm_id = active_llm.id.clone();
 
         let items: Vec<MenuItem<ProfileModelSelectorAction>> = match kind {
@@ -896,8 +937,7 @@ impl ProfileModelSelector {
         base_name: &str,
         ctx: &mut ViewContext<Self>,
     ) {
-        let llm_preferences = LLMPreferences::as_ref(ctx);
-        let active_llm = llm_preferences.get_active_base_model(ctx, Some(self.terminal_view_id));
+        let active_llm = active_base_llm_for_terminal(self.terminal_view_id, ctx);
         let active_llm_id = active_llm.id.clone();
 
         let items: Vec<MenuItem<ProfileModelSelectorAction>> = self
@@ -960,6 +1000,25 @@ impl ProfileModelSelector {
             .unwrap_or(0)
     }
 
+    fn set_selected_base_model(&self, llm_id: &LLMId, ctx: &mut ViewContext<Self>) {
+        LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
+            preferences.update_preferred_agent_mode_llm(llm_id, self.terminal_view_id, ctx);
+        });
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            history.set_selected_model_id_for_active_conversation(
+                self.terminal_view_id,
+                llm_id.clone(),
+                ctx,
+            );
+        });
+    }
+
+    fn clear_active_conversation_model(&self, ctx: &mut ViewContext<Self>) {
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            history.clear_selected_model_id_for_active_conversation(self.terminal_view_id, ctx);
+        });
+    }
+
     fn handle_sidecar_selection(&mut self, ctx: &mut ViewContext<Self>) {
         let index = self
             .model_spec_sidecar
@@ -971,9 +1030,7 @@ impl ProfileModelSelector {
                 "Selecting base agent model {} (from model selector)",
                 &llm.id
             );
-            LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
-                preferences.update_preferred_agent_mode_llm(&llm.id, self.terminal_view_id, ctx);
-            });
+            self.set_selected_base_model(&llm.id, ctx);
         }
         self.set_model_menu_visibility(false, ctx);
     }
@@ -1375,9 +1432,7 @@ impl ProfileModelSelector {
                 .get_active_cli_agent_model(app, Some(self.terminal_view_id))
                 .menu_display_name()
         } else {
-            llm_preferences
-                .get_active_base_model(app, Some(self.terminal_view_id))
-                .menu_display_name()
+            active_base_llm_for_terminal(self.terminal_view_id, app).menu_display_name()
         };
 
         let text_color = if self.is_blurred {
@@ -1800,14 +1855,13 @@ impl TypedActionView for ProfileModelSelector {
                 LLMPreferences::handle(ctx).update(ctx, |llm_prefs, ctx| {
                     llm_prefs.remove_llm_override(self.terminal_view_id, ctx);
                 });
+                self.clear_active_conversation_model(ctx);
 
                 self.set_profile_menu_visibility(false, ctx);
             }
             ProfileModelSelectorAction::SelectModel(llm_id) => {
-                LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
-                    log::info!("Selecting base agent model {llm_id} (from model selector)");
-                    preferences.update_preferred_agent_mode_llm(llm_id, self.terminal_view_id, ctx);
-                });
+                log::info!("Selecting base agent model {llm_id} (from model selector)");
+                self.set_selected_base_model(llm_id, ctx);
                 self.set_model_menu_visibility(false, ctx);
             }
             ProfileModelSelectorAction::SelectAutoModel

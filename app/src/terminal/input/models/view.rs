@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-use pathfinder_color::ColorU;
 use labrador_core::ui::appearance::Appearance;
 use labrador_core::ui::theme::color::internal_colors;
 use labrador_core::ui::theme::Fill;
@@ -10,6 +9,7 @@ use labrador_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, View, ViewContext,
     ViewHandle,
 };
+use pathfinder_color::ColorU;
 
 use crate::ai::blocklist::agent_view::AgentViewController;
 use crate::ai::blocklist::block::cli_controller::{CLISubagentController, CLISubagentEvent};
@@ -416,10 +416,19 @@ impl InlineModelSelectorView {
     fn active_model_id_for_current_tab(&self, ctx: &ViewContext<Self>) -> LLMId {
         let llm_preferences = LLMPreferences::as_ref(ctx);
         match self.active_tab(ctx) {
-            InlineModelSelectorTab::BaseAgent => llm_preferences
-                .get_active_base_model(ctx, Some(self.terminal_view_id))
-                .id
-                .clone(),
+            InlineModelSelectorTab::BaseAgent => {
+                let selected_model_id = BlocklistAIHistoryModel::as_ref(ctx)
+                    .active_conversation(self.terminal_view_id)
+                    .and_then(|conversation| conversation.selected_model_id());
+                llm_preferences
+                    .get_active_base_model_for_conversation(
+                        ctx,
+                        Some(self.terminal_view_id),
+                        selected_model_id,
+                    )
+                    .id
+                    .clone()
+            }
             InlineModelSelectorTab::FullTerminalUse => llm_preferences
                 .get_active_cli_agent_model(ctx, Some(self.terminal_view_id))
                 .id

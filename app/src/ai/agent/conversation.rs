@@ -3,6 +3,7 @@ use crate::ai::agent::linearization::compute_task_depths;
 use crate::ai::agent_sdk::AmbientAgentTaskId;
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::{RequestInput, ResponseStreamId, SerializedBlockListItem};
+use crate::ai::llms::LLMId;
 use crate::ai::skills::SkillDescriptor;
 use crate::persistence::model::{ConversationUsageMetadata, ModelTokenUsage, ToolUsageMetadata};
 use crate::server::ids::ServerId;
@@ -179,6 +180,9 @@ pub struct AIConversation {
     /// The per-conversation override on the user's usual autonomy settings.
     autoexecute_override: AIConversationAutoexecuteMode,
 
+    /// The base agent model selected for future requests in this conversation.
+    selected_model_id: Option<LLMId>,
+
     /// Map of new exchanges added keyed by ID of response stream corresponding to the MAA API
     /// request.
     added_exchanges_by_response: HashMap<ResponseStreamId, Vec1<AddedExchange>>,
@@ -261,6 +265,7 @@ impl AIConversation {
             server_metadata: None,
             transaction: None,
             autoexecute_override: Default::default(),
+            selected_model_id: None,
             added_exchanges_by_response: Default::default(),
             hidden_exchanges: Default::default(),
             reverted_action_ids: Default::default(),
@@ -354,6 +359,7 @@ impl AIConversation {
             parent_conversation_id,
             run_id,
             autoexecute_override,
+            selected_model_id,
             last_event_sequence,
         ) = if let Some(data) = conversation_data {
             let server_conversation_token = data
@@ -385,6 +391,7 @@ impl AIConversation {
             } else {
                 AIConversationAutoexecuteMode::default()
             };
+            let selected_model_id = data.selected_model_id.map(Into::into);
             let last_event_sequence = data.last_event_sequence;
 
             (
@@ -398,6 +405,7 @@ impl AIConversation {
                 parent_conversation_id,
                 run_id,
                 autoexecute_override,
+                selected_model_id,
                 last_event_sequence,
             )
         } else {
@@ -412,6 +420,7 @@ impl AIConversation {
                 None,
                 None,
                 AIConversationAutoexecuteMode::default(),
+                None,
                 None,
             )
         };
@@ -441,6 +450,7 @@ impl AIConversation {
             server_metadata: None,
             transaction: None,
             autoexecute_override,
+            selected_model_id,
             added_exchanges_by_response: Default::default(),
             existing_suggestions: None,
             hidden_exchanges: Default::default(),
@@ -1327,6 +1337,8 @@ impl AIConversation {
             request_start_ts,
             ..
         } = request_input;
+
+        self.selected_model_id = Some(model_id.clone());
 
         for (task_id, inputs) in input_messages.into_iter() {
             let should_hide = inputs
@@ -2812,6 +2824,7 @@ impl AIConversation {
                 parent_conversation_id: self.parent_conversation_id.map(|id| id.to_string()),
                 run_id: self.task_id.map(|id| id.to_string()),
                 autoexecute_override: Some(self.autoexecute_override.into()),
+                selected_model_id: self.selected_model_id.as_ref().map(|id| id.to_string()),
                 last_event_sequence: self.last_event_sequence,
             },
         };
@@ -2907,6 +2920,23 @@ impl AIConversation {
 
     pub fn autoexecute_override(&self) -> AIConversationAutoexecuteMode {
         self.autoexecute_override
+    }
+
+    pub fn selected_model_id(&self) -> Option<&LLMId> {
+        self.selected_model_id.as_ref()
+    }
+
+    pub fn set_selected_model_id(&mut self, model_id: LLMId) -> bool {
+        if self.selected_model_id.as_ref() == Some(&model_id) {
+            return false;
+        }
+
+        self.selected_model_id = Some(model_id);
+        true
+    }
+
+    pub fn clear_selected_model_id(&mut self) -> bool {
+        self.selected_model_id.take().is_some()
     }
 
     pub fn autoexecute_any_action(&self) -> bool {

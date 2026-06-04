@@ -38,7 +38,13 @@ fn propagate_parent_agent_settings(
     });
 
     let parent_base_model_id = LLMPreferences::as_ref(ctx)
-        .get_active_base_model(ctx, Some(parent_view_id))
+        .get_active_base_model_for_conversation(
+            ctx,
+            Some(parent_view_id),
+            BlocklistAIHistoryModel::as_ref(ctx)
+                .active_conversation(parent_view_id)
+                .and_then(|conversation| conversation.selected_model_id()),
+        )
         .id
         .clone();
     LLMPreferences::handle(ctx).update(ctx, |llm_prefs, ctx| {

@@ -1,9 +1,9 @@
+use labrador_core::features::FeatureFlag;
+use labrador_ui::{EntityId, ViewContext};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use vec1::Vec1;
-use labrador_core::features::FeatureFlag;
-use labrador_ui::{EntityId, ViewContext};
 
 use super::blocklist_filter::exchanges_for_blocklist;
 use crate::ai::blocklist::agent_view::{
@@ -895,6 +895,7 @@ impl TerminalView {
             parent_conversation_id: None,
             run_id: None,
             autoexecute_override: None,
+            selected_model_id: None,
             last_event_sequence: None,
         };
 

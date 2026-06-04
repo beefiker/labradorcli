@@ -10264,12 +10264,26 @@ impl Workspace {
         ctx: &mut ViewContext<Self>,
     ) {
         // Copy the LLM preference from source to new terminal view
+        let source_selected_model_id = BlocklistAIHistoryModel::as_ref(ctx)
+            .active_conversation(source_terminal_view_id)
+            .and_then(|conversation| conversation.selected_model_id());
         let source_llm_id = LLMPreferences::as_ref(ctx)
-            .get_active_base_model(ctx, Some(source_terminal_view_id))
+            .get_active_base_model_for_conversation(
+                ctx,
+                Some(source_terminal_view_id),
+                source_selected_model_id,
+            )
             .id
             .clone();
         LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
             prefs.update_preferred_agent_mode_llm(&source_llm_id, new_terminal_view_id, ctx);
+        });
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            history.set_selected_model_id_for_active_conversation(
+                new_terminal_view_id,
+                source_llm_id.clone(),
+                ctx,
+            );
         });
 
         // Copy the execution profile from source to new terminal view
