@@ -1,4 +1,8 @@
 use anyhow::Result;
+use labrador_core::channel::ChannelState;
+use labrador_ui::{AppContext, ModelContext};
+use labrador_ui::{Entity, SingletonEntity};
+use labrador_util::path::ShellFamily;
 use lazy_static::lazy_static;
 use regex::Regex;
 use settings::{
@@ -6,10 +10,6 @@ use settings::{
     ChangeEventReason, RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud,
 };
 use strum_macros::EnumIter;
-use labrador_core::channel::ChannelState;
-use labrador_util::path::ShellFamily;
-use labrador_ui::{AppContext, ModelContext};
-use labrador_ui::{Entity, SingletonEntity};
 
 use crate::terminal::ssh::util::{parse_interactive_ssh_command, SshLabradorifyCommand};
 
@@ -62,6 +62,16 @@ maybe_define_setting!(UseSshTmuxWrapper, group: LabradorifySettings, {
     private: false,
     toml_path: "labradorify.ssh.use_ssh_tmux_wrapper",
     description: "Whether to use a tmux-based wrapper for SSH shell bootstrapping.",
+});
+
+maybe_define_setting!(AutoLabradorifySsh, group: LabradorifySettings, {
+    type: bool,
+    default: false,
+    supported_platforms: SupportedPlatforms::ALL,
+    sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+    private: false,
+    toml_path: "labradorify.ssh.auto_labradorify_ssh",
+    description: format!("Whether to automatically {} SSH sessions after login completes, without prompting.", ChannelState::app_name_verbify()),
 });
 
 /// Controls how Labrador handles the SSH extension (remote server binary) when connecting
@@ -157,6 +167,11 @@ pub struct LabradorifySettings {
     /// tmux wrapper instead of the default legacy wrapper.
     pub use_ssh_tmux_wrapper: UseSshTmuxWrapper,
 
+    /// This setting controls whether interactive ssh sessions should be Labradorified
+    /// automatically (without prompting) once login completes. Auto-Labradorification
+    /// uses the subshell bootstrap, so it only applies while the tmux wrapper is off.
+    pub auto_labradorify_ssh: AutoLabradorifySsh,
+
     /// Controls the installation behavior for the SSH extension (remote server) when the binary
     /// is not installed on the remote host.
     pub ssh_extension_install_mode: SshExtensionInstallModeSetting,
@@ -225,6 +240,7 @@ impl LabradorifySettings {
             ssh_hosts_denylist,
             enable_ssh_labradorification: EnableSshLabradorification::new_from_storage(ctx),
             use_ssh_tmux_wrapper: UseSshTmuxWrapper::new_from_storage(ctx),
+            auto_labradorify_ssh: AutoLabradorifySsh::new_from_storage(ctx),
             ssh_extension_install_mode: SshExtensionInstallModeSetting::new_from_storage(ctx),
         }
     }
@@ -248,6 +264,7 @@ impl LabradorifySettings {
             ssh_hosts_denylist,
             enable_ssh_labradorification: EnableSshLabradorification::new(None),
             use_ssh_tmux_wrapper: UseSshTmuxWrapper::new(None),
+            auto_labradorify_ssh: AutoLabradorifySsh::new(None),
             ssh_extension_install_mode: SshExtensionInstallModeSetting::new(None),
         }
     }
@@ -273,6 +290,7 @@ impl LabradorifySettings {
                 }
                 LabradorifySettingsChangedEvent::EnableSshLabradorification { .. } => {}
                 LabradorifySettingsChangedEvent::UseSshTmuxWrapper { .. } => {}
+                LabradorifySettingsChangedEvent::AutoLabradorifySsh { .. } => {}
                 LabradorifySettingsChangedEvent::SshExtensionInstallModeSetting { .. } => {}
             })
         });
@@ -305,6 +323,14 @@ impl LabradorifySettings {
             LabradorifySettings,
             use_ssh_tmux_wrapper,
             UseSshTmuxWrapper,
+            handle.clone(),
+            ctx
+        );
+
+        register_settings_events!(
+            LabradorifySettings,
+            auto_labradorify_ssh,
+            AutoLabradorifySsh,
             handle.clone(),
             ctx
         );
@@ -344,6 +370,9 @@ pub enum LabradorifySettingsChangedEvent {
         change_event_reason: ChangeEventReason,
     },
     UseSshTmuxWrapper {
+        change_event_reason: ChangeEventReason,
+    },
+    AutoLabradorifySsh {
         change_event_reason: ChangeEventReason,
     },
     SshExtensionInstallModeSetting {

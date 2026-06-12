@@ -170,16 +170,16 @@ pub use init::{
     TOGGLE_HIDE_CLI_RESPONSES_KEYBINDING, TOGGLE_QUEUE_NEXT_PROMPT_KEYBINDING,
 };
 pub use inline_banner::{NotificationsDiscoveryBannerAction, NotificationsErrorBannerAction};
+use labrador_core::channel::{Channel, ChannelState};
+use labrador_ui::elements::{shimmering_text::ShimmeringTextStateHandle, Border, ChildView};
+use labrador_ui::fonts::Properties;
+use labrador_ui::{ViewHandle, WeakModelHandle};
 #[cfg(feature = "local_fs")]
 use repo_metadata::repositories::{DetectedRepositories, RepoDetectionSource};
 use session_sharing_protocol::common::LongRunningCommandAgentInteractionState;
 use session_sharing_protocol::sharer::{RoleUpdateReason, SessionEndedReason, SessionSourceType};
 use ssh_file_upload::{FileUpload, FileUploadEvent};
 use uuid::Uuid;
-use labrador_core::channel::{Channel, ChannelState};
-use labrador_ui::elements::{shimmering_text::ShimmeringTextStateHandle, Border, ChildView};
-use labrador_ui::fonts::Properties;
-use labrador_ui::{ViewHandle, WeakModelHandle};
 
 use crate::ai::agent::conversation::{AIConversation, AIConversationId, ConversationStatus};
 
@@ -318,6 +318,31 @@ use command_corrections::{correct_command, Command, Correction, HistoryItem, Ses
 use enclose::enclose;
 use instant::Instant;
 use itertools::Itertools;
+use labrador_core::context_flag::ContextFlag;
+use labrador_core::user_preferences::GetUserPreferences as _;
+use labrador_ui::clipboard::ClipboardContent;
+use labrador_ui::elements::new_scrollable::{
+    AxisConfiguration, ClippedAxisConfiguration, DualAxisConfig, NewScrollableElement,
+    ScrollableAppearance, SingleAxisConfig,
+};
+use labrador_ui::elements::{
+    get_rich_content_position_id, ChildAnchor, ClippedScrollStateHandle, Container,
+    CrossAxisAlignment, DispatchEventResult, DropTarget, DropTargetData, Empty, EventHandler,
+    Expanded, Flex, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
+    ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius,
+    ScrollableElement, ScrollbarWidth, Shrinkable, Text,
+};
+use labrador_ui::event::ModifiersState;
+use labrador_ui::keymap::Keystroke;
+use labrador_ui::notification::{
+    NotificationSendError, RequestPermissionsOutcome, UserNotification,
+};
+use labrador_ui::platform::{Cursor, OperatingSystem};
+use labrador_ui::r#async::{SpawnedFutureHandle, Timer};
+use labrador_ui::windowing::WindowManager;
+#[cfg(feature = "local_fs")]
+use labrador_util::path::LineAndColumnArg;
+use labrador_util::path::ShellFamily;
 use lazy_static::lazy_static;
 use markdown_parser::FormattedTextFragment;
 use parking_lot::FairMutex;
@@ -347,29 +372,6 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use sum_tree::SeekBias;
 use vec1::vec1;
-use labrador_core::context_flag::ContextFlag;
-use labrador_core::user_preferences::GetUserPreferences as _;
-#[cfg(feature = "local_fs")]
-use labrador_util::path::LineAndColumnArg;
-use labrador_util::path::ShellFamily;
-use labrador_ui::clipboard::ClipboardContent;
-use labrador_ui::elements::new_scrollable::{
-    AxisConfiguration, ClippedAxisConfiguration, DualAxisConfig, NewScrollableElement,
-    ScrollableAppearance, SingleAxisConfig,
-};
-use labrador_ui::elements::{
-    get_rich_content_position_id, ChildAnchor, ClippedScrollStateHandle, Container,
-    CrossAxisAlignment, DispatchEventResult, DropTarget, DropTargetData, Empty, EventHandler,
-    Expanded, Flex, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
-    ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius,
-    ScrollableElement, ScrollbarWidth, Shrinkable, Text,
-};
-use labrador_ui::event::ModifiersState;
-use labrador_ui::keymap::Keystroke;
-use labrador_ui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
-use labrador_ui::platform::{Cursor, OperatingSystem};
-use labrador_ui::r#async::{SpawnedFutureHandle, Timer};
-use labrador_ui::windowing::WindowManager;
 
 use labrador_ui::assets::asset_cache::{AssetCache, AssetCacheEvent};
 use labrador_ui::image_cache::ImageType;
@@ -393,7 +395,9 @@ use labrador_ui::{
     record_trace_event, WindowId,
 };
 
-use labrador_ui::{windowing, CursorInfo, EntityId, EventContext, ModelAsRef, SingletonEntity, Tracked};
+use labrador_ui::{
+    windowing, CursorInfo, EntityId, EventContext, ModelAsRef, SingletonEntity, Tracked,
+};
 
 use crate::ai_assistant::{ask_ai_assistant_text, AskAIType};
 use crate::appearance::{Appearance, AppearanceEvent};
@@ -470,9 +474,9 @@ use crate::terminal::{
     TerminalModel,
 };
 use crate::view_components::find::{Event as FindEvent, Find, FindDirection, FindWithinBlockState};
-use settings::{Setting, ToggleableSetting};
 use labrador_core::semantic_selection::SemanticSelection;
 use labrador_ui::text::SelectionType;
+use settings::{Setting, ToggleableSetting};
 
 use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
 use crate::server::telemetry::BlockLatencyInfo;
@@ -510,7 +514,7 @@ use super::ssh::labradorify::{
     SshLabradorifyBlockEvent,
 };
 use super::ssh::root_access::RootAccess;
-use super::ssh::ssh_detection::evaluate_labradorify_ssh_host;
+use super::ssh::ssh_detection::{evaluate_labradorify_ssh_host, should_auto_labradorify_ssh_host};
 use super::ssh::util::{
     convert_script_to_one_line, parse_interactive_ssh_command, InteractiveSshCommand,
     SshLabradorifyCommand,
@@ -9707,6 +9711,17 @@ impl TerminalView {
                     .active_block()
                     .agent_interaction_metadata()
                     .is_some();
+                // When auto-Labradorification of SSH sessions is enabled, interactive ssh
+                // commands skip the banner and bootstrap once the remote login completes
+                // (see handle_detected_end_of_ssh_login).
+                let auto_labradorify_ssh_host = parse_interactive_ssh_command(labradorify_command)
+                    .filter(|ssh_command| {
+                        should_auto_labradorify_ssh_host(
+                            ssh_command.host.as_deref(),
+                            labradorify_settings,
+                        )
+                    })
+                    .map(|ssh_command| ssh_command.host);
 
                 if is_compatible_subshell_command {
                     if command_is_denylisted || has_ai_metadata {
@@ -9723,6 +9738,13 @@ impl TerminalView {
                         );
                         self.labradorify_state
                             .add_auto_labradorify_abort_handle(auto_labradorify_abort_handle);
+                    } else if let Some(ssh_host) = auto_labradorify_ssh_host {
+                        if !self.model.lock().tmux_control_mode_active() {
+                            self.labradorify_state
+                                .set_pending_ssh_host(labradorify_command.to_string(), ssh_host);
+                            self.model.lock().start_notify_on_end_of_ssh_login();
+                            ctx.emit(Event::TerminalViewStateChanged);
+                        }
                     } else {
                         // Wait 1 second before showing the banner, just to make sure the
                         // command stays running for a bit. If the command fails instantly,
@@ -10450,8 +10472,10 @@ impl TerminalView {
 
                 ctx.spawn(
                     async {
-                        labrador_ui::r#async::Timer::after(*TRIGGER_RC_FILE_SUBSHELL_BOOTSTRAP_DELAY)
-                            .await
+                        labrador_ui::r#async::Timer::after(
+                            *TRIGGER_RC_FILE_SUBSHELL_BOOTSTRAP_DELAY,
+                        )
+                        .await
                     },
                     move |me, _, ctx| {
                         let uname = uname.to_owned().unwrap_or_default();
@@ -21833,7 +21857,9 @@ impl TerminalView {
 
         match action {
             LearnMore => {
-                ctx.open_url("https://docs.labrador.dev/terminal/labradorify/ssh-legacy#implementation");
+                ctx.open_url(
+                    "https://docs.labrador.dev/terminal/labradorify/ssh-legacy#implementation",
+                );
             }
             Settings => {
                 if FeatureFlag::SSHTmuxWrapper.is_enabled() {
@@ -22067,8 +22093,10 @@ impl TerminalView {
                 paths
             };
 
-            let input =
-                labrador_ui::clipboard_utils::escaped_paths_str(paths, Some(self.shell_family(ctx)));
+            let input = labrador_ui::clipboard_utils::escaped_paths_str(
+                paths,
+                Some(self.shell_family(ctx)),
+            );
             self.typed_characters_on_terminal(&input, ctx);
         }
     }
@@ -22235,6 +22263,22 @@ impl TerminalView {
                     return;
                 };
                 let ssh_host = &self.labradorify_state.get_pending_ssh_host();
+
+                // Auto-Labradorify the SSH session (no prompt) using the subshell
+                // bootstrap, which requires neither tmux nor a remote server binary.
+                let should_auto_labradorify = {
+                    let model = self.model.lock();
+                    !model.shared_session_status().is_viewer()
+                        && !model.block_list().active_block().is_agent_monitoring()
+                } && should_auto_labradorify_ssh_host(
+                    ssh_host.as_deref(),
+                    LabradorifySettings::as_ref(ctx),
+                );
+                if should_auto_labradorify {
+                    self.labradorify_state.take_pending_ssh_host();
+                    self.trigger_subshell_bootstrap(None, false, ctx);
+                    return;
+                }
 
                 let shell_family = self.shell_family(ctx);
                 let labradorify_settings = LabradorifySettings::as_ref(ctx);

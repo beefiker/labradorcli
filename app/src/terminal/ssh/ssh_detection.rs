@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use labrador_core::{features::FeatureFlag, settings::Setting};
 use labrador_util::path::ShellFamily;
+use serde::{Deserialize, Serialize};
 
 use crate::terminal::labradorify::settings::LabradorifySettings;
 
@@ -50,3 +50,23 @@ pub fn evaluate_labradorify_ssh_host(
         command: command.to_string(),
     }
 }
+
+/// Determines whether an interactive SSH session should be Labradorified automatically
+/// (without prompting) once login completes.
+///
+/// Auto-Labradorification uses the subshell bootstrap (no tmux or remote server binary
+/// required), so it only applies while the tmux wrapper is off. The host must be known
+/// so it can be matched against the user's denylist.
+pub fn should_auto_labradorify_ssh_host(
+    ssh_host: Option<&str>,
+    labradorify_settings: &LabradorifySettings,
+) -> bool {
+    *labradorify_settings.enable_ssh_labradorification.value()
+        && *labradorify_settings.auto_labradorify_ssh.value()
+        && !*labradorify_settings.use_ssh_tmux_wrapper.value()
+        && ssh_host.is_some_and(|host| !labradorify_settings.is_ssh_host_denylisted(host))
+}
+
+#[cfg(test)]
+#[path = "ssh_detection_test.rs"]
+mod tests;
