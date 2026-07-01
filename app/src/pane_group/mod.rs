@@ -155,6 +155,7 @@ pub use pane::ai_fact_pane::AIFactPane;
 pub use pane::code_diff_pane::CodeDiffPane;
 pub use pane::code_pane::CodePane;
 pub use pane::execution_profile_editor_pane::ExecutionProfileEditorPane;
+pub use pane::markdown_viewer_pane::MarkdownViewerPane;
 pub use pane::network_log_pane::NetworkLogPane;
 pub use pane::settings_pane::SettingsPane;
 pub use pane::terminal_pane::TerminalPane;
@@ -1657,6 +1658,14 @@ impl PaneGroup {
                 // pane on demand via Privacy settings or the keybinding.
                 Err(anyhow::anyhow!(
                     "Network log pane should not have been persisted, as it cannot be restored"
+                ))
+            }
+            LeafContents::MarkdownViewer { .. } => {
+                // Markdown viewer panes are intentionally not persisted (see
+                // `LeafContents::is_persisted`), so this should never be hit
+                // during restoration. Users reopen the viewer on demand.
+                Err(anyhow::anyhow!(
+                    "Markdown viewer pane should not have been persisted, as it cannot be restored"
                 ))
             }
             LeafContents::GetStarted => {

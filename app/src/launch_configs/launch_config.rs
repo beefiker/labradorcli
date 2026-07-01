@@ -148,6 +148,7 @@ impl TryFrom<PaneNodeSnapshot> for PaneTemplateType {
                 | LeafContents::ExecutionProfileEditor
                 | LeafContents::GetStarted
                 | LeafContents::NetworkLog
+                | LeafContents::MarkdownViewer { .. }
                 | LeafContents::Welcome { .. } => Err(()),
             },
         }

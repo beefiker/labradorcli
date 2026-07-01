@@ -17,6 +17,8 @@ pub(super) mod get_started_pane;
 pub(super) mod get_started_view;
 #[cfg(not(target_family = "wasm"))]
 pub(super) mod local_harness_launch;
+pub(super) mod markdown_viewer_pane;
+pub(crate) mod markdown_viewer_view;
 pub(super) mod network_log_pane;
 pub(super) mod settings_pane;
 pub(super) mod terminal_pane;
@@ -34,6 +36,7 @@ use crate::{
     ai::{blocklist::inline_action::code_diff_view::CodeDiffView, facts::AIFactView},
     code::view::CodeView,
     menu::MenuItem,
+    pane_group::pane::markdown_viewer_view::MarkdownViewerView,
     server::network_log_view::NetworkLogView,
     server::telemetry::SharingDialogSource,
     settings::PaneSettings,
@@ -131,6 +134,7 @@ pub(crate) enum IPaneType {
     ExecutionProfileEditor,
     GetStarted,
     NetworkLog,
+    MarkdownViewer,
     Welcome,
     DeferredPlaceholder,
     /// A pane type only for tests.
@@ -149,6 +153,7 @@ impl Display for IPaneType {
             IPaneType::ExecutionProfileEditor => write!(f, "Execution Profile Editor"),
             IPaneType::GetStarted => write!(f, "GetStarted"),
             IPaneType::NetworkLog => write!(f, "Network Log"),
+            IPaneType::MarkdownViewer => write!(f, "Markdown Viewer"),
             IPaneType::Welcome => write!(f, "Welcome"),
             IPaneType::DeferredPlaceholder => write!(f, "Placeholder"),
             #[cfg(test)]
@@ -217,6 +222,13 @@ impl PaneId {
         Self::new_from_ctx(IPaneType::NetworkLog, ctx)
     }
 
+    /// Creates a [`PaneId`] from a [`ViewContext<PaneView<MarkdownViewerView>>`].
+    pub fn from_markdown_viewer_pane_ctx(
+        ctx: &ViewContext<PaneView<MarkdownViewerView>>,
+    ) -> Self {
+        Self::new_from_ctx(IPaneType::MarkdownViewer, ctx)
+    }
+
     /// Creates a [`PaneId`] from a [`PaneView<TerminalView>`] entity ID.
     pub fn from_terminal_pane_view(
         terminal_pane_view: &ViewHandle<terminal_pane::TerminalPaneView>,
@@ -273,6 +285,13 @@ impl PaneId {
         network_log_pane_view: &ViewHandle<PaneView<NetworkLogView>>,
     ) -> Self {
         Self::new(IPaneType::NetworkLog, network_log_pane_view)
+    }
+
+    /// Creates a [`PaneId`] from a [`PaneView<MarkdownViewerView>`] entity ID.
+    pub fn from_markdown_viewer_pane_view(
+        markdown_viewer_pane_view: &ViewHandle<PaneView<MarkdownViewerView>>,
+    ) -> Self {
+        Self::new(IPaneType::MarkdownViewer, markdown_viewer_pane_view)
     }
 
     /// Creates a [`PaneId`] for a dummy pane.
@@ -345,6 +364,9 @@ impl PaneId {
             }
             IPaneType::NetworkLog => {
                 ChildView::<PaneView<NetworkLogView>>::with_id(self.0.pane_view_id).finish()
+            }
+            IPaneType::MarkdownViewer => {
+                ChildView::<PaneView<MarkdownViewerView>>::with_id(self.0.pane_view_id).finish()
             }
             IPaneType::Welcome => {
                 ChildView::<PaneView<WelcomeView>>::with_id(self.0.pane_view_id).finish()

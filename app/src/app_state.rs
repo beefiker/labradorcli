@@ -124,6 +124,10 @@ pub enum LeafContents {
     /// The in-app network log pane. Not persisted across restarts because the
     /// backing log is an in-memory ring buffer that starts empty on launch.
     NetworkLog,
+    /// A read-only, rendered Markdown viewer pane. Not persisted across
+    /// restarts: it is a lightweight, on-demand viewer and can simply be
+    /// reopened from the file tree or a link.
+    MarkdownViewer { path: PathBuf },
     /// An entrypoint pane type to launch other pane types from a search palette. The default view
     /// when creating a tab.
     Welcome {
@@ -150,6 +154,10 @@ impl LeafContents {
             // starts empty on launch; persisting would also regress back to
             // an on-disk log via the app-state database.
             LeafContents::NetworkLog => false,
+            // On-demand viewer; reopened from the file tree rather than
+            // restored. Keeping it non-persisted avoids serializing viewer
+            // panes into the app-state database.
+            LeafContents::MarkdownViewer { .. } => false,
             LeafContents::Terminal(_)
             | LeafContents::Code(_)
             | LeafContents::Settings(_)
