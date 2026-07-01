@@ -30,7 +30,7 @@ pub(super) async fn download_update_and_cleanup(
 ) -> Result<DownloadReady> {
     const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
 
-    let installer_file_name = installer_file_name()?;
+    let installer_file_name = installer_file_name(&version_info.version)?;
     let url = format!(
         "{}/{}",
         release_assets_directory_url(ChannelState::channel(), &version_info.version),
@@ -245,28 +245,18 @@ pub(super) fn relaunch() -> Result<()> {
     Ok(())
 }
 
-fn installer_file_name() -> Result<String> {
-    let app_name_prefix = app_name_prefix(ChannelState::channel());
-
-    // For example, on arm64 this is LabradorSetup-arm64.exe and on x64 this is
-    // LabradorSetup.exe.
-    if cfg!(target_arch = "aarch64") {
-        Ok(format!("{app_name_prefix}Setup-arm64.exe"))
-    } else if cfg!(target_arch = "x86_64") {
-        Ok(format!("{app_name_prefix}Setup.exe"))
+fn installer_file_name(version: &str) -> Result<String> {
+    // The release workflow publishes an x64-only installer named
+    // `labradorcli-<version>-windows-x64-setup.exe`, where `<version>` is the
+    // release tag without its leading `v`
+    // (see `.github/workflows/release-bundles.yml`).
+    let version = version.trim_start_matches('v');
+    if cfg!(target_arch = "x86_64") {
+        Ok(format!("labradorcli-{version}-windows-x64-setup.exe"))
     } else {
         Err(anyhow!(
-            "Could not construct setup file name for unsupported architecture"
+            "Could not construct setup file name for unsupported architecture \
+             (only the x64 Windows installer is published)"
         ))
-    }
-}
-
-fn app_name_prefix(channel: Channel) -> String {
-    match channel {
-        Channel::Stable | Channel::Preview | Channel::Dev | Channel::Oss => {
-            ChannelState::app_id_application_name(channel)
-        }
-        Channel::Local => ChannelState::app_name().to_owned(),
-        Channel::Integration => "integration".to_owned(),
     }
 }

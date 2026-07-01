@@ -4,18 +4,23 @@ use anyhow::{Context as _, Result};
 use channel_versions::ChannelVersions;
 
 use crate::{
-    channel::{Channel, ChannelState},
-    report_error,
+    channel::ChannelState,
     server::server_api::{ServerApi, FETCH_CHANNEL_VERSIONS_TIMEOUT},
 };
 
-// Fetches channel versions asynchronously from the Labrador server. If the Labrador server request fails,
-// then fetches from GCP JSON storage as a fallback.
+// Fetches channel versions asynchronously.
+//
+// This fork hosts its release manifest (`channel_versions.json`) directly on
+// GitHub Releases and does not operate the upstream Labrador `client_version`
+// server, so we skip that server hop entirely and read the manifest from the
+// configured releases base URL. (The `include_changelogs`/`is_daily` arguments
+// are retained for API compatibility with the upstream signature but are not
+// used here.)
 pub async fn fetch_channel_versions(
     nonce: &str,
     server_api: Arc<ServerApi>,
-    include_changelogs: bool,
-    is_daily: bool,
+    _include_changelogs: bool,
+    _is_daily: bool,
 ) -> Result<ChannelVersions> {
     if let Ok(path) = std::env::var("LABRADOR_CHANNEL_VERSIONS_PATH") {
         // Load channel versions from local filesystem. Used for testing both
@@ -26,32 +31,7 @@ pub async fn fetch_channel_versions(
             .context("Failed to parse channel versions JSON");
     }
 
-    let channel_versions = server_api
-        .fetch_channel_versions(include_changelogs, is_daily)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to retrieve channel versions from {} server",
-                ChannelState::app_name_display()
-            )
-        });
-    match channel_versions {
-        channel_versions @ Ok(_) => channel_versions,
-        Err(err) => {
-            match ChannelState::channel() {
-                // Only log an error on Dev and Preview -- if this is failing, its likely to be
-                // failing for all users, and Stable has too many users (this error would flood
-                // our Sentry logs).
-                Channel::Dev | Channel::Preview => report_error!(err),
-                _ => log::warn!(
-                    "Failed to retrieve channel versions from {} server, falling \
-                back to GCP JSON storage.",
-                    ChannelState::app_name_display()
-                ),
-            }
-            fetch_channel_versions_from_json_storage(server_api.http_client(), nonce).await
-        }
-    }
+    fetch_channel_versions_from_json_storage(server_api.http_client(), nonce).await
 }
 
 // Synchronously fetches updated Labrador [`ChannelVersions`] from GCP JSON storage. This will soon

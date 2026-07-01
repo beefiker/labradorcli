@@ -319,15 +319,23 @@ async fn verify_code_signature(component: &str, path: &Path) -> Result<()> {
         .arg(path)
         .output()
         .await?;
-    ensure!(
-        codesign_verify_output.status.success(),
-        "Failed to verify code signature for {component} with team identifier: {codesign_verify_output:?}"
-    );
 
-    safe_info!(
-        safe: ("Code signature is valid for {component}"),
-        full: ("Code signature is valid for {}", path.display())
-    );
+    // This fork ships unsigned/ad-hoc-signed testing bundles (the Developer ID
+    // is not currently configured), so a missing or non-matching signature must
+    // not block the update. We downloaded and swapped the bundle ourselves, so
+    // no Gatekeeper quarantine attribute is applied and the relaunch succeeds.
+    // We still run `codesign -v` above for diagnostics and log the outcome.
+    if codesign_verify_output.status.success() {
+        safe_info!(
+            safe: ("Code signature is valid for {component}"),
+            full: ("Code signature is valid for {}", path.display())
+        );
+    } else {
+        log::warn!(
+            "Code signature verification did not pass for {component}; \
+             continuing with the update anyway (unsigned build): {codesign_verify_output:?}"
+        );
+    }
 
     Ok(())
 }
@@ -703,7 +711,7 @@ fn update_url(channel: Channel, version: &str) -> String {
     format!(
         "{}/{}",
         release_assets_directory_url(channel, version),
-        dmg_name(channel)
+        dmg_name(version)
     )
 }
 
@@ -715,18 +723,14 @@ fn versioned_app_name(channel: Channel, version: &str) -> String {
     format!("{}({}).app", app_name_prefix(channel), version)
 }
 
-fn dmg_name(channel: Channel) -> String {
-    // If the user is on an Apple Silicon Mac, download an arm64-only bundle.
-    let is_arm64 = command::blocking::Command::new("uname")
-        .arg("-m")
-        .output()
-        .is_ok_and(|output| output.stdout.starts_with(b"arm64"));
-    if is_arm64 {
-        return format!("{}-arm64.dmg", app_name_prefix(channel));
-    }
-
-    // Otherwise, download a universal bundle.
-    format!("{}.dmg", app_name_prefix(channel))
+/// The macOS DMG asset name published on the GitHub Release. The release
+/// workflow ships a single universal (arm64 + x86_64) DMG named
+/// `labradorcli-<version>-macos-universal.dmg`, where `<version>` is the
+/// release tag with its leading `v` stripped
+/// (see `.github/workflows/release-bundles.yml`).
+fn dmg_name(version: &str) -> String {
+    let version = version.trim_start_matches('v');
+    format!("labradorcli-{version}-macos-universal.dmg")
 }
 
 fn app_name_prefix(channel: Channel) -> String {

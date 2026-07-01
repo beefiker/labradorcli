@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime};
 use lazy_static::lazy_static;
 use memo_map::MemoMap;
 use regex::Regex;
@@ -34,6 +34,11 @@ impl std::fmt::Display for ChannelVersions {
 lazy_static! {
     static ref VERSION_RE: Regex = Regex::new(r"v(\d+)\.(.+)\.(.+)_(\d+)").unwrap();
 
+    // Plain semantic-version tags, e.g. `v0.1.12`. Used as a fallback for
+    // releases that don't follow the date-based `vN.YYYY.MM.DD.HH.MM.channel_NN`
+    // scheme. Any trailing pre-release/build suffix is ignored for ordering.
+    static ref SEMVER_RE: Regex = Regex::new(r"^v?(\d+)\.(\d+)\.(\d+)").unwrap();
+
     // Cached mapping of version strings to semantic versions.
     static ref PARSED_VERSIONS_CACHE: MemoMap<String, ParsedVersion> = Default::default();
 }
@@ -51,22 +56,41 @@ impl TryFrom<&str> for ParsedVersion {
     fn try_from(value: &str) -> Result<Self> {
         PARSED_VERSIONS_CACHE
             .get_or_try_insert(value, || {
-                VERSION_RE
-                    .captures(value)
-                    .and_then(|captures| {
-                        let date_str = captures.get(2)?.as_str();
-                        let date =
-                            NaiveDateTime::parse_from_str(date_str, "%Y.%m.%d.%H.%M").ok()?;
-                        Some(ParsedVersion {
-                            major: captures.get(1)?.as_str().parse().ok()?,
-                            date,
-                            patch: captures.get(4)?.as_str().parse().ok()?,
-                        })
-                    })
+                parse_date_based(value)
+                    .or_else(|| parse_semver(value))
                     .context("Can't parse string into Version")
             })
             .cloned()
     }
+}
+
+/// Parses the date-based `vN.YYYY.MM.DD.HH.MM.channel_NN` release scheme.
+fn parse_date_based(value: &str) -> Option<ParsedVersion> {
+    let captures = VERSION_RE.captures(value)?;
+    let date_str = captures.get(2)?.as_str();
+    let date = NaiveDateTime::parse_from_str(date_str, "%Y.%m.%d.%H.%M").ok()?;
+    Some(ParsedVersion {
+        major: captures.get(1)?.as_str().parse().ok()?,
+        date,
+        patch: captures.get(4)?.as_str().parse().ok()?,
+    })
+}
+
+/// Parses a plain semantic-version tag (`v0.1.12`). The `minor` component is
+/// folded into the `date` slot as a synthetic, monotonically-increasing date so
+/// that ordering within the semver scheme sorts by `(major, minor, patch)`. This
+/// lets the auto-updater compare the fork's semver release tags, which don't use
+/// the upstream date-based scheme.
+fn parse_semver(value: &str) -> Option<ParsedVersion> {
+    let captures = SEMVER_RE.captures(value)?;
+    let major = captures.get(1)?.as_str().parse().ok()?;
+    let minor: i32 = captures.get(2)?.as_str().parse().ok()?;
+    let patch = captures.get(3)?.as_str().parse().ok()?;
+    // Synthesize a date from `minor`; a larger minor yields a later date. Kept
+    // well below real date-based release years so the two schemes stay ordered
+    // consistently if a project ever migrates between them.
+    let date = NaiveDate::from_ymd_opt(1970i32.checked_add(minor)?, 1, 1)?.and_hms_opt(0, 0, 0)?;
+    Some(ParsedVersion { major, date, patch })
 }
 
 impl Ord for ParsedVersion {

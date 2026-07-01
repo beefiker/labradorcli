@@ -747,10 +747,13 @@ async fn fetch_version(
     let versions = fetch_channel_versions(update_id, server_api.clone(), false, is_daily).await?;
 
     let channel_version = match channel {
-        Channel::Stable => versions.stable,
+        // This fork ships its release bundles on the `oss` channel (see
+        // `.github/workflows/release-bundles.yml`), so `oss` reads the
+        // `stable` entry of the manifest.
+        Channel::Stable | Channel::Oss => versions.stable,
         Channel::Preview => versions.preview,
         Channel::Dev => versions.dev,
-        Channel::Integration | Channel::Local | Channel::Oss => {
+        Channel::Integration | Channel::Local => {
             // These channels don't ship release artifacts, so there's no
             // version to fetch. This branch is normally unreachable because
             // `AutoupdateState::register` gates the poll loop on the
@@ -759,7 +762,7 @@ async fn fetch_version(
             // these channels. Return an error rather than panicking so the
             // poll loop just logs and bails.
             anyhow::bail!(
-                "Local, integration, and open-source channel binaries don't support autoupdate"
+                "Local and integration channel binaries don't support autoupdate"
             );
         }
     };
@@ -1106,22 +1109,14 @@ pub fn is_incoming_version_past_current(version: Option<&str>) -> bool {
     installed_version.is_some_and(|curr_version| incoming_version > curr_version)
 }
 
-/// Returns the base URL that contains release assets for the given version
-/// of this app bundle.
-fn release_assets_directory_url(channel: Channel, version: &str) -> String {
-    let releases_base_url = ChannelState::releases_base_url();
-    match channel {
-        Channel::Stable => {
-            format!("{releases_base_url}/stable/{version}")
-        }
-        Channel::Preview => {
-            format!("{releases_base_url}/preview/{version}")
-        }
-        Channel::Dev => format!("{releases_base_url}/dev/{version}"),
-        Channel::Local | Channel::Integration | Channel::Oss => {
-            unreachable!("local/integration/oss autoupdate not supported");
-        }
-    }
+/// Returns the base URL that contains release assets for this app bundle.
+///
+/// Assets are hosted on GitHub Releases, which serves them from a flat
+/// `.../releases/latest/download/<filename>` namespace (no per-channel or
+/// per-version subdirectories). The version is instead encoded into each
+/// asset's filename by the platform-specific URL builders.
+fn release_assets_directory_url(_channel: Channel, _version: &str) -> String {
+    ChannelState::releases_base_url().into_owned()
 }
 
 #[cfg(test)]

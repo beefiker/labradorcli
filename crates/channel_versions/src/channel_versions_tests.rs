@@ -53,6 +53,43 @@ fn test_patches_compare_correctly() {
 }
 
 #[test]
+fn test_parse_semver_version_string() {
+    let parsed_version: ParsedVersion = "v0.1.12"
+        .try_into()
+        .expect("semver string is parsable");
+    assert_eq!(parsed_version.major, 0);
+    assert_eq!(parsed_version.patch, 12);
+}
+
+#[test]
+fn test_semver_minor_compares_correctly() {
+    let older_version: ParsedVersion = "v0.1.12".try_into().expect("older_version is parsable");
+    let newer_version: ParsedVersion = "v0.2.0".try_into().expect("newer_version is parsable");
+    assert!(newer_version > older_version);
+}
+
+#[test]
+fn test_semver_patch_compares_correctly() {
+    let older_version: ParsedVersion = "v0.1.12".try_into().expect("older_version is parsable");
+    let newer_version: ParsedVersion = "v0.1.13".try_into().expect("newer_version is parsable");
+    assert!(newer_version > older_version);
+}
+
+#[test]
+fn test_semver_major_compares_correctly() {
+    let older_version: ParsedVersion = "v0.9.9".try_into().expect("older_version is parsable");
+    let newer_version: ParsedVersion = "v1.0.0".try_into().expect("newer_version is parsable");
+    assert!(newer_version > older_version);
+}
+
+#[test]
+fn test_semver_parses_with_and_without_v_prefix() {
+    let with_v: ParsedVersion = "v0.1.12".try_into().expect("parsable with v");
+    let without_v: ParsedVersion = "0.1.12".try_into().expect("parsable without v");
+    assert_eq!(with_v, without_v);
+}
+
+#[test]
 fn test_ignores_unknown_channels() {
     // We no longer support or parse-out beta and canary versions, but we
     // need to be able to parse a JSON file that still contains them.

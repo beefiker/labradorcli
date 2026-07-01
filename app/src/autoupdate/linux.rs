@@ -87,10 +87,15 @@ mod appimage {
     ) -> Result<DownloadReady> {
         const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
 
-        // Compute the URL where we can download the new release.
-        let Some(appimage_name) = option_env!("APPIMAGE_NAME") else {
-            bail!("APPIMAGE_NAME environment variable was not set at compile time!");
-        };
+        // Compute the URL where we can download the new release. The release
+        // workflow publishes `labradorcli-<version>-linux-<arch>.AppImage`,
+        // where `<version>` is the release tag without its leading `v` and
+        // `<arch>` matches `uname -m` on the build runner (x86_64 / aarch64),
+        // which is what `std::env::consts::ARCH` reports for this binary.
+        // See `.github/workflows/release-bundles.yml`.
+        let version = version_info.version.trim_start_matches('v');
+        let appimage_name =
+            format!("labradorcli-{version}-linux-{}.AppImage", std::env::consts::ARCH);
 
         let url = format!(
             "{}/{}",

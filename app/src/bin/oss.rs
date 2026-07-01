@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use labrador_core::{
-    channel::{Channel, ChannelConfig, ChannelState, OzConfig, LabradorServerConfig},
+    channel::{AutoupdateConfig, Channel, ChannelConfig, ChannelState, OzConfig, LabradorServerConfig},
     AppId,
 };
 
@@ -23,7 +23,19 @@ fn main() -> Result<()> {
             oz_config: OzConfig::production(),
             telemetry_config: None,
             crash_reporting_config: None,
-            autoupdate_config: None,
+            // In-app auto-update, served from this repo's GitHub Releases.
+            // `latest/download` always resolves to the newest published release,
+            // and works for both the `channel_versions.json` manifest and the
+            // flat release-asset downloads. Overridable at runtime for testing.
+            autoupdate_config: Some(AutoupdateConfig {
+                releases_base_url: std::env::var("LABRADOR_RELEASES_BASE_URL")
+                    .unwrap_or_else(|_| {
+                        "https://github.com/beefiker/labradorcli/releases/latest/download"
+                            .to_owned()
+                    })
+                    .into(),
+                show_autoupdate_menu_items: true,
+            }),
             mcp_static_config: None,
         },
     );

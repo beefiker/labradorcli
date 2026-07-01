@@ -66,6 +66,24 @@ jobs:
               --notes-file "$notes"
           fi
 
+      - name: Publish channel_versions.json manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          # The in-app auto-updater reads this manifest from
+          # <repo>/releases/latest/download/channel_versions.json to discover the
+          # latest version. The shipped bundles run on the `oss` channel, which the
+          # updater maps to the manifest's `stable` entry. All three keys are
+          # required by the ChannelVersions struct; only `stable` drives updates.
+          cat > channel_versions.json <<JSON
+          {"dev":{"version":"$RELEASE_TAG"},"preview":{"version":"$RELEASE_TAG"},"stable":{"version":"$RELEASE_TAG"}}
+          JSON
+          gh release upload "$RELEASE_TAG" channel_versions.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
   build:
     name: Build ${{ matrix.platform }}
     needs: prepare-release
