@@ -438,10 +438,42 @@ async fn apply_update(channel: Channel, version_info: &VersionInfo, update_id: &
         );
     }
 
+    refresh_launch_services_registration(&bundle_path, &staged_bundle.path).await;
+
     log::info!("Setting installed version to {:?}", &version_info);
     log::info!("Applied update in {:?}", update_start.elapsed());
 
     Ok(())
+}
+
+// Path to the LaunchServices registration tool. Not covered by the public API, but stable
+// across macOS releases and the only way to force a registration refresh from the CLI.
+const LSREGISTER_PATH: &str = "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister";
+
+/// After the bundle swap, LaunchServices can still resolve our bundle identifier to the
+/// swapped-out copy (or to another stale registration), so clicking a notification posted
+/// around the update activates a dead bundle instead of focusing the app. Unregister the
+/// old bundle at its post-swap location and force-register the updated bundle as the
+/// canonical owner of the identifier. Best-effort: the update itself already succeeded, so
+/// failures here are logged rather than propagated.
+async fn refresh_launch_services_registration(new_bundle: &Path, old_bundle: &Path) {
+    for (flag, path) in [("-u", old_bundle), ("-f", new_bundle)] {
+        let mut lsregister_cmd = Command::new(LSREGISTER_PATH);
+        lsregister_cmd.arg(flag);
+        lsregister_cmd.arg(path);
+
+        log::info!("Refreshing LaunchServices registration with command \"{lsregister_cmd:?}\"");
+
+        match lsregister_cmd.output().await {
+            Ok(output) if output.status.success() => {}
+            Ok(output) => {
+                log::warn!("lsregister {flag} {path:?} failed: {output:?}");
+            }
+            Err(err) => {
+                log::warn!("Failed to run lsregister {flag} {path:?}: {err:#}");
+            }
+        }
+    }
 }
 
 /// The staged app bundle that we're about to install. It's copied out of the `.dmg` file into a
